@@ -18,8 +18,3 @@
   under `bni` (whether a `--` separator is needed) vs. the compiled
   binary, once we have an example that reads `Args()`. The run scripts
   currently forward extra args as-is.
-
-- **GitHub Actions Node 20 deprecation.** `.github/workflows/build.yml` uses
-  `actions/checkout@v4` and `actions/cache@v4`, which run on Node 20. GitHub
-  forces Node 24 on 2026-06-16 and removes Node 20 on 2026-09-16 — bump to the
-  Node 24-compatible action versions before then (the build is green today).
