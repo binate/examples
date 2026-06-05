@@ -1,0 +1,25 @@
+package "pkg/seq"
+
+// Fib returns the nth Fibonacci number, with Fib(0) = 0 and Fib(1) = 1.
+func Fib(n int) int {
+	var a int = 0
+	var b int = 1
+	var i int = 0
+	for i < n {
+		var t int = a + b
+		a = b
+		b = t
+		i = i + 1
+	}
+	return a
+}
+
+// Gcd returns the greatest common divisor of a and b (Euclid's algorithm).
+func Gcd(a int, b int) int {
+	for b != 0 {
+		var t int = b
+		b = a % b
+		a = t
+	}
+	return a
+}

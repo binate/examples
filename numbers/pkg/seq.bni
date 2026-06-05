@@ -1,0 +1,11 @@
+// Package seq is a tiny integer-sequence helper, local to the `numbers`
+// example. It demonstrates an example-private package: its directory
+// (`numbers/`) is the search root, so the runnables under
+// `numbers/cmd/*` import it as `pkg/seq`.
+package "pkg/seq"
+
+// Fib returns the nth Fibonacci number, with Fib(0) = 0 and Fib(1) = 1.
+func Fib(n int) int
+
+// Gcd returns the greatest common divisor of a and b.
+func Gcd(a int, b int) int

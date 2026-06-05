@@ -1,0 +1,12 @@
+package "main"
+
+// Prints the first 11 Fibonacci numbers via the example-local pkg/seq.
+import "pkg/seq"
+
+func main() {
+	var i int = 0
+	for i <= 10 {
+		println(seq.Fib(i))
+		i = i + 1
+	}
+}

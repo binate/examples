@@ -1,0 +1,9 @@
+package "main"
+
+// A second runnable in the same example, sharing the same pkg/seq.
+import "pkg/seq"
+
+func main() {
+	println(seq.Gcd(48, 36))
+	println(seq.Gcd(1071, 462))
+}
