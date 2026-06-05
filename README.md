@@ -51,9 +51,12 @@ Compiled binaries land under `out/<example>/<sub>` (gitignored).
 
 ## Examples
 
-- **`hello`** — minimal "hello world".
-- **`numbers`** — an example-local package (`pkg/seq`: Fibonacci, GCD) shared by
-  two runnables (`cmd/fib`, `cmd/gcd`); shows the search-root + multi-runnable layout.
+Each example directory has its own `README.md` with run commands and expected
+output.
+
+- [`hello`](hello/) — minimal "hello world".
+- [`numbers`](numbers/) — an example-local package (`pkg/seq`) shared by two
+  runnables; shows the search-root + multi-runnable layout.
 
 See [`TODO.md`](TODO.md) for planned work (test scripts, a canary CI run against
 the latest release).
