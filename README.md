@@ -3,5 +3,55 @@
 Example programs for the [Binate](https://github.com/binate) programming
 language and toolchain.
 
-Part of the Binate project workspace, alongside `binate` (self-hosted
-toolchain), `explorations` (design notes), `docs`, `bootstrap`, and `website`.
+## Layout
+
+Each example is a self-contained mini-project that doubles as its own package
+search root:
+
+```
+<example>/
+  cmd/<subexample>/    one runnable program per directory (package "main")
+  pkg/...              (optional) packages private to the example
+```
+
+A runnable example is identified by its `cmd` path, e.g. `hello/cmd/hello`.
+Grouping several runnables under one `<example>` lets them share that example's
+`pkg/...`; an example's own packages resolve because the example directory is
+prepended to the toolchain's `-I`/`-L` search paths.
+
+## Toolchain
+
+Builds use a released Binate bundle (`bnc`, `bni`, plus the standard library and
+C runtime) — no Binate source checkout required, just `clang` on `PATH` for
+linking compiled output. The version is pinned in `BUILDER_VERSION` and
+fetched/cached on demand by `scripts/fetch-builder.sh`:
+
+```sh
+BUILDER_VERSION=latest ./scripts/build-compiled.sh hello/cmd/hello   # override the pin
+```
+
+`latest` resolves the newest published release; bundles are sha256-verified and
+cached under `~/.cache/binate/builders/`.
+
+## Scripts
+
+```
+scripts/build-compiled.sh   <example>/cmd/<sub>             compile to out/
+scripts/run-compiled.sh     <example>/cmd/<sub> [args...]   compile + run native
+scripts/run-interpreted.sh  <example>/cmd/<sub> [args...]   run via the bytecode VM (bni)
+scripts/build-all.sh                                        compile every */cmd/* (CI)
+```
+
+Compiled binaries land under `out/<example>/<sub>` (gitignored).
+
+```sh
+./scripts/run-compiled.sh    hello/cmd/hello     # -> Hello from Binate!
+./scripts/run-interpreted.sh hello/cmd/hello     # same, through the VM
+```
+
+## Examples
+
+- **`hello`** — minimal "hello world".
+
+See [`TODO.md`](TODO.md) for planned work (test scripts, a canary CI run against
+the latest release).

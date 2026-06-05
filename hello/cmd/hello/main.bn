@@ -1,0 +1,6 @@
+package "main"
+
+// The minimal Binate example: print a line and exit.
+func main() {
+	println("Hello from Binate!")
+}
