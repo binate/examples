@@ -221,28 +221,32 @@ tests/ PROVENANCE.md  nbs/P###.bas  expected/P###.out  run.sh
 Error tests (expected rejection) assert non-zero exit / a diagnostic rather than
 diffing bas55's specific error text.
 
-## 7. Open decisions (yours)
+## 7. Decisions
 
-1. **Numeric PRINT format target.** ECMA-55 leaves it partly
-   implementation-defined and the natural targets diverge:
+**Open:**
+
+1. **Numeric PRINT format target.** (Tabled — revisit before M1's formatter +
+   M5's fixtures.) ECMA-55 leaves it partly implementation-defined and the
+   natural targets diverge:
    - **(recommended) Standard reference:** significance-width d=6, 5 zones × 15
      cols — what the spec's own examples use; cleanest to test against the
      standard's stated outputs.
    - **bas55-compatible:** IEEE double, d≤8, 16-col zones — lets us sanity-check
      against bas55's runs, but ties fixtures to bas55's formatting latitude.
    This picks the formatting algorithm *and* what our fixtures encode.
-2. **I/O delegate realization.** Both verified working in both modes:
-   - **(recommended) Direct `import "pkg/bootstrap"`** in the single `pkg/host`
-     delegate — one import, simplest, and *is* exactly the "only the delegate
-     touches it" isolation you asked for.
-   - **Local same-named `pkg/bootstrap.bni`** shadow declaring just
-     `Read`/`Write`/`Exit`+consts — self-contained minimal contract in the
-     example tree, still binds to the runtime symbol/VM registry. (Renaming the
-     package is *not* an option — externs are keyed by package-qualified name in
-     both backends, so a rename breaks both modes; there are no Binate bodies to
-     copy.)
-3. **Vendor the full ECMA-55 digest** (`/tmp/minbasic-ecma55.md`) into
-   `docs/ecma55-notes.md`? Useful implementer reference; I'd vet it first.
+
+**Resolved:**
+
+2. **I/O delegate realization → direct `import "pkg/bootstrap"`** in the single
+   `pkg/host` delegate. One import, simplest, and *is* exactly the "only the
+   delegate touches it" isolation. (The copy-the-`.bni` hack was only worth it if
+   the bundle lacked `bootstrap.bni`; it ships it. Renaming the package is not an
+   option regardless — externs are keyed by package-qualified name in both
+   backends, so a rename breaks both modes, and there are no Binate bodies to
+   copy.)
+3. **ECMA-55 digest vendored** → [`docs/ecma55-notes.md`](ecma55-notes.md)
+   (implementer-grade, sourced from a faithful plain-text reproduction
+   cross-checked against the official ECMA PDF + bas55).
 
 ## 8. Non-goals (for now, by nature of Minimal BASIC — not silent scope cuts)
 
