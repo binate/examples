@@ -44,11 +44,12 @@ type runtime struct {
 
 // newRuntime builds a runtime over a fresh variable store writing to out, with
 // the program prog, its precomputed line-number map, and its global DATA
-// sequence. The program counter starts at the first line; the FOR and GOSUB
-// stacks start empty; the data pointer starts at the first datum.
-func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum) @runtime {
+// sequence. base is the OPTION BASE array lower bound. The program counter
+// starts at the first line; the FOR and GOSUB stacks start empty; the data
+// pointer starts at the first datum; no array is dimensioned yet.
+func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum, base int) @runtime {
 	var r @runtime = make(runtime)
-	r.env = newEnv()
+	r.env = newEnv(base)
 	r.out = out
 	r.col = 0
 	r.prog = prog
@@ -102,6 +103,8 @@ func (r @runtime) evalNum(e @Expr) float64 {
 		return r.evalBinary(e)
 	} else if e.Kind == EX_CALL {
 		return r.evalCall(e)
+	} else if e.Kind == EX_AINDEX {
+		return r.evalArrayRef(e)
 	}
 	// EX_STR / EX_SVAR cannot appear in a numeric context (the parser keeps
 	// numeric and string expressions apart); treat as 0.

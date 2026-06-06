@@ -85,18 +85,28 @@ func (r @runtime) dispatch(errMsg *@[]char) int {
 	} else if s.Kind == ST_RESTORE {
 		return r.execRestore()
 	}
-	// ST_DATA (and any unhandled kind) is a no-op when reached: DATA is collected
-	// at load and contributes nothing to execution flow.
+	// ST_DATA, ST_DIM, and ST_OPTION are no-ops when reached: DATA is collected
+	// at load, and DIM/OPTION are declarations applied at load (see runProgram).
+	// None contributes anything to execution flow.
 	return STEP_NEXT
 }
 
-// execLet executes a LET assignment, returning STEP_NEXT on success. A
-// '$'-suffixed target name is a string variable (string RHS); otherwise a
-// numeric variable (numeric RHS). Assigning a string longer than MAX_STR_LEN
-// chars is a fatal ECMA-55 error: it sets *errMsg and returns STEP_ERROR. A
-// numeric RHS that raises a fatal exception (a not-yet-supported function)
-// leaves the target unchanged — step turns the parked fatal into STEP_ERROR.
+// execLet executes a LET assignment, returning STEP_NEXT on success. A present
+// LHS is a numeric-array element target (numeric RHS); otherwise a '$'-suffixed
+// Name is a string variable (string RHS) and a plain Name is a numeric variable
+// (numeric RHS). Assigning a string longer than MAX_STR_LEN chars is a fatal
+// ECMA-55 error: it sets *errMsg and returns STEP_ERROR. A numeric RHS or array
+// target that raises a fatal exception (a not-yet-supported function, an
+// out-of-range subscript) leaves storage unchanged — step turns the parked
+// fatal into STEP_ERROR.
 func (r @runtime) execLet(s @Stmt, errMsg *@[]char) int {
+	if s.LHS != nil {
+		var v float64 = r.evalNum(s.Value)
+		if r.fatal {
+			return STEP_NEXT
+		}
+		return r.storeArray(s.LHS, v)
+	}
 	if s.Name[len(s.Name) - 1] == '$' {
 		var val @[]char = r.evalStr(s.Value)
 		if len(val) > MAX_STR_LEN {

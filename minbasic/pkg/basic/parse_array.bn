@@ -1,0 +1,100 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+import "pkg/stdx/slices"
+
+// parseDim parses `DIM <decl> (, <decl>)*` where each decl is `<letter>(<int>)`
+// or `<letter>(<int>,<int>)` (ECMA-55 clause 18.2). The integers are the upper
+// bounds; the subscript range is base..upper inclusive per dimension. The
+// declarations are applied to the array store at load (see applyDecls), which is
+// also where a re-DIM or a DIM of an in-use array is diagnosed. At least one
+// declaration is required.
+func (p @parser) parseDim() @Stmt {
+	p.advance()
+	var decls @[]@dimDecl = make_slice(@dimDecl, 0)
+	decls = slices.Append[@dimDecl](decls, p.parseDimDecl())
+	for !p.hasErr && p.cur.Kind == TOK_COMMA {
+		p.advance()
+		decls = slices.Append[@dimDecl](decls, p.parseDimDecl())
+	}
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_DIM
+	s.Decls = decls
+	return s
+}
+
+// parseDimDecl parses one DIM declaration: a single-letter array name followed
+// by `(<int>)` or `(<int>,<int>)`. The name must be exactly one letter (a
+// digit-suffixed simple variable cannot name an array). On any error it records
+// the failure and returns a best-effort declaration.
+func (p @parser) parseDimDecl() @dimDecl {
+	var d @dimDecl = make(dimDecl)
+	if p.cur.Kind != TOK_VAR || len(p.cur.Text) != 1 {
+		p.fail(buf.CopyStr("DIM: expected a single-letter array name"))
+		return d
+	}
+	d.Name = p.cur.Text
+	p.advance()
+	if p.cur.Kind != TOK_LPAREN {
+		p.fail(buf.CopyStr("DIM: expected '(' after array name"))
+		return d
+	}
+	p.advance()
+	d.Dims = 1
+	d.Upper1 = p.parseDimBound()
+	if p.cur.Kind == TOK_COMMA {
+		p.advance()
+		d.Dims = 2
+		d.Upper2 = p.parseDimBound()
+	}
+	if p.cur.Kind != TOK_RPAREN {
+		p.fail(buf.CopyStr("DIM: expected ')' to close bounds"))
+		return d
+	}
+	p.advance()
+	return d
+}
+
+// parseDimBound parses one DIM upper bound: a non-negative integer literal. A
+// fractional or exponent constant is rejected, since a bound must be an integer
+// (ECMA-55 clause 18.2). On error it records the failure and returns 0.
+func (p @parser) parseDimBound() int {
+	if p.cur.Kind != TOK_NUMBER {
+		p.fail(buf.CopyStr("DIM: expected an integer bound"))
+		return 0
+	}
+	var t @[]char = p.cur.Text
+	var n int = 0
+	for i := 0; i < len(t); i++ {
+		if !isDigit(t[i]) {
+			p.fail(buf.CopyStr("DIM: bound must be a non-negative integer"))
+			return 0
+		}
+		n = n*10 + cast(int, t[i]-'0')
+	}
+	p.advance()
+	return n
+}
+
+// parseOption parses `OPTION BASE 0` or `OPTION BASE 1` (ECMA-55 clause 19),
+// the program-wide array subscript lower bound. The base is stored in the
+// statement's Target; load-time setup checks that OPTION precedes any DIM or
+// array reference and that there is at most one.
+func (p @parser) parseOption() @Stmt {
+	p.advance()
+	if p.cur.Kind != TOK_BASE {
+		p.fail(buf.CopyStr("OPTION: expected BASE"))
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	if p.cur.Kind != TOK_NUMBER || !charsEq(p.cur.Text, "0") && !charsEq(p.cur.Text, "1") {
+		p.fail(buf.CopyStr("OPTION BASE: expected 0 or 1"))
+		return simpleStmt(ST_REM)
+	}
+	var base int = cast(int, p.cur.Text[0] - '0')
+	p.advance()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_OPTION
+	s.Target = base
+	return s
+}

@@ -14,6 +14,8 @@ package "pkg/basic"
 // EX_UNARY     Op (TOK_PLUS or TOK_MINUS), X (operand)
 // EX_CALL      Op (FN_* function code), X (argument, nil for RND)
 // EX_TAB       X (the TAB column argument); a PRINT-list item, never a value
+// EX_AINDEX    Name (single-letter array name), Op (subscript count, 1 or 2),
+//              X (first subscript), Y (second subscript; used only when Op == 2)
 const (
 	EX_NUM int = iota
 	EX_STR
@@ -23,6 +25,7 @@ const (
 	EX_UNARY
 	EX_CALL
 	EX_TAB
+	EX_AINDEX
 )
 
 // Expr is one expression node. Kind selects which fields are meaningful (see the
@@ -87,6 +90,10 @@ type Rel struct {
 // ST_DATA      Data (this line's data, part of the global sequence; a no-op
 //              when reached during execution)
 // ST_RESTORE   (none — resets the data pointer to the start)
+// ST_DIM       Decls (the array declarations; processed at load, a no-op when
+//              reached during execution)
+// ST_OPTION    Target (the OPTION BASE lower bound, 0 or 1; processed at load, a
+//              no-op when reached during execution)
 const (
 	ST_LET int = iota
 	ST_PRINT
@@ -103,7 +110,21 @@ const (
 	ST_READ
 	ST_DATA
 	ST_RESTORE
+	ST_DIM
+	ST_OPTION
 )
+
+// dimDecl is one array declaration inside a DIM statement: the single-letter
+// array name, its dimensionality Dims (1 or 2), and its per-dimension upper
+// bounds Upper1 and Upper2 (Upper2 unused when Dims == 1). The bounds are the
+// integer literals written in the source; the subscript range is base..upper
+// inclusive (base from OPTION BASE).
+type dimDecl struct {
+	Name   @[]char
+	Dims   int
+	Upper1 int
+	Upper2 int
+}
 
 // PRINT-separator kinds, stored per item in Stmt.Seps. SEP_NONE marks the last
 // item of a list that has no trailing separator (so an end-of-line is emitted).
@@ -126,7 +147,11 @@ const (
 // and Step is unused. Targets is an ON…GOTO line-number list (selected 1-based
 // by the rounded Value selector). Names is a READ variable-list (each entry a
 // numeric or "$"-suffixed string variable name). Data is a DATA line's data,
-// merged into the program's global data sequence at load.
+// merged into the program's global data sequence at load. LHS is a LET's
+// array-element target (an EX_AINDEX expression) when the assignment writes
+// `A(...)`; it is unused (the scalar/string Name path is taken) otherwise.
+// Decls is a DIM line's array-declaration list, applied to the array store at
+// load. For ST_OPTION, Target holds the OPTION BASE lower bound (0 or 1).
 type Stmt struct {
 	Kind    int
 	Name    @[]char
@@ -141,6 +166,8 @@ type Stmt struct {
 	Targets @[]int
 	Names   @[]@[]char
 	Data    @[]@datum
+	LHS     @Expr
+	Decls   @[]@dimDecl
 }
 
 // Line is one parsed program line: its line number (1..9999) and its statement.

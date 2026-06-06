@@ -1,0 +1,114 @@
+package "pkg/basic"
+
+// NUM_ARRAYS is the size of the numeric-array table: one slot per letter A..Z.
+// An array is named by a single letter (ECMA-55 clause 18) and occupies a
+// namespace separate from the simple numeric variable of the same letter, so a
+// program may use both `A` and `A(I)` independently.
+const NUM_ARRAYS int = 26
+
+// DEFAULT_BOUND is the upper bound ECMA-55 gives every dimension of an array
+// used without a DIM (clause 18.2): the implicit range is base..10 per
+// dimension.
+const DEFAULT_BOUND int = 10
+
+// arrayStore holds a program's 26 numeric arrays as flat fixed tables (no
+// hashmap), mirroring env's scalar idiom. For each letter, dims is its
+// dimensionality (0 = not yet established, 1 or 2 once dimensioned), upper1 and
+// upper2 are its per-dimension upper bounds, explicit records whether the
+// dimensionality came from a DIM (true) or from an implicit first reference
+// (false), and cells is the row-major flat backing of float64 (every element
+// defaults to 0.0). base is the program-wide subscript lower bound from OPTION
+// BASE (0 by default, or 1). One arrayStore lives inside each env.
+type arrayStore struct {
+	base     int
+	dims     [NUM_ARRAYS]int
+	upper1   [NUM_ARRAYS]int
+	upper2   [NUM_ARRAYS]int
+	explicit [NUM_ARRAYS]bool
+	cells    [NUM_ARRAYS]@[]float64
+}
+
+// newArrayStore builds an empty array store at the given OPTION BASE lower
+// bound. No letter is dimensioned yet (dims all 0); each array is materialized
+// lazily on its first DIM or reference.
+func newArrayStore(base int) @arrayStore {
+	var a @arrayStore = make(arrayStore)
+	a.base = base
+	for i := 0; i < NUM_ARRAYS; i++ {
+		a.dims[i] = 0
+		a.cells[i] = make_slice(float64, 0)
+	}
+	return a
+}
+
+// arrayIndex maps a single-letter array name to its slot in the array store.
+// The name is assumed well-formed (a one-letter A..Z, which the parser
+// guarantees for an array reference).
+func arrayIndex(name @[]char) int {
+	return cast(int, name[0] - 'A')
+}
+
+// extent returns the number of valid subscripts along one dimension whose upper
+// bound is `upper`: upper - base + 1 (base..upper inclusive).
+func (a @arrayStore) extent(upper int) int {
+	return upper - a.base + 1
+}
+
+// allocCells sizes slot i's flat backing for its current dimensionality and
+// bounds, zero-filling every element. make_slice already zeroes float64
+// elements, so this just computes the element count and allocates.
+func (a @arrayStore) allocCells(i int) {
+	var n int = a.extent(a.upper1[i])
+	if a.dims[i] == 2 {
+		n = n * a.extent(a.upper2[i])
+	}
+	a.cells[i] = make_slice(float64, n)
+}
+
+// dimDeclare establishes slot i as an explicit (DIM-declared) array with the
+// given dimensionality (1 or 2) and upper bounds (upper2 ignored when d == 1).
+// It allocates the zeroed backing. The caller (DIM processing) has already
+// verified the slot was undimensioned, so this never re-dimensions.
+func (a @arrayStore) dimDeclare(i int, d int, upper1 int, upper2 int) {
+	a.dims[i] = d
+	a.upper1[i] = upper1
+	a.upper2[i] = upper2
+	a.explicit[i] = true
+	a.allocCells(i)
+}
+
+// ensureImplicit establishes slot i as an implicitly-dimensioned array of
+// dimensionality d (each upper bound DEFAULT_BOUND) if it is not yet
+// dimensioned. A reference fixes an undimensioned array's shape this way
+// (ECMA-55 clause 18.2). An already-dimensioned slot is left untouched; arity
+// agreement is checked separately by the caller.
+func (a @arrayStore) ensureImplicit(i int, d int) {
+	if a.dims[i] != 0 {
+		return
+	}
+	a.dims[i] = d
+	a.upper1[i] = DEFAULT_BOUND
+	a.upper2[i] = DEFAULT_BOUND
+	a.explicit[i] = false
+	a.allocCells(i)
+}
+
+// flatIndex computes the row-major offset into slot i's backing for the rounded
+// subscripts. For a 1-D array only sub1 is used; for a 2-D array the offset is
+// row * rowLen + col with row = sub1 - base and col = sub2 - base. It returns
+// the offset and ok; ok is false when any subscript is outside base..upper for
+// its dimension (a fatal ECMA-55 exception, reported by the caller).
+func (a @arrayStore) flatIndex(i int, sub1 int, sub2 int) (int, bool) {
+	if sub1 < a.base || sub1 > a.upper1[i] {
+		return 0, false
+	}
+	var row int = sub1 - a.base
+	if a.dims[i] == 1 {
+		return row, true
+	}
+	if sub2 < a.base || sub2 > a.upper2[i] {
+		return 0, false
+	}
+	var rowLen int = a.extent(a.upper2[i])
+	return row*rowLen + (sub2 - a.base), true
+}

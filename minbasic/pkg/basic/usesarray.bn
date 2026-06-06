@@ -1,0 +1,57 @@
+package "pkg/basic"
+
+// stmtUsesArrays reports whether a statement references the array machinery: a
+// DIM declaration, or any array element `A(...)` appearing in one of the
+// statement's expressions (a LET target or RHS, a PRINT/FOR/IF/ON expression).
+// It is used by the load-time OPTION-ordering check, which requires OPTION BASE
+// to precede every DIM and array reference (ECMA-55 clause 18.4).
+func stmtUsesArrays(s @Stmt) bool {
+	if s.Kind == ST_DIM {
+		return true
+	}
+	if s.LHS != nil && exprUsesArrays(s.LHS) {
+		return true
+	}
+	if s.Value != nil && exprUsesArrays(s.Value) {
+		return true
+	}
+	if s.Limit != nil && exprUsesArrays(s.Limit) {
+		return true
+	}
+	if s.Step != nil && exprUsesArrays(s.Step) {
+		return true
+	}
+	if s.Cond != nil && relUsesArrays(s.Cond) {
+		return true
+	}
+	return itemsUseArrays(s.Items)
+}
+
+// itemsUseArrays reports whether any expression in a PRINT-item list references
+// an array element.
+func itemsUseArrays(items @[]@Expr) bool {
+	for i := 0; i < len(items); i++ {
+		if exprUsesArrays(items[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+// relUsesArrays reports whether either operand of a relational expression
+// references an array element.
+func relUsesArrays(rel @Rel) bool {
+	return exprUsesArrays(rel.X) || exprUsesArrays(rel.Y)
+}
+
+// exprUsesArrays reports whether an expression tree contains an array element
+// reference (EX_AINDEX), walking the binary/unary/call/tab children.
+func exprUsesArrays(e @Expr) bool {
+	if e == nil {
+		return false
+	}
+	if e.Kind == EX_AINDEX {
+		return true
+	}
+	return exprUsesArrays(e.X) || exprUsesArrays(e.Y)
+}

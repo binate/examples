@@ -63,11 +63,7 @@ func (p @parser) parsePrimary() @Expr {
 		return p.parseNumberLit()
 	}
 	if p.cur.Kind == TOK_VAR {
-		var e @Expr = make(Expr)
-		e.Kind = EX_VAR
-		e.Name = p.cur.Text
-		p.advance()
-		return e
+		return p.parseVarOrArray()
 	}
 	if p.cur.Kind == TOK_FUNC {
 		return p.parseFuncCall()
@@ -84,6 +80,52 @@ func (p @parser) parsePrimary() @Expr {
 	}
 	p.fail(buf.CopyStr("expected a numeric primary"))
 	return make(Expr)
+}
+
+// parseVarOrArray parses a reference beginning at a TOK_VAR. A single-letter
+// name immediately followed by '(' is a numeric-array element `A(...)`; any
+// other case is a simple numeric variable. A digit-suffixed name (e.g. `A1`)
+// can never name an array, so a '(' after one is a parse error (a simple
+// variable cannot be subscripted).
+func (p @parser) parseVarOrArray() @Expr {
+	var name @[]char = p.cur.Text
+	p.advance()
+	if p.cur.Kind != TOK_LPAREN {
+		var e @Expr = make(Expr)
+		e.Kind = EX_VAR
+		e.Name = name
+		return e
+	}
+	if len(name) != 1 {
+		p.fail(buf.CopyStr("a simple variable cannot be subscripted"))
+		return make(Expr)
+	}
+	return p.parseArrayRef(name)
+}
+
+// parseArrayRef parses the subscript list of an array element `A(<expr>)` or
+// `A(<expr>,<expr>)` (the name is already consumed and cur is the '('). The
+// resulting EX_AINDEX node carries the name, the subscript count in Op (1 or 2),
+// and the subscript expressions in X and Y. ECMA-55 arrays have 1 or 2
+// dimensions only, so a third subscript is a parse error.
+func (p @parser) parseArrayRef(name @[]char) @Expr {
+	p.advance()
+	var e @Expr = make(Expr)
+	e.Kind = EX_AINDEX
+	e.Name = name
+	e.Op = 1
+	e.X = p.parseExpr()
+	if p.cur.Kind == TOK_COMMA {
+		p.advance()
+		e.Op = 2
+		e.Y = p.parseExpr()
+	}
+	if p.cur.Kind != TOK_RPAREN {
+		p.fail(buf.CopyStr("array reference: expected ')'"))
+		return e
+	}
+	p.advance()
+	return e
 }
 
 // parseFuncCall parses a supplied-function reference at the current TOK_FUNC: a

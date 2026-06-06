@@ -54,6 +54,11 @@ const (
 	TOK_READ
 	TOK_DATA
 	TOK_RESTORE
+	// TOK_DIM is the DIM array-declaration keyword (clause 18.2); TOK_OPTION and
+	// TOK_BASE spell the two words of `OPTION BASE n` (clause 19).
+	TOK_DIM
+	TOK_OPTION
+	TOK_BASE
 	// TOK_PLUS .. TOK_CARET are the arithmetic operators.
 	TOK_PLUS
 	TOK_MINUS

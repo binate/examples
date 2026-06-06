@@ -27,8 +27,20 @@ func runProgram(prog @[]@Line, out @io.ConsoleOut) {
 		emitDiag(out, lineDiag(badLine, noSuchLine(badTarget)))
 		return
 	}
+	var optIdx int
+	var base int
+	var optMsg @[]char
+	if !checkOption(prog, &optIdx, &base, &optMsg) {
+		emitDiag(out, optMsg)
+		return
+	}
 	var data @[]@datum = collectData(prog)
-	var r @runtime = newRuntime(out, prog, lm, data)
+	var r @runtime = newRuntime(out, prog, lm, data, base)
+	var dimMsg @[]char
+	if !applyDims(prog, r.env, &dimMsg) {
+		emitDiag(out, dimMsg)
+		return
+	}
 	for r.pc < len(prog) {
 		var errMsg @[]char
 		var status int = r.step(&errMsg)

@@ -105,6 +105,10 @@ func (p @parser) parseStmtBodyRest(k int) @Stmt {
 	} else if k == TOK_RESTORE {
 		p.advance()
 		return simpleStmt(ST_RESTORE)
+	} else if k == TOK_DIM {
+		return p.parseDim()
+	} else if k == TOK_OPTION {
+		return p.parseOption()
 	}
 	p.fail(buf.CopyStr("expected a statement keyword"))
 	return simpleStmt(ST_REM)
@@ -127,11 +131,15 @@ func (p @parser) parseRem() @Stmt {
 	return simpleStmt(ST_REM)
 }
 
-// parseLet parses `LET <var> = <expr>`. The LET keyword is required. The target
-// may be a numeric variable (numeric RHS) or a string variable (string RHS);
-// the kinds must match.
+// parseLet parses `LET <target> = <expr>`. The LET keyword is required. The
+// target may be a numeric variable (numeric RHS), a numeric-array element
+// `A(...)` (numeric RHS), or a string variable (string RHS); the RHS kind must
+// match the target.
 func (p @parser) parseLet() @Stmt {
 	p.advance()
+	if p.cur.Kind == TOK_VAR && len(p.cur.Text) == 1 {
+		return p.parseLetVarOrArray()
+	}
 	var isStr bool = p.cur.Kind == TOK_SVAR
 	if p.cur.Kind != TOK_VAR && p.cur.Kind != TOK_SVAR {
 		p.fail(buf.CopyStr("LET: expected a variable"))
@@ -139,6 +147,38 @@ func (p @parser) parseLet() @Stmt {
 	}
 	var name @[]char = p.cur.Text
 	p.advance()
+	return p.finishLetScalar(name, isStr)
+}
+
+// parseLetVarOrArray parses a LET whose target begins with a single-letter
+// TOK_VAR: a numeric-array element `A(...)` when a '(' follows, else a simple
+// numeric variable `A`. cur is the single-letter TOK_VAR on entry.
+func (p @parser) parseLetVarOrArray() @Stmt {
+	var name @[]char = p.cur.Text
+	var target @Expr = p.parseVarOrArray()
+	if p.hasErr {
+		return simpleStmt(ST_REM)
+	}
+	if target.Kind == EX_VAR {
+		return p.finishLetScalar(name, false)
+	}
+	if p.cur.Kind != TOK_EQ {
+		p.fail(buf.CopyStr("LET: expected '='"))
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	var rhs @Expr = p.parseExpr()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_LET
+	s.LHS = target
+	s.Value = rhs
+	return s
+}
+
+// finishLetScalar parses the `= <expr>` of a LET to a simple numeric or string
+// variable (the target name is already consumed). isStr selects a string RHS;
+// the RHS kind must match the target's kind.
+func (p @parser) finishLetScalar(name @[]char, isStr bool) @Stmt {
 	if p.cur.Kind != TOK_EQ {
 		p.fail(buf.CopyStr("LET: expected '='"))
 		return simpleStmt(ST_REM)

@@ -190,9 +190,9 @@ intrinsics**: the transcendentals (`SQR`/`SIN`/`COS`/`TAN`/`ATN`/`EXP`/`LOG`) ar
 parsed but deferred until `pkg/std/math` ships them (the bundle has no float
 math — not rolling our own), and `RND`/`RANDOMIZE` are deferred (need a PRNG +
 entropy decision); all of these reserve their names and surface a clean
-`?<fn> not yet supported` fatal. **M2 slice 1** (`GOSUB`/`RETURN`, `ON…GOTO`,
-`READ`/`DATA`/`RESTORE`) is done and verified. **M2 remaining**: `DIM` + arrays +
-`OPTION BASE`, then single-line `DEF FN`. minbasic needs a main toolchain
+`?<fn> not yet supported` fatal. **M2 slices 1–2** (`GOSUB`/`RETURN`, `ON…GOTO`,
+`READ`/`DATA`/`RESTORE`; `DIM` + numeric arrays + `OPTION BASE`) are done and
+verified. **M2 remaining**: single-line `DEF FN`. minbasic needs a main toolchain
 (interface-vtable + IR-gen-OOM fixes, both in main, not the pinned `bnc-0.0.7`) —
 build against a main bundle via `BINATE_BUNDLE`.
 

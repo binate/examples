@@ -1,0 +1,70 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// The program's load-time array pass runs in two phases (see runProgram):
+// checkOption determines the OPTION BASE lower bound (needed before the variable
+// store is built), and applyDims populates the array store afterward. Both
+// report violations as a diagnostic and false.
+
+// checkOption finds the program's OPTION BASE statement, enforcing that there is
+// at most one and that it precedes every DIM statement and every array
+// reference (ECMA-55 clauses 18.4, 19). It sets *base to the chosen lower bound
+// (0 when no OPTION is present) and *optIdx to the OPTION line's index (-1 if
+// none). On a violation it sets *msg and returns false.
+func checkOption(prog @[]@Line, optIdx *int, base *int, msg *@[]char) bool {
+	*optIdx = -1
+	*base = 0
+	for i := 0; i < len(prog); i++ {
+		if prog[i].Stmt.Kind == ST_OPTION {
+			if *optIdx >= 0 {
+				*msg = buf.CopyStr("at most one OPTION BASE statement is allowed")
+				return false
+			}
+			*optIdx = i
+			*base = prog[i].Stmt.Target
+		}
+	}
+	if *optIdx < 0 {
+		return true
+	}
+	return optionPrecedesArrays(prog, *optIdx, msg)
+}
+
+// optionPrecedesArrays verifies the OPTION statement at index optIdx appears on
+// a lower-numbered line than every DIM statement and every array reference. On
+// the first earlier-or-equal DIM/reference it sets *msg and returns false.
+func optionPrecedesArrays(prog @[]@Line, optIdx int, msg *@[]char) bool {
+	for i := 0; i < len(prog); i++ {
+		if i == optIdx {
+			continue
+		}
+		if stmtUsesArrays(prog[i].Stmt) && i < optIdx {
+			*msg = buf.CopyStr("OPTION BASE must precede any DIM or array reference")
+			return false
+		}
+	}
+	return true
+}
+
+// applyDims applies every DIM declaration in the program to env's array store,
+// in program order, diagnosing a re-DIMed array (an array already declared by an
+// earlier DIM). On the first such conflict it sets *msg and returns false.
+func applyDims(prog @[]@Line, e @env, msg *@[]char) bool {
+	for i := 0; i < len(prog); i++ {
+		var s @Stmt = prog[i].Stmt
+		if s.Kind != ST_DIM {
+			continue
+		}
+		for j := 0; j < len(s.Decls); j++ {
+			var d @dimDecl = s.Decls[j]
+			var slot int = arrayIndex(d.Name)
+			if e.arrays.dims[slot] != 0 {
+				*msg = buf.Concat("array already dimensioned: ", d.Name)
+				return false
+			}
+			e.arrays.dimDeclare(slot, d.Dims, d.Upper1, d.Upper2)
+		}
+	}
+	return true
+}

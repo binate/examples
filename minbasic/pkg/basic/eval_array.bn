@@ -1,0 +1,98 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// resolveArray resolves an EX_AINDEX reference to a (slot, flatOffset) pair,
+// applying ECMA-55 array semantics: an undimensioned array is implicitly
+// dimensioned by this reference (each upper bound 10, dimensionality fixed by
+// the subscript count); the subscript count must match the array's established
+// dimensionality; subscripts are numeric expressions rounded to the nearest
+// integer; and a subscript outside base..upper for its dimension is a fatal
+// exception. It returns the slot index, the row-major flat offset, and ok. On a
+// fatal exception it records the diagnostic on the runtime (setFatal) and
+// returns ok == false. The subscript expressions are evaluated regardless (their
+// own evaluation may itself raise a fatal, which setFatal preserves first).
+func (r @runtime) resolveArray(e @Expr) (int, int, bool) {
+	var i int = arrayIndex(e.Name)
+	var sub1 int = cast(int, roundf(r.evalNum(e.X)))
+	var sub2 int = 0
+	if e.Op == 2 {
+		sub2 = cast(int, roundf(r.evalNum(e.Y)))
+	}
+	if r.fatal {
+		return 0, 0, false
+	}
+	r.env.arrays.ensureImplicit(i, e.Op)
+	if r.env.arrays.dims[i] != e.Op {
+		r.setFatal(arityDiag(e.Name, r.env.arrays.dims[i], e.Op))
+		return 0, 0, false
+	}
+	var off int
+	var ok bool
+	off, ok = r.env.arrays.flatIndex(i, sub1, sub2)
+	if !ok {
+		r.setFatal(subscriptDiag(e.Name, sub1, sub2, e.Op))
+		return 0, 0, false
+	}
+	return i, off, true
+}
+
+// evalArrayRef evaluates a numeric-array element to its value, defaulting to 0.0
+// when the reference raises a fatal exception (the parked fatal then aborts the
+// statement). Elements start at 0.0, so an in-range read of a never-written cell
+// also yields 0.0.
+func (r @runtime) evalArrayRef(e @Expr) float64 {
+	var i int
+	var off int
+	var ok bool
+	i, off, ok = r.resolveArray(e)
+	if !ok {
+		return 0.0
+	}
+	return r.env.arrays.cells[i][off]
+}
+
+// storeArray writes v into the array element named by the EX_AINDEX target,
+// returning STEP_NEXT on success. A fatal exception (arity mismatch or
+// subscript out of range, recorded by resolveArray) leaves the element
+// unchanged; step turns the parked fatal into STEP_ERROR.
+func (r @runtime) storeArray(target @Expr, v float64) int {
+	var i int
+	var off int
+	var ok bool
+	i, off, ok = r.resolveArray(target)
+	if ok {
+		r.env.arrays.cells[i][off] = v
+	}
+	return STEP_NEXT
+}
+
+// arityDiag builds the fatal diagnostic for using the wrong number of subscripts
+// on an array of established dimensionality (e.g. `A(I,J)` on a 1-D array).
+func arityDiag(name @[]char, have int, used int) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("array ")
+	b = b.WriteStr(name)
+	b = b.WriteStr(" is ")
+	b = b.WriteInt(have)
+	b = b.WriteStr("-dimensional, used with ")
+	b = b.WriteInt(used)
+	b = b.WriteStr(" subscript(s)")
+	return b.Freeze()
+}
+
+// subscriptDiag builds the fatal diagnostic for a subscript out of the declared
+// or default range (ECMA-55 clause 18.5). It reports the rounded subscript(s).
+func subscriptDiag(name @[]char, sub1 int, sub2 int, dims int) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("subscript out of range: ")
+	b = b.WriteStr(name)
+	b = b.WriteByte('(')
+	b = b.WriteInt(sub1)
+	if dims == 2 {
+		b = b.WriteByte(',')
+		b = b.WriteInt(sub2)
+	}
+	b = b.WriteByte(')')
+	return b.Freeze()
+}
