@@ -113,8 +113,8 @@ func subroutineKeywordKind(word @[]char) int {
 }
 
 // arrayKeywordKind returns the keyword token kind for the array-declaration
-// keywords (DIM, OPTION, BASE) and the user-function keyword DEF, or -1 if word
-// is not one of them. Split out so no if/else-if chain grows unwieldy.
+// keywords (DIM, OPTION, BASE), the user-function keyword DEF, and RANDOMIZE, or
+// -1 if word is not one of them. Split out so no if/else-if chain grows unwieldy.
 func arrayKeywordKind(word @[]char) int {
 	if charsEq(word, "DIM") {
 		return TOK_DIM
@@ -124,6 +124,8 @@ func arrayKeywordKind(word @[]char) int {
 		return TOK_BASE
 	} else if charsEq(word, "DEF") {
 		return TOK_DEF
+	} else if charsEq(word, "RANDOMIZE") {
+		return TOK_RANDOMIZE
 	}
 	return -1
 }

@@ -99,6 +99,11 @@ const (
 	// three-letter `FN`+letter run can never name a variable (at most a letter
 	// plus a digit).
 	TOK_FN
+	// TOK_RANDOMIZE is the RANDOMIZE keyword (clause 20). It is parsed but its
+	// effect is deferred: executing it is a fatal "not yet supported" (it would
+	// need an entropy source the bundle lacks; deferred by decision). RND itself
+	// is a supplied function (TOK_FUNC) and is fully implemented.
+	TOK_RANDOMIZE
 	// TOK_ERROR marks a lexing failure; Token.Text holds the diagnostic.
 	TOK_ERROR
 )

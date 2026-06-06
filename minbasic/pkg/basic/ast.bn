@@ -105,6 +105,8 @@ type Rel struct {
 //              Value (the body expression); declarative — collected at load, a
 //              no-op when reached during execution (the body is evaluated only
 //              on a call)
+// ST_RANDOMIZE (none — parsed but deferred; executing it is a fatal "not yet
+//              supported", since it would need an entropy source not available)
 const (
 	ST_LET int = iota
 	ST_PRINT
@@ -125,6 +127,7 @@ const (
 	ST_DIM
 	ST_OPTION
 	ST_DEF
+	ST_RANDOMIZE
 )
 
 // dimDecl is one array declaration inside a DIM statement: the single-letter

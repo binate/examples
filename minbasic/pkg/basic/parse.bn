@@ -89,9 +89,9 @@ func (p @parser) parseStmtBody() @Stmt {
 }
 
 // parseStmtBodyRest dispatches the remaining statement keywords (RETURN, ON,
-// READ, INPUT, DATA, RESTORE, DIM, OPTION, DEF), split from parseStmtBody so
-// neither if/else-if chain grows unwieldy. A line that begins with no known
-// keyword is an error (this slice has no implicit-LET).
+// READ, INPUT, DATA, RESTORE, DIM, OPTION, DEF, RANDOMIZE), split from
+// parseStmtBody so neither if/else-if chain grows unwieldy. A line that begins
+// with no known keyword is an error (this slice has no implicit-LET).
 func (p @parser) parseStmtBodyRest(k int) @Stmt {
 	if k == TOK_RETURN {
 		p.advance()
@@ -113,6 +113,9 @@ func (p @parser) parseStmtBodyRest(k int) @Stmt {
 		return p.parseOption()
 	} else if k == TOK_DEF {
 		return p.parseDef()
+	} else if k == TOK_RANDOMIZE {
+		p.advance()
+		return simpleStmt(ST_RANDOMIZE)
 	}
 	p.fail(buf.CopyStr("expected a statement keyword"))
 	return simpleStmt(ST_REM)

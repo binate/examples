@@ -188,19 +188,20 @@ slice 2b = `TAB` + the deterministic intrinsics `ABS`/`SGN`/`INT`. So the
 **non-interactive deterministic core (M1) is complete except the math-dependent
 intrinsics**: the transcendentals (`SQR`/`SIN`/`COS`/`TAN`/`ATN`/`EXP`/`LOG`) are
 parsed but deferred until `pkg/std/math` ships them (the bundle has no float
-math — not rolling our own), and `RND`/`RANDOMIZE` are deferred (need a PRNG +
-entropy decision); all of these reserve their names and surface a clean
-`?<fn> not yet supported` fatal. **M2** (`GOSUB`/`RETURN`, `ON…GOTO`,
+math — not rolling our own); `RND` is now implemented (a reproducible fixed-seed
+PRNG), and `RANDOMIZE` is parsed but deferred (true unpredictability needs an
+entropy source the bundle lacks). The still-deferred names reserve their
+identifiers and surface a clean `?… not yet supported` fatal. **M2** (`GOSUB`/`RETURN`, `ON…GOTO`,
 `READ`/`DATA`/`RESTORE`, `DIM` + numeric arrays + `OPTION BASE`, single-line
 `DEF FN`) is done and verified — the **non-interactive language is complete**,
 bar the deferred math-dependent intrinsics. **M3** (the embeddable REPL —
 `basicSession : ReplSession`, incremental line edits, immediate mode,
 `RUN`/`LIST`/`NEW`, driven by `Init`/`Step`) and **M4's `INPUT`** (the injected
 `ConsoleIn` seam, atomic-validate + `?REDO FROM START` re-request, one shared
-stdin reader for the REPL and INPUT) are done and verified. Remaining: **M4's
-`RND`/`RANDOMIZE`** (a PRNG + an entropy decision for RANDOMIZE), then **M5** (NBS
-conformance harness) — plus the deferred transcendentals once `pkg/std/math`
-lands. (M3 ships a marked `*func` temp for the REPL sinks, tracked in `TODO.md` +
+stdin reader for the REPL and INPUT) are done and verified, and **all of M4 is
+complete** — `RND` is a reproducible fixed-seed PRNG; `RANDOMIZE` is
+parsed-but-deferred. Next: **M5** (NBS conformance harness) — plus the deferred
+transcendentals once `pkg/std/math` lands. (M3 ships a marked `*func` temp for the REPL sinks, tracked in `TODO.md` +
 `explorations/claude-todo.md` — restore `@func` when the destructor defect is
 fixed.) minbasic needs a main toolchain (interface-vtable + IR-gen-OOM fixes, both
 in main, not the pinned `bnc-0.0.7`) — build against a main bundle via

@@ -86,6 +86,12 @@ func (r @runtime) dispatch(errMsg *@[]char) int {
 		return r.execInput(s, errMsg)
 	} else if s.Kind == ST_RESTORE {
 		return r.execRestore()
+	} else if s.Kind == ST_RANDOMIZE {
+		// RANDOMIZE is parsed but deferred: it would need an entropy source the
+		// bundle lacks (deferred by decision), so executing it is a fatal "not yet
+		// supported". setFatal parks the diagnostic; step turns it into STEP_ERROR.
+		r.setFatal(buf.CopyStr("RANDOMIZE not yet supported"))
+		return STEP_NEXT
 	}
 	// ST_DATA, ST_DIM, and ST_OPTION are no-ops when reached: DATA is collected
 	// at load, and DIM/OPTION are declarations applied at load (see runProgram).

@@ -98,11 +98,11 @@ func funcNameRest(fn int) @[]char {
 	return buf.CopyStr("TAN")
 }
 
-// evalCall evaluates an EX_CALL node. Only ABS/SGN/INT are implemented; the
-// transcendentals (ATN/COS/EXP/LOG/SIN/SQR/TAN) and RND need a float-math
-// library / PRNG that has not landed (pkg/std/math), so calling one is a fatal
-// runtime error: it records the diagnostic on the runtime and returns 0 (the
-// step loop reports the fatal and stops).
+// evalCall evaluates an EX_CALL node. ABS/SGN/INT and RND are implemented; the
+// transcendentals (ATN/COS/EXP/LOG/SIN/SQR/TAN) need a float-math library that
+// has not landed (pkg/std/math), so calling one is a fatal runtime error: it
+// records the diagnostic on the runtime and returns 0 (the step loop reports the
+// fatal and stops). RND takes no argument and draws from the runtime's PRNG.
 func (r @runtime) evalCall(e @Expr) float64 {
 	if e.Op == FN_ABS {
 		return absf(r.evalNum(e.X))
@@ -110,6 +110,8 @@ func (r @runtime) evalCall(e @Expr) float64 {
 		return sgn(r.evalNum(e.X))
 	} else if e.Op == FN_INT {
 		return floorf(r.evalNum(e.X))
+	} else if e.Op == FN_RND {
+		return r.nextRnd()
 	}
 	r.setFatal(deferredFuncDiag(e.Op))
 	return 0.0

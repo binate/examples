@@ -29,7 +29,8 @@ const MAX_STR_LEN int = 18
 // cannot be returned through the float64-typed evaluators, so the value is
 // parked here and the step loop reports it after the statement. defs is the
 // program's user-defined-function table (built at load), consulted when a
-// reference FN<letter> is evaluated.
+// reference FN<letter> is evaluated. rnd is the RND pseudo-random generator's
+// xorshift64 state, seeded from a fixed constant per run so RND is reproducible.
 type runtime struct {
 	env      @env
 	out      @io.ConsoleOut
@@ -45,6 +46,7 @@ type runtime struct {
 	fatal    bool
 	fatalMsg @[]char
 	defs     @defStore
+	rnd      uint64
 }
 
 // newRuntime builds a runtime over a fresh variable store writing to out and
@@ -69,6 +71,7 @@ func newRuntime(out @io.ConsoleOut, inp @io.ConsoleIn, prog @[]@Line, lm @lineMa
 	r.dataPtr = 0
 	r.fatal = false
 	r.defs = defs
+	r.rnd = RND_SEED
 	return r
 }
 
@@ -145,4 +148,24 @@ func (r @runtime) evalStr(e @Expr) @[]char {
 		return r.env.getStr(e.Name)
 	}
 	return e.Str
+}
+
+// RND_SEED is the fixed initial state of the RND pseudo-random generator. ECMA-55
+// makes RND reproducible without RANDOMIZE, so every run seeds from this constant
+// and replays the same sequence. It is an arbitrary nonzero xorshift64 seed; the
+// resulting sequence is minbasic's own (ECMA-55 leaves the RND sequence
+// implementation-defined, so it matches no other implementation's RND).
+const RND_SEED uint64 = 88172645463325252
+
+// nextRnd advances the runtime's xorshift64 PRNG state and returns the next
+// value, uniformly distributed in [0, 1). The top 53 bits of the 64-bit state
+// form a double's mantissa; those bits never set the sign bit, so the
+// uint64 -> float64 conversion is exact and positive.
+func (r @runtime) nextRnd() float64 {
+	var x uint64 = r.rnd
+	x = x ^ (x << 13)
+	x = x ^ (x >> 7)
+	x = x ^ (x << 17)
+	r.rnd = x
+	return cast(float64, x >> 11) / 9007199254740992.0
 }
