@@ -27,20 +27,23 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **148** are vendored. The other **60**
+Of the **208** NBS programs (P001..P208), **153** are vendored. The other **55**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
 
-### Excluded — deferred feature (39)
+### Excluded — deferred feature (34)
 
 The program reaches a `?… not yet supported` fatal: it uses a transcendental
-function or a non-integer `^` exponent (both need `pkg/std/math`, not yet
-landed), or `RANDOMIZE` (needs an entropy source we have deferred).
+function or a non-integer `^` exponent, or `RANDOMIZE` (needs an entropy source
+we have deferred). `SQR` is now implemented (via `pkg/std/math.Sqrt`), so its
+SQR-only programs are kept; the other transcendentals await further
+`pkg/std/math` functions.
 
-- transcendentals: SQR — P117 P118 P132 P142 P166 P172 · SIN — P127 P165 ·
-  COS — P120 · TAN — P128 P129 P164 · ATN — P119 P183 ·
-  EXP — P121 P122 P123 P169 P175 P181 · LOG — P124 P125 P126 P167 P171 P179
+- transcendentals: SIN — P127 P165 · COS — P120 · TAN — P128 P129 P164 ·
+  ATN — P119 P183 · EXP — P121 P122 P123 P166 P169 P175 P181 ·
+  LOG — P124 P125 P126 P167 P171 P179 (P166 uses SQR but also EXP/LOG/TAN/ATN,
+  so it stays here until those land)
 - non-integer `^` exponent (needs exp()/log()): P025 P026 P029 P032 P033 P043
   P170 P173 P174 P176 P177 P182
 - `RANDOMIZE`: P131

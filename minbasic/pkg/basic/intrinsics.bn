@@ -1,6 +1,7 @@
 package "pkg/basic"
 
 import "pkg/binate/buf"
+import "pkg/std/math"
 
 // FN_* identify the eleven ECMA-55 supplied numeric functions (clause 9). The
 // code is stored in an EX_CALL node's Op field. FN_RND alone takes no argument
@@ -98,11 +99,13 @@ func funcNameRest(fn int) @[]char {
 	return buf.CopyStr("TAN")
 }
 
-// evalCall evaluates an EX_CALL node. ABS/SGN/INT and RND are implemented; the
-// transcendentals (ATN/COS/EXP/LOG/SIN/SQR/TAN) need a float-math library that
-// has not landed (pkg/std/math), so calling one is a fatal runtime error: it
-// records the diagnostic on the runtime and returns 0 (the step loop reports the
-// fatal and stops). RND takes no argument and draws from the runtime's PRNG.
+// evalCall evaluates an EX_CALL node. ABS/SGN/INT/RND and SQR are implemented
+// (SQR via pkg/std/math.Sqrt; SQR of a negative argument is the ECMA-55 fatal
+// exception of clause 9, not a NaN). The remaining transcendentals
+// (ATN/COS/EXP/LOG/SIN/TAN) need math functions that have not landed yet, so
+// calling one is a fatal runtime error: it records the diagnostic on the runtime
+// and returns 0 (the step loop reports the fatal and stops). RND takes no
+// argument and draws from the runtime's PRNG.
 func (r @runtime) evalCall(e @Expr) float64 {
 	if e.Op == FN_ABS {
 		return absf(r.evalNum(e.X))
@@ -112,6 +115,13 @@ func (r @runtime) evalCall(e @Expr) float64 {
 		return floorf(r.evalNum(e.X))
 	} else if e.Op == FN_RND {
 		return r.nextRnd()
+	} else if e.Op == FN_SQR {
+		var x float64 = r.evalNum(e.X)
+		if x < 0.0 {
+			r.setFatal(buf.CopyStr("SQR of a negative number"))
+			return 0.0
+		}
+		return math.Sqrt(x)
 	}
 	r.setFatal(deferredFuncDiag(e.Op))
 	return 0.0

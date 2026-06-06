@@ -1,0 +1,53 @@
+PROGRAM FILE 117: ACCURACY OF SQR FUNCTION.
+    ANSI STANDARD 7.6, 8.4
+
+SECTION 117.1: ACCURACY OF SQR FUNCTION.
+
+THIS PROGRAM TESTS VALUES RETURNED BY INVOCATIONS OF THE
+SQR FUNCTION FOR ACCURACY. THE INVOCATION MUST RETURN,
+ACCURATE TO SIX DIGITS, SOME VALUE ACTUALLY TAKEN ON BY
+THE FUNCTION WITHIN A DOMAIN BOUNDED BY THE ACTUAL ARGUMENT
+PLUS OR MINUS ONE IN THE SIXTH DIGIT. ALSO, AN
+'ERROR MEASURE' IS COMPUTED AND REPORTED. THIS MEASURE
+IS JUST 2 * THE ABSOLUTE ERROR OVER THE SIZE OF THE RANGE;
+THUS, A VALUE JUST BARELY PASSING OR FAILING WILL USUALLY
+HAVE A MEASURE OF ABOUT 1. A VALUE 3 TIMES
+AS INACCURATE AS EXPECTED WILL HAVE A MEASURE OF 3.
+
+THIS TEST IS INFORMATIVE ONLY, SINCE THE ANSI STANDARD
+DOES NOT MANDATE ANY ACCURACY FOR SUPPLIED-FUNCTIONS.
+
+              BEGIN TEST
+
+ARGUMENT       TRUE           COMPUTED       ERROR          OUTCOME
+               VALUE          VALUE          MEASURE
+
+ 0              0              0             RANGE ZERO      OK  - EXACT
+ 1.E-38         1.E-19         1.E-19         0              OK  - EXACT
+ 9.99999E-38    3.16228E-19    3.16228E-19    .000147321     OK 
+ 9.E-38         3.E-19         3.E-19         0              OK  - EXACT
+ 9.99999E-37    9.99999E-19    9.99999E-19    3.84534E-8     OK 
+ 9.99999E-31    9.99999E-16    9.99999E-16    1.24972E-7     OK 
+ 1.23456E-20    1.11111E-10    1.11111E-10    .000468189     OK 
+ .0000654321    .00808901      .00808901      .000393464     OK 
+ .5             .707107        .707107        .000154491     OK 
+ 1              1              1              0              OK  - EXACT
+ .999999        1              .999999        3.8459E-8      OK 
+ 2              1.41421        1.41421        .00027788      OK 
+ 3              1.73205        1.73205        .000308127     OK 
+ 4              2              2              0              OK  - EXACT
+ 5              2.23607        2.23607        .000345333     OK 
+ 9.99999        3.16228        3.16228        .000147321     OK 
+ 10             3.16228        3.16228        .00000808739   OK 
+ 40000          200            200            0              OK  - EXACT
+ 1.23456E+8     11111.1        11111.1        .000468189     OK 
+ 6.54321E+20    2.55797E+10    2.55797E+10    .000261354     OK 
+ 9.99999E+31    1.E+16         9.99999E+15    1.24938E-7     OK 
+ 9.E+36         3.E+18         3.E+18         0              OK  - EXACT
+ 1.E+38         1.E+19         1.E+19         0              OK  - EXACT
+
+*** INFORMATIVE TEST PASSED ***
+
+               END TEST
+
+END PROGRAM 117
