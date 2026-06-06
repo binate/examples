@@ -81,7 +81,10 @@ func (s @basicSession) runProgram() {
 	if s.prog.isEmpty() {
 		return
 	}
-	s.env = runProgramInto(s.prog.snapshot(), s.out, s.inp)
+	// Program output and run diagnostics both go to the session's ConsoleOut: the
+	// REPL keeps a single program stream (a fatal/nonfatal `?…` diagnostic prints
+	// there, distinct from LIST/prompt framing, which uses ReplIO).
+	s.env = runProgramInto(s.prog.snapshot(), s.out, s.out, s.inp)
 }
 
 // listProgram (LIST) prints the stored program through the FRAMING sink, each

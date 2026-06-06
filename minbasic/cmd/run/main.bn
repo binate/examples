@@ -35,5 +35,10 @@ func main() {
 		bootstrap.Write(bootstrap.STDERR, "run: cannot read file\n")
 		bootstrap.Exit(1)
 	}
-	basic.RunSource(src, host.NewConsole(), host.NewConsoleIn(host.NewStdinReader()))
+	// Program output and diagnostics both go to standard output: a single ordered
+	// stream keeps a piped transcript readable and makes compiled and interpreted
+	// runs diff byte-for-byte (the same choice cmd/basic makes for its REPL
+	// framing). A non-CLI host could point the two sinks at different streams.
+	basic.RunSource(src, host.NewConsole(), host.NewConsole(),
+		host.NewConsoleIn(host.NewStdinReader()))
 }

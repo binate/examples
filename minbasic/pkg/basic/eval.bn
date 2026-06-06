@@ -17,8 +17,11 @@ const MARGIN int = 75
 const MAX_STR_LEN int = 18
 
 // runtime is the per-RUN execution context. env is the variable store; out the
-// output sink; inp the INPUT reply source (consulted by execInput, never for
-// PRINT); col the 0-based column the next character would occupy on the
+// program-output sink; err the diagnostic sink (fatal diagnostics AND nonfatal-
+// exception reports, kept off the program-output stream so a host can route them
+// apart — cmd/run merges both to stdout); inp the INPUT reply source (consulted
+// by execInput, never for PRINT); col the 0-based column the next character
+// would occupy on the
 // current line (for PRINT zone spacing). prog is the line-ordered program;
 // lineMap resolves a line number to its index in prog (-1 if absent); pc is the
 // program counter (an index into prog); fors is the stack of open FOR loops;
@@ -34,6 +37,7 @@ const MAX_STR_LEN int = 18
 type runtime struct {
 	env      @env
 	out      @io.ConsoleOut
+	err      @io.ConsoleOut
 	inp      @io.ConsoleIn
 	col      int
 	prog     @[]@Line
@@ -49,17 +53,18 @@ type runtime struct {
 	rnd      uint64
 }
 
-// newRuntime builds a runtime over a fresh variable store writing to out and
-// reading INPUT replies from inp, with the program prog, its precomputed
-// line-number map, its global DATA sequence, and its user-defined-function table
-// defs. base is the OPTION BASE array lower bound. The program counter starts at
-// the first line; the FOR and GOSUB stacks start empty; the data pointer starts
-// at the first datum; no array is dimensioned yet.
-func newRuntime(out @io.ConsoleOut, inp @io.ConsoleIn, prog @[]@Line, lm @lineMap,
-	data @[]@datum, base int, defs @defStore) @runtime {
+// newRuntime builds a runtime over a fresh variable store writing program output
+// to out and diagnostics to err, reading INPUT replies from inp, with the program
+// prog, its precomputed line-number map, its global DATA sequence, and its
+// user-defined-function table defs. base is the OPTION BASE array lower bound.
+// The program counter starts at the first line; the FOR and GOSUB stacks start
+// empty; the data pointer starts at the first datum; no array is dimensioned yet.
+func newRuntime(out @io.ConsoleOut, err @io.ConsoleOut, inp @io.ConsoleIn, prog @[]@Line,
+	lm @lineMap, data @[]@datum, base int, defs @defStore) @runtime {
 	var r @runtime = make(runtime)
 	r.env = newEnv(base)
 	r.out = out
+	r.err = err
 	r.inp = inp
 	r.col = 0
 	r.prog = prog
@@ -85,6 +90,15 @@ func (r @runtime) setFatal(msg @[]char) {
 	}
 }
 
+// reportNonfatal reports a recovered (nonfatal) ECMA-55 exception (clause 3.5
+// requires nonfatal exceptions to be reported even though execution continues),
+// tagged with the executing line, through the diagnostic sink. Unlike setFatal it
+// does not stop execution and does not touch the print column — the diagnostic is
+// not part of the program's output layout.
+func (r @runtime) reportNonfatal(msg @[]char) {
+	emitDiag(r.err, lineDiag(r.prog[r.pc].Num, msg))
+}
+
 // emit writes s through the sink and advances the tracked print column. A
 // newline resets the column to the start of the line.
 func (r @runtime) emit(s @[]char) {
@@ -102,6 +116,13 @@ func (r @runtime) emit(s @[]char) {
 // are dispatched by Kind with an if/else-if chain (the codebase idiom).
 func (r @runtime) evalNum(e @Expr) float64 {
 	if e.Kind == EX_NUM {
+		// A numeric-constant literal whose value is infinite can only have come
+		// from an overflowing constant (the lexer never scans "inf"); ECMA-55
+		// clause 8.5 makes that a nonfatal exception reported at evaluation, with
+		// the constant recovered to signed machine infinity (already its value).
+		if isInfinite(absf(e.Num)) {
+			r.reportNonfatal(buf.CopyStr("numeric constant overflow"))
+		}
 		return e.Num
 	} else if e.Kind == EX_VAR {
 		return r.env.getNum(e.Name)

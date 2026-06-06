@@ -121,8 +121,11 @@ after the fix:
    numeric *constant* whose magnitude overflows the float range (`3E99999`,
    clause 8.5) was rejected as "malformed"; it now recovers to signed machine
    infinity (`±INF`) — the `±Inf` the float parser already returns — and
-   continues. Recovery is silent on the program's output stream (no inline
-   diagnostic), which keeps both modes byte-identical and matches bas55's stdout
-   (bas55 reports the exception on stderr; minbasic's single-sink non-interactive
-   runner has no separate diagnostic channel). (Surfaced by P008 and P030, now
+   continues. Each recovery is also REPORTED (clause 3.5 requires nonfatal
+   exceptions to be reported): `RunSource` takes a separate `err` diagnostic sink
+   through which a `?line N: …` line is emitted at the point of recovery, then
+   execution continues. `cmd/run` points `err` at stdout (a single ordered
+   transcript, as `cmd/basic` does for its REPL framing), so the report appears
+   inline and both modes stay byte-identical; a host wanting diagnostics off the
+   program stream can pass a different sink. (Surfaced by P008 and P030, now
    kept.)

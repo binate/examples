@@ -18,8 +18,8 @@ const (
 // and discards the final state. All load validation and execution is delegated
 // to runProgramInto; the resulting env (which would let an interactive caller
 // inspect variables afterward) is not needed here, so it is dropped.
-func runProgram(prog @[]@Line, out @io.ConsoleOut, inp @io.ConsoleIn) {
-	_ = runProgramInto(prog, out, inp)
+func runProgram(prog @[]@Line, out @io.ConsoleOut, err @io.ConsoleOut, inp @io.ConsoleIn) {
+	_ = runProgramInto(prog, out, err, inp)
 }
 
 // runProgramInto executes a parsed program with a jumping program counter and
@@ -29,23 +29,23 @@ func runProgram(prog @[]@Line, out @io.ConsoleOut, inp @io.ConsoleIn) {
 // execution from the lowest-numbered line. The program counter advances by one
 // line normally and is set directly by control statements (GOTO/IF/FOR/NEXT).
 // INPUT replies are read through inp. Execution stops at END/STOP, a fatal
-// runtime error (reported as a diagnostic line through out), or end-of-input
+// runtime error (reported as a diagnostic line through err), or end-of-input
 // while an INPUT awaits a reply (a clean stop). On a LOAD-time error (a bad jump
 // target, a duplicate OPTION/DEF, a re-DIM) it reports the diagnostic and returns
 // a fresh empty env, since no program state was established.
-func runProgramInto(prog @[]@Line, out @io.ConsoleOut, inp @io.ConsoleIn) @env {
+func runProgramInto(prog @[]@Line, out @io.ConsoleOut, err @io.ConsoleOut, inp @io.ConsoleIn) @env {
 	var lm @lineMap = buildLineMap(prog)
 	var badLine int
 	var badTarget int
 	if !checkTargets(prog, lm, &badLine, &badTarget) {
-		emitDiag(out, lineDiag(badLine, noSuchLine(badTarget)))
+		emitDiag(err, lineDiag(badLine, noSuchLine(badTarget)))
 		return newEnv(0)
 	}
 	var optIdx int
 	var base int
 	var optMsg @[]char
 	if !checkOption(prog, &optIdx, &base, &optMsg) {
-		emitDiag(out, optMsg)
+		emitDiag(err, optMsg)
 		return newEnv(0)
 	}
 	var defs @defStore
@@ -53,25 +53,25 @@ func runProgramInto(prog @[]@Line, out @io.ConsoleOut, inp @io.ConsoleIn) @env {
 	var defOk bool
 	defs, defMsg, defOk = collectDefs(prog)
 	if !defOk {
-		emitDiag(out, defMsg)
+		emitDiag(err, defMsg)
 		return newEnv(base)
 	}
 	if !checkDefs(prog, defs, &defMsg) {
-		emitDiag(out, defMsg)
+		emitDiag(err, defMsg)
 		return newEnv(base)
 	}
 	var data @[]@datum = collectData(prog)
-	var r @runtime = newRuntime(out, inp, prog, lm, data, base, defs)
+	var r @runtime = newRuntime(out, err, inp, prog, lm, data, base, defs)
 	var dimMsg @[]char
 	if !applyDims(prog, r.env, &dimMsg) {
-		emitDiag(out, dimMsg)
+		emitDiag(err, dimMsg)
 		return r.env
 	}
 	for r.pc < len(prog) {
 		var errMsg @[]char
 		var status int = r.step(&errMsg)
 		if status == STEP_ERROR {
-			emitDiag(out, lineDiag(prog[r.pc].Num, errMsg))
+			emitDiag(err, lineDiag(prog[r.pc].Num, errMsg))
 			return r.env
 		} else if status == STEP_END {
 			return r.env

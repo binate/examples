@@ -4,31 +4,33 @@ import "pkg/basic/io"
 import "pkg/binate/buf"
 import "pkg/stdx/slices"
 
-// RunSource parses the program text src and runs it, routing all output through
-// out and reading any INPUT replies from inp. Parse errors and fatal runtime
-// errors are reported as a single diagnostic line emitted through out
-// (errors-as-values internally; the public entry just runs and reports for this
-// slice).
-func RunSource(src *[]readonly char, out @io.ConsoleOut, inp @io.ConsoleIn) {
+// RunSource parses the program text src and runs it, routing program output
+// through out and reading any INPUT replies from inp. Diagnostics — parse errors,
+// fatal runtime errors, and nonfatal-exception reports — are emitted as single
+// "?<message>" lines through the separate err sink, so a host can route them
+// apart from program output (cmd/run merges both onto stdout). (Errors-as-values
+// internally; the public entry just runs and reports for this slice.)
+func RunSource(src *[]readonly char, out @io.ConsoleOut, err @io.ConsoleOut, inp @io.ConsoleIn) {
 	var prog @[]@Line
 	var perr @[]char
 	var ok bool
 	prog, perr, ok = parseProgram(src)
 	if !ok {
-		emitDiag(out, perr)
+		emitDiag(err, perr)
 		return
 	}
-	runProgram(prog, out, inp)
+	runProgram(prog, out, err, inp)
 }
 
-// emitDiag emits a diagnostic line ("?<message>") through out. The leading '?'
-// marks engine-level errors distinctly from program PRINT output.
-func emitDiag(out @io.ConsoleOut, msg @[]char) {
+// emitDiag emits a diagnostic line ("?<message>") through the given diagnostic
+// sink. The leading '?' marks engine-level errors distinctly from program PRINT
+// output.
+func emitDiag(sink @io.ConsoleOut, msg @[]char) {
 	var b buf.CharBuf = buf.New()
 	b = b.WriteByte('?')
 	b = b.WriteStr(msg)
 	b = b.WriteByte('\n')
-	out.Write(b.Bytes())
+	sink.Write(b.Bytes())
 }
 
 // parseProgram splits src into numbered lines and parses each into a Line. It

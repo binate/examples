@@ -38,7 +38,10 @@ func (r @runtime) emitTab(arg @Expr) {
 		return
 	}
 	if n < 1 {
-		// Nonfatal (ECMA-55 14.4): recover by using column 1.
+		// Nonfatal (ECMA-55 14.4): report the exception, then recover by using
+		// column 1. The report does not disturb the print column (it is not part
+		// of the program's output layout).
+		r.reportNonfatal(buf.CopyStr("TAB argument less than 1"))
 		n = 1
 	}
 	if n > MARGIN {

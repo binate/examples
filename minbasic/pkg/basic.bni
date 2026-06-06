@@ -15,13 +15,17 @@ package "pkg/basic"
 
 import "pkg/basic/io"
 
-// RunSource parses the BASIC program text src and executes it, sending all
-// program output to out and reading any INPUT replies from inp. On a parse error
-// or a fatal runtime error it emits a single clear diagnostic line through out
-// and stops; partial output produced before the error is preserved (ECMA-55 has
-// no rollback). End-of-input while an INPUT awaits a reply stops the run cleanly.
-// src is a raw readonly char view of the source file's bytes.
-func RunSource(src *[]readonly char, out @io.ConsoleOut, inp @io.ConsoleIn)
+// RunSource parses the BASIC program text src and executes it, sending program
+// output to out and reading any INPUT replies from inp. Diagnostics go to the
+// separate err sink: a parse error or fatal runtime error emits a single clear
+// "?<message>" line through err and stops (partial output produced before the
+// error is preserved — ECMA-55 has no rollback), and a recovered nonfatal
+// exception (clause 3.5) emits a "?<message>" line through err and continues.
+// Keeping diagnostics off the program-output stream lets a host route them apart
+// (a CLI typically points both at stdout; a test buffer or wasm host can split
+// them). End-of-input while an INPUT awaits a reply stops the run cleanly. src is
+// a raw readonly char view of the source file's bytes.
+func RunSource(src *[]readonly char, out @io.ConsoleOut, err @io.ConsoleOut, inp @io.ConsoleIn)
 
 // ReplIO is the host-supplied sink for the REPL's OWN framing output: the
 // banner, the prompts, and the syntax/runtime diagnostics. Routing the engine's
