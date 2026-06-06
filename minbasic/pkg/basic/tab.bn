@@ -25,8 +25,9 @@ func roundf(x float64) float64 {
 }
 
 // emitTab positions the print cursor for a TAB(arg) print-item (ECMA-55 clause
-// 14.4). The argument is rounded to the nearest integer n. n < 1 is a fatal
-// exception. If n exceeds the margin it is reduced modulo the margin so
+// 14.4). The argument is rounded to the nearest integer n. An n < 1 is a
+// NONFATAL exception whose ECMA-55 recovery is to use column 1 (n is forced to
+// 1) and continue. If n exceeds the margin it is reduced modulo the margin so
 // 1 ≤ n ≤ MARGIN. The cursor then moves to column n (1-based): if it is at or
 // before column n on the current line, spaces fill up to it; if it is already
 // past column n, an end-of-line is emitted and spaces fill to column n on the
@@ -37,8 +38,8 @@ func (r @runtime) emitTab(arg @Expr) {
 		return
 	}
 	if n < 1 {
-		r.setFatal(buf.CopyStr("TAB argument less than 1"))
-		return
+		// Nonfatal (ECMA-55 14.4): recover by using column 1.
+		n = 1
 	}
 	if n > MARGIN {
 		// Reduce into 1..MARGIN: n - MARGIN*INT((n-1)/MARGIN). With n >= 1 the

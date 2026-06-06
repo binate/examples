@@ -31,8 +31,8 @@ func powf(a float64, b float64) float64 {
 // STEP_* status describing how control proceeds: STEP_NEXT to fall through to
 // the next line, STEP_JUMP if the statement set r.pc itself (GOTO/IF/FOR/NEXT),
 // STEP_END to terminate (END/STOP), or STEP_ERROR after setting *errMsg on a
-// fatal runtime error. A fatal exception parked mid-expression (r.fatal — a TAB
-// argument < 1 or a not-yet-supported function) overrides the status with
+// fatal runtime error. A fatal exception parked mid-expression (r.fatal — a
+// not-yet-supported function or operator) overrides the status with
 // STEP_ERROR. PRINT output is emitted through the runtime's sink.
 func (r @runtime) step(errMsg *@[]char) int {
 	var status int = r.dispatch(errMsg)

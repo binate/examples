@@ -321,14 +321,22 @@ func (p @parser) parseTabItem() @Expr {
 	return e
 }
 
-// parseNumberLit converts the current TOK_NUMBER's text to a float64 constant.
+// parseNumberLit converts the current TOK_NUMBER's text to a float64 constant. A
+// constant whose magnitude overflows the float range is a NONFATAL ECMA-55
+// exception (clause 8.5): the recovery value is signed machine infinity, which
+// is exactly the +Inf ParseFloat returns — the lexer scans an unsigned numeric
+// constant (a leading '-' is a separate unary operator), so an overflow is
+// always +Inf — so the constant takes that value and parsing continues. A
+// present error with a NON-infinite value (0) means text the lexer admitted but
+// ParseFloat rejects as malformed (e.g. an exponent with no digits); that stays
+// a fatal parse error.
 func (p @parser) parseNumberLit() @Expr {
 	var e @Expr = make(Expr)
 	e.Kind = EX_NUM
 	var n float64
 	var perr @errors.Error
 	n, perr = strconv.ParseFloat(p.cur.Text, 64)
-	if present(perr) {
+	if present(perr) && !isInfinite(n) {
 		p.fail(buf.Concat("malformed numeric constant: ", p.cur.Text))
 	}
 	e.Num = n

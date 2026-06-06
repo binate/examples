@@ -27,7 +27,7 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **146** are vendored. The other **62**
+Of the **208** NBS programs (P001..P208), **148** are vendored. The other **60**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
@@ -60,25 +60,15 @@ The program uses the `RND` function. minbasic's RND is deterministic, but it is
 these cannot be dev-validated against bas55: P130 P133 P134 P135 P136 P137 P138
 P139 P140 P141 P145 P146 P149.
 
-### Excluded — pending a semantics decision (2)
-
-minbasic currently makes a recoverable (nonfatal) ECMA-55 exception fatal, which
-diverges from the standard and from bas55. These are real minbasic conformance
-gaps, held back from this cut until the exception classification is decided
-(rather than freeze knowingly-wrong output):
-
-- **P008** — `TAB(n)` with `n < 1`: minbasic terminates; ECMA-55, bas55, and
-  P008's own pass criterion say this is **nonfatal** (report, recover to column 1,
-  continue).
-- **P030** — a numeric *constant* that overflows (`3E99999`): minbasic rejects it
-  as "malformed"; ECMA-55 says constant overflow is **nonfatal** (recover with
-  machine infinity, continue).
+(The two ECMA-55 nonfatal-recovery cases that were once held back here —
+`TAB(n) < 1` and numeric-constant overflow — are now handled and kept; see
+"bugs found and fixed" item 4 below.)
 
 ## Cross-validation against bas55 (development oracle)
 
-During development the 146 kept fixtures were compared to bas55's `.ok` files
-(CRLF-normalized; bas55's error-line path prefix ignored). bas55's fixtures are
-**not** committed (GPL-3.0; see `PROVENANCE.md`). How the kept set compares:
+During development the original 146-program cut was compared to bas55's `.ok`
+files (CRLF-normalized; bas55's error-line path prefix ignored). bas55's fixtures
+are **not** committed (GPL-3.0; see `PROVENANCE.md`). How that cut compares:
 
 - **31** byte-identical to bas55.
 - **25** differ *only* in numeric formatting — minbasic uses the ECMA-55
@@ -96,6 +86,13 @@ During development the 146 kept fixtures were compared to bas55's `.ok` files
 
 No *unexplained* structural difference (wrong control flow, wrong integer, wrong
 value) remained in the kept set after the bug fixes noted below.
+
+**P008 and P030** were added later (when the nonfatal-recovery fix below landed),
+so they are outside that 146-program bas55 cross-check. They are instead
+validated against each program's *own* embedded NBS pass criteria — P008 prints
+its `X` in column 1 in all four sections, P030 supplies `+INF` / `-INF` for the
+overflowing `±3E99999` constants — plus the standard dual-mode byte-identical
+assertion.
 
 ## minbasic bugs found and fixed while building this harness
 
@@ -115,3 +112,14 @@ after the fix:
    deferral as the transcendentals it depends on (exp()/log()), so such programs
    land cleanly in the deferred-feature bucket instead of producing wrong output.
    (Surfaced by P029, P032, P033, P170, etc.)
+4. **Nonfatal-exception recovery.** Two recoverable ECMA-55 exceptions were
+   wrongly treated as fatal. (a) `TAB(n)` with a rounded `n < 1` (clause 14.4)
+   terminated the run; it now recovers by using column 1 and continuing. (b) A
+   numeric *constant* whose magnitude overflows the float range (`3E99999`,
+   clause 8.5) was rejected as "malformed"; it now recovers to signed machine
+   infinity (`±INF`) — the `±Inf` the float parser already returns — and
+   continues. Recovery is silent on the program's output stream (no inline
+   diagnostic), which keeps both modes byte-identical and matches bas55's stdout
+   (bas55 reports the exception on stderr; minbasic's single-sink non-interactive
+   runner has no separate diagnostic channel). (Surfaced by P008 and P030, now
+   kept.)

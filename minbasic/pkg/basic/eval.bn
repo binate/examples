@@ -25,7 +25,7 @@ const MAX_STR_LEN int = 18
 // gosubs is the GOSUB return stack. data is the program's global DATA sequence
 // (collected at load) and dataPtr is the conceptual READ pointer into it (the
 // index of the next datum). fatal/fatalMsg carry a fatal exception raised
-// mid-expression (a TAB argument < 1, or a not-yet-supported function); they
+// mid-expression (a not-yet-supported function or operator); they
 // cannot be returned through the float64-typed evaluators, so the value is
 // parked here and the step loop reports it after the statement. defs is the
 // program's user-defined-function table (built at load), consulted when a
