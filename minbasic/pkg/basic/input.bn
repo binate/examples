@@ -1,0 +1,106 @@
+package "pkg/basic"
+
+import "pkg/basic/io"
+import "pkg/binate/buf"
+
+// execInput executes an INPUT statement (ECMA-55 clause 15). It repeatedly emits
+// the prompt, reads one reply line through the runtime's ConsoleIn, and tries to
+// satisfy the whole variable-list from that reply. Validation is atomic: the
+// reply's datum count must equal the target count and each datum's type must
+// match its target before any assignment happens. Any mismatch is a nonfatal
+// exception — the reply is discarded, a re-request notice is shown, and the read
+// repeats. End-of-input while awaiting a reply terminates the run cleanly
+// (STEP_END). On a valid reply each datum is assigned in order and execution
+// continues (STEP_NEXT), unless assigning to an array element raises a fatal
+// subscript/arity exception (STEP_ERROR via the parked fatal).
+//
+// The prompt is the ECMA-55-recommended question mark plus a space (clause 15.6).
+// The re-request notice mirrors the conventional `?REDO FROM START`, marking the
+// whole reply as discarded before the prompt is shown again. Both are program
+// output, so they route through the runtime's ConsoleOut (via emit), not any REPL
+// framing sink.
+func (r @runtime) execInput(s @Stmt, errMsg *@[]char) int {
+	for {
+		r.emit(buf.CopyStr("? "))
+		var res io.InLine = r.inp.ReadLine()
+		if res.Eof {
+			return STEP_END
+		}
+		var dataOk bool
+		var data @[]@datum = scanReply(res.Text, &dataOk)
+		if dataOk && validInput(s.InTargets, data) {
+			return r.assignInput(s.InTargets, data)
+		}
+		r.emit(buf.CopyStr("?REDO FROM START\n"))
+	}
+}
+
+// scanReply scans an input-reply line into its data (ECMA-55's `input-list =
+// padded-datum (, padded-datum)*`), reusing the DATA scanner: a quoted datum
+// keeps its interior verbatim, an unquoted datum is the comma-delimited run
+// trimmed of surrounding spaces. *ok is set false on a malformed reply (an
+// unterminated quote, or stray text after a closing quote), which is a nonfatal
+// INPUT exception like any other and triggers a re-request.
+func scanReply(line @[]char, ok *bool) @[]@datum {
+	var l @lexer = newLexer(line)
+	var data @[]@datum
+	var derr @[]char
+	var dok bool
+	data, derr, dok = l.scanDataLine()
+	_ = derr
+	*ok = dok
+	return data
+}
+
+// validInput reports whether the scanned reply data satisfy the INPUT targets
+// atomically (ECMA-55 clause 15.4): the datum count must equal the target count,
+// and each datum's type must match its target — a numeric target (a numeric
+// variable or a numeric-array element) requires a numeric-constant datum, while a
+// string target accepts any datum bounded to 18 characters. No assignment is
+// performed; the whole reply is accepted or rejected as a unit.
+func validInput(targets @[]@Expr, data @[]@datum) bool {
+	if len(targets) != len(data) {
+		return false
+	}
+	for i := 0; i < len(targets); i++ {
+		if !datumFitsTarget(targets[i], data[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// datumFitsTarget reports whether datum d may be assigned to the INPUT target t:
+// a string target (EX_SVAR) takes any datum no longer than 18 characters; a
+// numeric target (EX_VAR or EX_AINDEX) takes only a datum that parses as a
+// numeric constant.
+func datumFitsTarget(t @Expr, d @datum) bool {
+	if t.Kind == EX_SVAR {
+		return len(d.Text) <= MAX_STR_LEN
+	}
+	return numericDatum(d)
+}
+
+// assignInput assigns each validated datum to its INPUT target in order, after
+// validInput has confirmed the reply (so types and count already match). A string
+// target stores the datum text verbatim; a numeric variable stores the parsed
+// value; a numeric-array element resolves its subscripts and stores there, which
+// may raise a fatal subscript/arity exception (then turned into STEP_ERROR by the
+// step loop). It returns STEP_NEXT once every target is assigned.
+func (r @runtime) assignInput(targets @[]@Expr, data @[]@datum) int {
+	for i := 0; i < len(targets); i++ {
+		var t @Expr = targets[i]
+		var d @datum = data[i]
+		if t.Kind == EX_SVAR {
+			r.env.setStr(t.Name, copyChars(d.Text))
+		} else if t.Kind == EX_VAR {
+			r.env.setNum(t.Name, datumValue(d))
+		} else {
+			var status int = r.storeArray(t, datumValue(d))
+			if r.fatal {
+				return status
+			}
+		}
+	}
+	return STEP_NEXT
+}

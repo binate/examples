@@ -192,12 +192,19 @@ math — not rolling our own), and `RND`/`RANDOMIZE` are deferred (need a PRNG +
 entropy decision); all of these reserve their names and surface a clean
 `?<fn> not yet supported` fatal. **M2** (`GOSUB`/`RETURN`, `ON…GOTO`,
 `READ`/`DATA`/`RESTORE`, `DIM` + numeric arrays + `OPTION BASE`, single-line
-`DEF FN`) is done and verified — so the **non-interactive language is complete**,
-bar the deferred math-dependent intrinsics. Next: **M3** (embeddable REPL), then
-**M4** (`INPUT`) and **M5** (NBS conformance harness). minbasic needs a main
-toolchain
-(interface-vtable + IR-gen-OOM fixes, both in main, not the pinned `bnc-0.0.7`) —
-build against a main bundle via `BINATE_BUNDLE`.
+`DEF FN`) is done and verified — the **non-interactive language is complete**,
+bar the deferred math-dependent intrinsics. **M3** (the embeddable REPL —
+`basicSession : ReplSession`, incremental line edits, immediate mode,
+`RUN`/`LIST`/`NEW`, driven by `Init`/`Step`) and **M4's `INPUT`** (the injected
+`ConsoleIn` seam, atomic-validate + `?REDO FROM START` re-request, one shared
+stdin reader for the REPL and INPUT) are done and verified. Remaining: **M4's
+`RND`/`RANDOMIZE`** (a PRNG + an entropy decision for RANDOMIZE), then **M5** (NBS
+conformance harness) — plus the deferred transcendentals once `pkg/std/math`
+lands. (M3 ships a marked `*func` temp for the REPL sinks, tracked in `TODO.md` +
+`explorations/claude-todo.md` — restore `@func` when the destructor defect is
+fixed.) minbasic needs a main toolchain (interface-vtable + IR-gen-OOM fixes, both
+in main, not the pinned `bnc-0.0.7`) — build against a main bundle via
+`BINATE_BUNDLE`.
 
 - **M0 — skeleton + wiring.** Create `pkg/io`, the core package shell, and a
   trivial `cmd/run` that builds and prints a banner; confirm it builds compiled +

@@ -82,6 +82,8 @@ func (r @runtime) dispatch(errMsg *@[]char) int {
 		return r.execOnGoto(s, errMsg)
 	} else if s.Kind == ST_READ {
 		return r.execRead(s, errMsg)
+	} else if s.Kind == ST_INPUT {
+		return r.execInput(s, errMsg)
 	} else if s.Kind == ST_RESTORE {
 		return r.execRestore()
 	}

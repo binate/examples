@@ -14,12 +14,12 @@ const (
 )
 
 // runProgram executes a parsed program for the non-interactive runner: it builds
-// a fresh variable store, runs the program, and discards the final state. All
-// load validation and execution is delegated to runProgramInto; the resulting
-// env (which would let an interactive caller inspect variables afterward) is not
-// needed here, so it is dropped.
-func runProgram(prog @[]@Line, out @io.ConsoleOut) {
-	_ = runProgramInto(prog, out)
+// a fresh variable store, runs the program (reading any INPUT replies from inp),
+// and discards the final state. All load validation and execution is delegated
+// to runProgramInto; the resulting env (which would let an interactive caller
+// inspect variables afterward) is not needed here, so it is dropped.
+func runProgram(prog @[]@Line, out @io.ConsoleOut, inp @io.ConsoleIn) {
+	_ = runProgramInto(prog, out, inp)
 }
 
 // runProgramInto executes a parsed program with a jumping program counter and
@@ -28,11 +28,12 @@ func runProgram(prog @[]@Line, out @io.ConsoleOut) {
 // line-number map, validates every GOTO/IF target up front, then drives
 // execution from the lowest-numbered line. The program counter advances by one
 // line normally and is set directly by control statements (GOTO/IF/FOR/NEXT).
-// Execution stops at END/STOP or a fatal runtime error, which is reported as a
-// diagnostic line through out. On a LOAD-time error (a bad jump target, a
-// duplicate OPTION/DEF, a re-DIM) it reports the diagnostic and returns a fresh
-// empty env, since no program state was established.
-func runProgramInto(prog @[]@Line, out @io.ConsoleOut) @env {
+// INPUT replies are read through inp. Execution stops at END/STOP, a fatal
+// runtime error (reported as a diagnostic line through out), or end-of-input
+// while an INPUT awaits a reply (a clean stop). On a LOAD-time error (a bad jump
+// target, a duplicate OPTION/DEF, a re-DIM) it reports the diagnostic and returns
+// a fresh empty env, since no program state was established.
+func runProgramInto(prog @[]@Line, out @io.ConsoleOut, inp @io.ConsoleIn) @env {
 	var lm @lineMap = buildLineMap(prog)
 	var badLine int
 	var badTarget int
@@ -60,7 +61,7 @@ func runProgramInto(prog @[]@Line, out @io.ConsoleOut) @env {
 		return newEnv(base)
 	}
 	var data @[]@datum = collectData(prog)
-	var r @runtime = newRuntime(out, prog, lm, data, base, defs)
+	var r @runtime = newRuntime(out, inp, prog, lm, data, base, defs)
 	var dimMsg @[]char
 	if !applyDims(prog, r.env, &dimMsg) {
 		emitDiag(out, dimMsg)

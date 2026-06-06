@@ -9,16 +9,17 @@ import "pkg/binate/buf"
 // (numbered lines edited at the prompt), a persistent variable state and print
 // column (so immediate-mode LET/PRINT see and update the same variables across
 // turns, and after a RUN), the ReplIO framing sink (banner/prompts/diagnostics),
-// the injected ConsoleOut (the BASIC program's own PRINT output), the count of
-// turns processed, and the inert cooperative-interrupt delegate. The two output
-// seams are kept strictly separate: framing goes through `io`, program output
-// through `out`.
+// the injected ConsoleOut (the BASIC program's own PRINT output), the injected
+// ConsoleIn (a running program's INPUT replies), the count of turns processed,
+// and the inert cooperative-interrupt delegate. The two output seams are kept
+// strictly separate: framing goes through `io`, program output through `out`.
 type basicSession struct {
 	prog  @progStore
 	env   @env
 	col   int
 	io    ReplIO
 	out   @io.ConsoleOut
+	inp   @io.ConsoleIn
 	turns int
 	poll  *func() PollResult
 }
@@ -26,13 +27,14 @@ type basicSession struct {
 // NewSession builds a fresh interactive BASIC session (see the .bni). It returns
 // no setup errors today — construction cannot fail — but keeps the @[]ReplError
 // slot for contract fidelity and future setup-time validation.
-func NewSession(io ReplIO, out @io.ConsoleOut) (@ReplSession, @[]ReplError) {
+func NewSession(io ReplIO, out @io.ConsoleOut, inp @io.ConsoleIn) (@ReplSession, @[]ReplError) {
 	var s @basicSession = make(basicSession)
 	s.prog = newProgStore()
 	s.env = newEnv(0)
 	s.col = 0
 	s.io = io
 	s.out = out
+	s.inp = inp
 	s.turns = 0
 	s.poll = defaultPoll
 	var sess @ReplSession = s

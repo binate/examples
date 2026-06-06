@@ -90,6 +90,9 @@ type Rel struct {
 // ST_ON        Value (the selector expression), Targets (the listed line
 //              numbers, selected 1-based by the rounded selector)
 // ST_READ      Names (the variable-list targets, "$"-suffixed for string vars)
+// ST_INPUT     InTargets (the variable-list targets as expressions: EX_VAR,
+//              EX_SVAR, or EX_AINDEX, so an array element `A(I)` is a valid
+//              target like in LET; assigned from a runtime-read reply line)
 // ST_DATA      Data (this line's data, part of the global sequence; a no-op
 //              when reached during execution)
 // ST_RESTORE   (none — resets the data pointer to the start)
@@ -118,6 +121,7 @@ const (
 	ST_READ
 	ST_DATA
 	ST_RESTORE
+	ST_INPUT
 	ST_DIM
 	ST_OPTION
 	ST_DEF
@@ -155,7 +159,9 @@ const (
 // the FOR omits its STEP clause (the runtime then uses the default increment +1)
 // and Step is unused. Targets is an ON…GOTO line-number list (selected 1-based
 // by the rounded Value selector). Names is a READ variable-list (each entry a
-// numeric or "$"-suffixed string variable name). Data is a DATA line's data,
+// numeric or "$"-suffixed string variable name). InTargets is an INPUT
+// variable-list as expressions (EX_VAR/EX_SVAR/EX_AINDEX, so an array element is
+// a valid target). Data is a DATA line's data,
 // merged into the program's global data sequence at load. LHS is a LET's
 // array-element target (an EX_AINDEX expression) when the assignment writes
 // `A(...)`; it is unused (the scalar/string Name path is taken) otherwise.
@@ -165,23 +171,24 @@ const (
 // records whether a parameter was declared, and Param is the parameter variable
 // name (used only when HasParam).
 type Stmt struct {
-	Kind     int
-	Name     @[]char
-	Value    @Expr
-	Items    @[]@Expr
-	Seps     @[]int
-	Target   int
-	Cond     @Rel
-	Limit    @Expr
-	Step     @Expr
-	HasStep  bool
-	Targets  @[]int
-	Names    @[]@[]char
-	Data     @[]@datum
-	LHS      @Expr
-	Decls    @[]@dimDecl
-	HasParam bool
-	Param    @[]char
+	Kind      int
+	Name      @[]char
+	Value     @Expr
+	Items     @[]@Expr
+	Seps      @[]int
+	Target    int
+	Cond      @Rel
+	Limit     @Expr
+	Step      @Expr
+	HasStep   bool
+	Targets   @[]int
+	Names     @[]@[]char
+	InTargets @[]@Expr
+	Data      @[]@datum
+	LHS       @Expr
+	Decls     @[]@dimDecl
+	HasParam  bool
+	Param     @[]char
 }
 
 // Line is one parsed program line: its line number (1..9999) and its statement.

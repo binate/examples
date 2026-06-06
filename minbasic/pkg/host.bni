@@ -15,6 +15,12 @@ func NewConsole() @io.ConsoleOut
 // from a file descriptor is the one job that touches pkg/bootstrap.
 func NewStdinReader() @LineReader
 
+// NewConsoleIn returns a pkg/basic/io.ConsoleIn that reads a BASIC program's
+// INPUT replies from reader. The caller passes the LineReader so one stdin stream
+// can be shared between a REPL command loop and program INPUT (rather than two
+// competing readers racing for the same descriptor).
+func NewConsoleIn(reader @LineReader) @io.ConsoleIn
+
 // LineResult is one ReadLine outcome: the line's characters (the terminating
 // newline stripped) and an Eof flag. Eof is true only when the input is exhausted
 // at a line boundary, in which case Line is empty; a final line with content but

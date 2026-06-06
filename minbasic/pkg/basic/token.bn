@@ -54,6 +54,9 @@ const (
 	TOK_READ
 	TOK_DATA
 	TOK_RESTORE
+	// TOK_INPUT is the INPUT keyword (clause 15): `INPUT variable-list` reads a
+	// reply line of comma-separated data into its variables at runtime.
+	TOK_INPUT
 	// TOK_DIM is the DIM array-declaration keyword (clause 18.2); TOK_OPTION and
 	// TOK_BASE spell the two words of `OPTION BASE n` (clause 19).
 	TOK_DIM

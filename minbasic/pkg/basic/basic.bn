@@ -5,10 +5,11 @@ import "pkg/binate/buf"
 import "pkg/stdx/slices"
 
 // RunSource parses the program text src and runs it, routing all output through
-// out. Parse errors and fatal runtime errors are reported as a single diagnostic
-// line emitted through out (errors-as-values internally; the public entry just
-// runs and reports for this slice).
-func RunSource(src *[]readonly char, out @io.ConsoleOut) {
+// out and reading any INPUT replies from inp. Parse errors and fatal runtime
+// errors are reported as a single diagnostic line emitted through out
+// (errors-as-values internally; the public entry just runs and reports for this
+// slice).
+func RunSource(src *[]readonly char, out @io.ConsoleOut, inp @io.ConsoleIn) {
 	var prog @[]@Line
 	var perr @[]char
 	var ok bool
@@ -17,7 +18,7 @@ func RunSource(src *[]readonly char, out @io.ConsoleOut) {
 		emitDiag(out, perr)
 		return
 	}
-	runProgram(prog, out)
+	runProgram(prog, out, inp)
 }
 
 // emitDiag emits a diagnostic line ("?<message>") through out. The leading '?'

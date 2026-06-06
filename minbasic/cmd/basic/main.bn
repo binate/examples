@@ -40,17 +40,23 @@ func prompt() {
 	bootstrap.Write(bootstrap.STDOUT, "> ")
 }
 
-// main constructs the session (framing sink + program-output console), reports
-// any setup errors, then drives Init followed by the read/Step loop: render the
-// prompt, read one line from stdin, feed it to Step, and stop when Step reports
-// a clean end-of-input. The reader's Eof flag is forwarded to Step, which returns
-// STEP_EOF_CLEAN at a turn boundary; the loop then exits.
+// main constructs the session (framing sink + program-output console + INPUT
+// source), reports any setup errors, then drives Init followed by the read/Step
+// loop: render the prompt, read one line from stdin, feed it to Step, and stop
+// when Step reports a clean end-of-input. The reader's Eof flag is forwarded to
+// Step, which returns STEP_EOF_CLEAN at a turn boundary; the loop then exits.
+//
+// A single host LineReader is shared: the REPL command loop reads its lines from
+// it, and the session's ConsoleIn (built over the SAME reader) draws a running
+// program's INPUT replies from it too. One reader on one descriptor means INPUT
+// during a RUN consumes the next stdin lines that would otherwise be commands,
+// with no second competing reader racing for the same input.
 func main() {
+	var reader @host.LineReader = host.NewStdinReader()
 	var sess @basic.ReplSession
 	var errs @[]basic.ReplError
-	sess, errs = basic.NewSession(newIO(), host.NewConsole())
+	sess, errs = basic.NewSession(newIO(), host.NewConsole(), host.NewConsoleIn(reader))
 	reportSetupErrors(errs)
-	var reader @host.LineReader = host.NewStdinReader()
 	var r basic.StepResult = sess.Init()
 	for r.Status != basic.STEP_EOF_CLEAN {
 		prompt()

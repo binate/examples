@@ -69,6 +69,51 @@ func (p @parser) parseRead() @Stmt {
 	return s
 }
 
+// parseInput parses `INPUT <variable-list>` — one or more numeric, string, or
+// numeric-array-element targets separated by commas. Unlike READ (whose targets
+// are simple variables only), an INPUT target may be an array element `A(I)`,
+// just like a LET target; the runtime reads one reply line and assigns each
+// scanned datum to the corresponding target.
+func (p @parser) parseInput() @Stmt {
+	p.advance()
+	var targets @[]@Expr = p.parseInputTargets()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_INPUT
+	s.InTargets = targets
+	return s
+}
+
+// parseInputTargets parses a comma-separated list of one or more INPUT targets,
+// returning their target expressions. On a malformed target it records a parse
+// error and returns the targets parsed so far.
+func (p @parser) parseInputTargets() @[]@Expr {
+	var targets @[]@Expr = make_slice(@Expr, 0)
+	targets = slices.Append[@Expr](targets, p.parseInputTarget())
+	for !p.hasErr && p.cur.Kind == TOK_COMMA {
+		p.advance()
+		targets = slices.Append[@Expr](targets, p.parseInputTarget())
+	}
+	return targets
+}
+
+// parseInputTarget parses one INPUT target: a string variable (EX_SVAR), or a
+// numeric variable / array element (EX_VAR / EX_AINDEX via parseVarOrArray). Any
+// other token is a parse error.
+func (p @parser) parseInputTarget() @Expr {
+	if p.cur.Kind == TOK_SVAR {
+		var e @Expr = make(Expr)
+		e.Kind = EX_SVAR
+		e.Name = p.cur.Text
+		p.advance()
+		return e
+	}
+	if p.cur.Kind == TOK_VAR {
+		return p.parseVarOrArray()
+	}
+	p.fail(buf.CopyStr("INPUT: expected a variable"))
+	return make(Expr)
+}
+
 // parseVarList parses a comma-separated list of one or more variables (numeric
 // TOK_VAR or string TOK_SVAR), returning their names. A non-variable token is a
 // parse error.

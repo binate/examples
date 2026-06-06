@@ -25,3 +25,8 @@ Cases covered:
 - **parse-error** — a parse error on a numbered line is reported and the line is
   NOT stored (the following `LIST` omits it); the session continues, accepts more
   lines, and `RUN`s.
+- **input-run** — a stored program with an `INPUT` statement is `RUN`; the reply
+  line is read from the SAME stdin stream the REPL command loop reads (one shared
+  host reader), so the line after `RUN` is consumed by the program's `INPUT`
+  rather than treated as a command; a following immediate `PRINT` shows the
+  variable the program's `INPUT` set.

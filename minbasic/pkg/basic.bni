@@ -16,11 +16,12 @@ package "pkg/basic"
 import "pkg/basic/io"
 
 // RunSource parses the BASIC program text src and executes it, sending all
-// program output to out. On a parse error or a fatal runtime error it emits a
-// single clear diagnostic line through out and stops; partial output produced
-// before the error is preserved (ECMA-55 has no rollback). src is a raw
-// readonly char view of the source file's bytes.
-func RunSource(src *[]readonly char, out @io.ConsoleOut)
+// program output to out and reading any INPUT replies from inp. On a parse error
+// or a fatal runtime error it emits a single clear diagnostic line through out
+// and stops; partial output produced before the error is preserved (ECMA-55 has
+// no rollback). End-of-input while an INPUT awaits a reply stops the run cleanly.
+// src is a raw readonly char view of the source file's bytes.
+func RunSource(src *[]readonly char, out @io.ConsoleOut, inp @io.ConsoleIn)
 
 // ReplIO is the host-supplied sink for the REPL's OWN framing output: the
 // banner, the prompts, and the syntax/runtime diagnostics. Routing the engine's
@@ -136,10 +137,13 @@ interface ReplSession {
 }
 
 // NewSession builds a fresh interactive BASIC session: an empty program store, a
-// zeroed variable state, the ReplIO framing sink, and the injected ConsoleOut
-// for the BASIC program's own output. It returns the session behind a
-// @ReplSession plus any setup errors as @[]ReplError values (none arise today —
-// construction cannot fail — but the slot keeps the contract shape and lets
-// future setup-time validation surface errors as values rather than printing +
-// exiting). io is the framing sink; out receives all PRINT output.
-func NewSession(io ReplIO, out @io.ConsoleOut) (@ReplSession, @[]ReplError)
+// zeroed variable state, the ReplIO framing sink, the injected ConsoleOut for the
+// BASIC program's own output, and the injected ConsoleIn for a running program's
+// INPUT replies. It returns the session behind a @ReplSession plus any setup
+// errors as @[]ReplError values (none arise today — construction cannot fail —
+// but the slot keeps the contract shape and lets future setup-time validation
+// surface errors as values rather than printing + exiting). io is the framing
+// sink; out receives all PRINT output; inp supplies INPUT replies. A host that
+// shares one stdin reader between its command loop and INPUT passes a ConsoleIn
+// backed by that same reader, so RUN's INPUT pulls from the same stream.
+func NewSession(io ReplIO, out @io.ConsoleOut, inp @io.ConsoleIn) (@ReplSession, @[]ReplError)

@@ -17,7 +17,8 @@ const MARGIN int = 75
 const MAX_STR_LEN int = 18
 
 // runtime is the per-RUN execution context. env is the variable store; out the
-// output sink; col the 0-based column the next character would occupy on the
+// output sink; inp the INPUT reply source (consulted by execInput, never for
+// PRINT); col the 0-based column the next character would occupy on the
 // current line (for PRINT zone spacing). prog is the line-ordered program;
 // lineMap resolves a line number to its index in prog (-1 if absent); pc is the
 // program counter (an index into prog); fors is the stack of open FOR loops;
@@ -32,6 +33,7 @@ const MAX_STR_LEN int = 18
 type runtime struct {
 	env      @env
 	out      @io.ConsoleOut
+	inp      @io.ConsoleIn
 	col      int
 	prog     @[]@Line
 	lineMap  @lineMap
@@ -45,17 +47,18 @@ type runtime struct {
 	defs     @defStore
 }
 
-// newRuntime builds a runtime over a fresh variable store writing to out, with
-// the program prog, its precomputed line-number map, its global DATA sequence,
-// and its user-defined-function table defs. base is the OPTION BASE array lower
-// bound. The program counter starts at the first line; the FOR and GOSUB stacks
-// start empty; the data pointer starts at the first datum; no array is
-// dimensioned yet.
-func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum, base int,
-	defs @defStore) @runtime {
+// newRuntime builds a runtime over a fresh variable store writing to out and
+// reading INPUT replies from inp, with the program prog, its precomputed
+// line-number map, its global DATA sequence, and its user-defined-function table
+// defs. base is the OPTION BASE array lower bound. The program counter starts at
+// the first line; the FOR and GOSUB stacks start empty; the data pointer starts
+// at the first datum; no array is dimensioned yet.
+func newRuntime(out @io.ConsoleOut, inp @io.ConsoleIn, prog @[]@Line, lm @lineMap,
+	data @[]@datum, base int, defs @defStore) @runtime {
 	var r @runtime = make(runtime)
 	r.env = newEnv(base)
 	r.out = out
+	r.inp = inp
 	r.col = 0
 	r.prog = prog
 	r.lineMap = lm

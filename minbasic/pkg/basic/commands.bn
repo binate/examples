@@ -81,7 +81,7 @@ func (s @basicSession) runProgram() {
 	if s.prog.isEmpty() {
 		return
 	}
-	s.env = runProgramInto(s.prog.snapshot(), s.out)
+	s.env = runProgramInto(s.prog.snapshot(), s.out, s.inp)
 }
 
 // listProgram (LIST) prints the stored program through the FRAMING sink, each

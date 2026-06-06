@@ -88,6 +88,39 @@ func (r @stdinReader) ReadLine() LineResult {
 
 impl @stdinReader : LineReader
 
+// consoleIn adapts a LineReader into a pkg/basic/io.ConsoleIn: a BASIC INPUT
+// reply is just one line of input, so ReadLine forwards to the wrapped reader
+// and repackages its LineResult as the io.InLine the core expects. It holds the
+// reader (not a fresh one) so a single stdin stream can be shared — the REPL host
+// gives the same LineReader its command loop reads from, and program INPUT then
+// pulls the next line from that one stream rather than a competing reader.
+type consoleIn struct {
+	reader @LineReader
+}
+
+// NewConsoleIn returns a ConsoleIn that reads INPUT replies from reader. The
+// caller supplies the LineReader so the same stdin stream can serve both a REPL
+// command loop and program INPUT (see consoleIn).
+func NewConsoleIn(reader @LineReader) @io.ConsoleIn {
+	var c @consoleIn = make(consoleIn)
+	c.reader = reader
+	var cin @io.ConsoleIn = c
+	return cin
+}
+
+// ReadLine reads the next reply line from the wrapped LineReader and repackages
+// it as an io.InLine (Text and Eof carried across verbatim — both seams strip the
+// terminating newline and report Eof only when no line remains).
+func (c @consoleIn) ReadLine() io.InLine {
+	var lr LineResult = c.reader.ReadLine()
+	var res io.InLine
+	res.Text = lr.Line
+	res.Eof = lr.Eof
+	return res
+}
+
+impl @consoleIn : io.ConsoleIn
+
 // READ_CHUNK is the buffer size used per read(2) call when slurping a file.
 const READ_CHUNK int = 4096
 

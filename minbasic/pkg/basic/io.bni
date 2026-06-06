@@ -8,8 +8,27 @@ package "pkg/basic/io"
 // ConsoleOut is the sink for a BASIC program's PRINT output. The core formats
 // numbers/strings and the print-zone spacing, then emits the resulting
 // characters through Write; the implementation only moves bytes onward. Returns
-// the number of characters written. (ConsoleIn, for INPUT, joins this seam when
-// the INPUT statement lands.)
+// the number of characters written. ConsoleIn is the matching INPUT seam.
 interface ConsoleOut {
 	Write(s *[]readonly char) int
+}
+
+// InLine is one ConsoleIn.ReadLine outcome: the reply line's characters (Text,
+// the terminating newline stripped) and an Eof flag. Eof is true only when the
+// input is exhausted with no line to return (Text empty); a final line with
+// content but no trailing newline is returned with Eof false, and the following
+// call reports Eof. It is a single struct (not a multi-value return) because a
+// vtable-dispatched interface method returning a tuple is currently miscompiled
+// — the same reason pkg/host's LineResult is a struct.
+type InLine struct {
+	Text @[]char
+	Eof  bool
+}
+
+// ConsoleIn is the source for a BASIC program's INPUT replies. INPUT prompts
+// through ConsoleOut, then reads one reply line through ReadLine; the core scans
+// and validates the reply, never touching a file descriptor. The implementation
+// only supplies the next line of input and signals end-of-input.
+interface ConsoleIn {
+	ReadLine() InLine
 }

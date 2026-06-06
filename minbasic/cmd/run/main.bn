@@ -1,7 +1,9 @@
 // Command run is the non-interactive minbasic host: `run <prog.bas>` reads a
 // BASIC source file and executes it, routing all program output through the
-// console I/O delegate. It is the thin outer shell — argument handling, file
-// reading, and process exit — around the pkg/basic interpreter core.
+// console output delegate and reading any INPUT replies from standard input
+// (the program text comes from the file argument, so stdin is free for INPUT).
+// It is the thin outer shell — argument handling, file reading, and process exit
+// — around the pkg/basic interpreter core.
 package "main"
 
 import "pkg/basic"
@@ -33,5 +35,5 @@ func main() {
 		bootstrap.Write(bootstrap.STDERR, "run: cannot read file\n")
 		bootstrap.Exit(1)
 	}
-	basic.RunSource(src, host.NewConsole())
+	basic.RunSource(src, host.NewConsole(), host.NewConsoleIn(host.NewStdinReader()))
 }

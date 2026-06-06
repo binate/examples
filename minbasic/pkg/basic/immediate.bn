@@ -4,13 +4,16 @@ import "pkg/basic/io"
 import "pkg/binate/buf"
 
 // runImmediate parses and executes one direct (un-numbered) BASIC statement
-// against the persistent session state. LET and PRINT — the statements that read
-// and update variables and produce output — are the supported immediate-mode
-// cases; REM is a harmless no-op. Statements that need the stored-program context
-// (the control-flow statements, which jump between line numbers) or load-time
-// processing (READ/DATA/RESTORE, DIM, OPTION, DEF, END, STOP) are rejected in
-// immediate mode with a clear diagnostic rather than misbehaving against an
-// empty program. A parse error is reported through the diagnostics sink.
+// against the persistent session state. LET, PRINT, and INPUT — the statements
+// that read and update variables and produce output — are the supported
+// immediate-mode cases; REM is a harmless no-op. A direct INPUT prompts and reads
+// one reply line from the session's ConsoleIn (the same stdin stream the REPL
+// command loop reads), so it composes with the REPL like any other direct
+// statement. Statements that need the stored-program context (the control-flow
+// statements, which jump between line numbers) or load-time processing
+// (READ/DATA/RESTORE, DIM, OPTION, DEF, END, STOP) are rejected in immediate mode
+// with a clear diagnostic rather than misbehaving against an empty program. A
+// parse error is reported through the diagnostics sink.
 func (s @basicSession) runImmediate(text @[]char) {
 	var p @parser = newParser(text)
 	var stmt @Stmt = p.parseStmt()
@@ -26,11 +29,12 @@ func (s @basicSession) runImmediate(text @[]char) {
 }
 
 // immediateAllowed reports whether a statement of the given kind may run in
-// immediate mode. LET/PRINT read and update the persistent variable state and
-// produce output; REM is a no-op. Every other kind depends on a stored program
-// or on load-time processing and is rejected (see runImmediate).
+// immediate mode. LET/PRINT/INPUT read and update the persistent variable state
+// and produce output (INPUT also reads a reply line); REM is a no-op. Every other
+// kind depends on a stored program or on load-time processing and is rejected
+// (see runImmediate).
 func immediateAllowed(kind int) bool {
-	return kind == ST_LET || kind == ST_PRINT || kind == ST_REM
+	return kind == ST_LET || kind == ST_PRINT || kind == ST_INPUT || kind == ST_REM
 }
 
 // execImmediate executes one allowed immediate statement against the persistent
@@ -41,7 +45,7 @@ func immediateAllowed(kind int) bool {
 // fatal runtime error (e.g. a string too long, or a not-yet-supported function
 // in an expression) is reported through the diagnostics sink.
 func (s @basicSession) execImmediate(stmt @Stmt) {
-	var r @runtime = newImmediateRuntime(s.out, s.env, s.col)
+	var r @runtime = newImmediateRuntime(s.out, s.inp, s.env, s.col)
 	var ln @Line = make(Line)
 	ln.Num = 0
 	ln.Stmt = stmt
@@ -56,12 +60,14 @@ func (s @basicSession) execImmediate(stmt @Stmt) {
 
 // newImmediateRuntime builds a runtime that shares the session's persistent
 // variable store env and resumes at print column `col`, writing program output
-// to out. It has no stored program, line map, DATA, or user-function table —
-// immediate statements neither jump nor READ nor call FNs — so those are empty.
-func newImmediateRuntime(out @io.ConsoleOut, env @env, col int) @runtime {
+// to out and reading INPUT replies from inp. It has no stored program, line map,
+// DATA, or user-function table — immediate statements neither jump nor READ nor
+// call FNs — so those are empty.
+func newImmediateRuntime(out @io.ConsoleOut, inp @io.ConsoleIn, env @env, col int) @runtime {
 	var r @runtime = make(runtime)
 	r.env = env
 	r.out = out
+	r.inp = inp
 	r.col = col
 	r.prog = make_slice(@Line, 0)
 	r.lineMap = emptyLineMap()
