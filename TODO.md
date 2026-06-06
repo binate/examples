@@ -1,5 +1,13 @@
 # examples — TODO
 
+- **Restore minbasic's REPL sinks to `@func`.** `minbasic/pkg/basic.bni`
+  (`ReplIO.WriteOut`/`WriteErr`) and `minbasic/pkg/basic/session.bn` (`SetPoll`
+  and the `poll` field) use raw `*func` as a temporary dodge: spelling them the
+  contract's `@func` (as `pkg/binate/repl` does) crashes the managed
+  `basicSession` destructor (`func_value_dtor on nil`, both backends). Restore
+  `@func` once the binate codegen/VM defect is fixed (tracked in
+  `explorations/claude-todo.md`).
+
 - **Tests.** Support `*_test.bn` in examples (not required per example).
   Decide whether to run tests via `bni --test`, `bnc --test`, or both,
   and add the scripts — strawman: `build-tests-compiled.sh`,

@@ -21,3 +21,125 @@ import "pkg/basic/io"
 // before the error is preserved (ECMA-55 has no rollback). src is a raw
 // readonly char view of the source file's bytes.
 func RunSource(src *[]readonly char, out @io.ConsoleOut)
+
+// ReplIO is the host-supplied sink for the REPL's OWN framing output: the
+// banner, the prompts, and the syntax/runtime diagnostics. Routing the engine's
+// framing through a pluggable sink — rather than straight to a file descriptor —
+// is what lets a non-CLI host (a wasm worker, a test buffer) redirect it. Two
+// channels: normal output and diagnostics; a CLI wires both to stdout, a richer
+// host can split them. Output produced by the BASIC program itself (PRINT) is a
+// SEPARATE concern, handled by the injected pkg/basic/io.ConsoleOut, never by
+// this sink. (Duplicated from pkg/binate/repl.bni; the bundle does not expose
+// that package to examples, so the small contract is copied here.)
+//
+// The two sink channels are raw (`*func`) rather than the managed (`@func`) that
+// pkg/binate/repl uses, to dodge a current toolchain defect: the managed session
+// struct's destructor miscompiles when its sink fields are managed `@func` —
+// crashing with `func_value_dtor on nil` in BOTH backends (compiled SIGTRAP,
+// interpreted aborts). A simpler standalone struct of two `@func` fields does
+// NOT trigger it, so the trigger is the session's fuller managed-field layout
+// (the sinks mixed with other managed fields). These sinks are non-capturing
+// host functions, so a raw function value is semantically fine and the natural
+// fit; restore `@func` to match pkg/binate/repl once the defect is fixed.
+type ReplIO struct {
+	WriteOut *func(*[]readonly char) int
+	WriteErr *func(*[]readonly char) int
+}
+
+// ReplError is one setup-time error surfaced by NewSession. Returning these as
+// VALUES rather than printing + exiting the process is what lets a non-CLI host
+// decide how to react. Just a message for now; position/severity can join it
+// later without changing the contract. (Duplicated from pkg/binate/repl.bni.)
+type ReplError struct {
+	Msg @[]char
+}
+
+// StepStatus enumerates the control outcomes of Init / Step, carried in
+// StepResult.Status. It is a named type (not bare int constants) so the type
+// checker rejects mixing a status with an arbitrary integer. (Duplicated from
+// pkg/binate/repl.bni.)
+type StepStatus int
+const (
+	// STEP_NEED_MORE means the input is incomplete; the host shows a continuation
+	// prompt. BASIC lines are always one complete turn, so minbasic never returns
+	// this — it is kept only for shape fidelity with pkg/binate/repl.
+	STEP_NEED_MORE StepStatus = iota
+	// STEP_EVALUATED means the turn completed; the host shows the primary prompt.
+	STEP_EVALUATED
+	// STEP_EOF_CLEAN means input ended at a turn boundary (the clean end of a
+	// session).
+	STEP_EOF_CLEAN
+	// STEP_EOF_UNBALANCED means input ended mid-accumulation; the buffer was
+	// discarded. minbasic never accumulates, so it never returns this — kept for
+	// shape fidelity.
+	STEP_EOF_UNBALANCED
+	// STEP_SUSPENDED is reserved for a cooperative-interrupt suspend stage; the
+	// poll seam is inert in this version, so Step never returns it.
+	STEP_SUSPENDED
+	// STEP_BROKE is reserved for a cooperative-interrupt break stage; not produced
+	// in this version.
+	STEP_BROKE
+)
+
+// StepResult is the outcome of Init / Step plus the data the host needs to
+// render the NEXT prompt. The engine never bakes prompt strings: Depth (0 ⇒
+// primary, >0 ⇒ continuation) and Counter (a host-render index) let the host
+// render however it likes. For line-numbered BASIC every turn is complete, so
+// Depth is always 0 and Counter is the count of turns processed (purely
+// informational; the host may ignore it). Output is already flushed through the
+// sink; StepResult carries only control + prompt metadata. (Duplicated from
+// pkg/binate/repl.bni.)
+type StepResult struct {
+	Status  StepStatus
+	Counter int
+	Depth   int
+}
+
+// PollResult is what a host's cooperative-interrupt delegate returns at each
+// poll point: keep running, unwind to the prompt, or suspend. A named type (not
+// bare int) carrying no engine dependency, so the SetPoll contract — and thus
+// the ReplSession interface — stays decoupled. (Duplicated from
+// pkg/binate/repl.bni; the poll seam is inert in this version.)
+type PollResult int
+const (
+	// POLL_CONTINUE means keep evaluating.
+	POLL_CONTINUE PollResult = iota
+	// POLL_BREAK means abort the turn and unwind to the prompt.
+	POLL_BREAK
+	// POLL_SUSPEND means suspend the turn so it can be resumed.
+	POLL_SUSPEND
+)
+
+// ReplSession is the host-facing handle to a running BASIC REPL engine. It is an
+// INTERFACE so an embedder can hold any session behind it without depending on
+// the engine's internals. The host drives a session by calling Init once, then
+// Step per host-read line, and (optionally) SetPoll to arm cooperative
+// interrupts (inert here). (Duplicated from pkg/binate/repl.bni.)
+interface ReplSession {
+	// Init runs any pre-prompt initialization, emits its banner through the
+	// ReplIO sink, and returns the StepResult for the first prompt.
+	Init() StepResult
+	// Step feeds ONE host-read line into the session and runs it to completion,
+	// returning what the host should render next. eof at a turn boundary →
+	// STEP_EOF_CLEAN; otherwise the line is processed (a numbered line edits the
+	// stored program, an immediate line executes now) and STEP_EVALUATED is
+	// returned. line is a raw readonly view of the input bytes (newline already
+	// stripped by the host).
+	Step(line *[]readonly uint8, eof bool) StepResult
+	// SetPoll installs the host's cooperative-interrupt delegate. The delegate
+	// takes no arguments and returns a PollResult. In this version the seam is
+	// inert: the session STORES the delegate but NEVER invokes it, so Step never
+	// returns STEP_SUSPENDED / STEP_BROKE. Kept for shape fidelity with
+	// pkg/binate/repl. (Raw `*func` rather than its `@func`, for the same
+	// toolchain-defect reason noted on ReplIO.)
+	SetPoll(poll *func() PollResult)
+}
+
+// NewSession builds a fresh interactive BASIC session: an empty program store, a
+// zeroed variable state, the ReplIO framing sink, and the injected ConsoleOut
+// for the BASIC program's own output. It returns the session behind a
+// @ReplSession plus any setup errors as @[]ReplError values (none arise today —
+// construction cannot fail — but the slot keeps the contract shape and lets
+// future setup-time validation surface errors as values rather than printing +
+// exiting). io is the framing sink; out receives all PRINT output.
+func NewSession(io ReplIO, out @io.ConsoleOut) (@ReplSession, @[]ReplError)

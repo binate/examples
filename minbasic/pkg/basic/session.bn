@@ -1,0 +1,124 @@
+package "pkg/basic"
+
+import "pkg/basic/io"
+import "pkg/binate/buf"
+
+// basicSession is the embeddable BASIC REPL engine: it implements ReplSession,
+// driving the shared lexer/parser/evaluator from a persistent, mutable session
+// rather than parsing a whole file at once. It owns the mutable program store
+// (numbered lines edited at the prompt), a persistent variable state and print
+// column (so immediate-mode LET/PRINT see and update the same variables across
+// turns, and after a RUN), the ReplIO framing sink (banner/prompts/diagnostics),
+// the injected ConsoleOut (the BASIC program's own PRINT output), the count of
+// turns processed, and the inert cooperative-interrupt delegate. The two output
+// seams are kept strictly separate: framing goes through `io`, program output
+// through `out`.
+type basicSession struct {
+	prog  @progStore
+	env   @env
+	col   int
+	io    ReplIO
+	out   @io.ConsoleOut
+	turns int
+	poll  *func() PollResult
+}
+
+// NewSession builds a fresh interactive BASIC session (see the .bni). It returns
+// no setup errors today — construction cannot fail — but keeps the @[]ReplError
+// slot for contract fidelity and future setup-time validation.
+func NewSession(io ReplIO, out @io.ConsoleOut) (@ReplSession, @[]ReplError) {
+	var s @basicSession = make(basicSession)
+	s.prog = newProgStore()
+	s.env = newEnv(0)
+	s.col = 0
+	s.io = io
+	s.out = out
+	s.turns = 0
+	s.poll = defaultPoll
+	var sess @ReplSession = s
+	return sess, make_slice(ReplError, 0)
+}
+
+// defaultPoll is the inert cooperative-interrupt delegate the session holds until
+// (and unless) a host installs its own via SetPoll. It always reports
+// POLL_CONTINUE. NewSession seeds the poll field with it so the seam always holds
+// a valid function value. It is never invoked (the seam is inert), so its result
+// is irrelevant beyond being well-formed.
+func defaultPoll() PollResult {
+	return POLL_CONTINUE
+}
+
+impl @basicSession : ReplSession
+
+// SetPoll stores the host's cooperative-interrupt delegate. The seam is INERT in
+// this version: the delegate is recorded but never invoked, so Step never
+// returns STEP_SUSPENDED / STEP_BROKE. It exists for shape fidelity with
+// pkg/binate/repl.
+func (s @basicSession) SetPoll(poll *func() PollResult) {
+	s.poll = poll
+}
+
+// Init emits the session banner through the framing sink and returns the
+// StepResult for the first prompt (Depth 0, primary prompt). It establishes no
+// program or variable state beyond what NewSession set up.
+func (s @basicSession) Init() StepResult {
+	s.writeOut(buf.CopyStr("minbasic — ECMA-55 Minimal BASIC\n"))
+	s.writeOut(buf.CopyStr("READY\n"))
+	return s.result(STEP_EVALUATED)
+}
+
+// Step processes ONE host-read line and returns what the host should render
+// next. At a turn boundary, eof ends the session cleanly (STEP_EOF_CLEAN);
+// otherwise the line is dispatched — a line beginning with a digit edits the
+// stored program, anything else is an immediate command or statement — and
+// STEP_EVALUATED is returned. BASIC lines are always one complete turn, so Depth
+// stays 0 and STEP_NEED_MORE is never returned.
+func (s @basicSession) Step(line *[]readonly uint8, eof bool) StepResult {
+	if eof {
+		return s.result(STEP_EOF_CLEAN)
+	}
+	s.turns = s.turns + 1
+	var text @[]char = copyReadonly(line)
+	s.dispatchLine(text)
+	return s.result(STEP_EVALUATED)
+}
+
+// result builds a StepResult with the given status, the running turn count as
+// Counter (informational for line-numbered BASIC), and Depth 0 (every BASIC line
+// is a complete turn, so there is never a continuation prompt).
+func (s @basicSession) result(status StepStatus) StepResult {
+	var r StepResult
+	r.Status = status
+	r.Counter = s.turns
+	r.Depth = 0
+	return r
+}
+
+// writeOut sends framing text (banner, prompt acknowledgements, info) through
+// the ReplIO normal-output channel — never through the program's ConsoleOut.
+func (s @basicSession) writeOut(text @[]char) {
+	s.io.WriteOut(text)
+}
+
+// writeErr sends a framing diagnostic through the ReplIO diagnostics channel,
+// prefixing it with '?' (the engine's error marker) and a trailing newline.
+// Kept distinct from program output so a syntax/runtime error is never confused
+// with PRINT text.
+func (s @basicSession) writeErr(msg @[]char) {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteByte('?')
+	b = b.WriteStr(msg)
+	b = b.WriteByte('\n')
+	s.io.WriteErr(b.Bytes())
+}
+
+// copyReadonly copies a raw readonly uint8 input view into an owned managed char
+// slice (char and uint8 are the same byte). The host hands Step a borrowed view;
+// the session must own the characters it parses and may store.
+func copyReadonly(line *[]readonly uint8) @[]char {
+	var out @[]char = make_slice(char, len(line))
+	for i := 0; i < len(line); i++ {
+		out[i] = cast(char, line[i])
+	}
+	return out
+}

@@ -10,6 +10,30 @@ import "pkg/basic/io"
 // process's standard output.
 func NewConsole() @io.ConsoleOut
 
+// NewStdinReader returns a LineReader that reads the process's standard input one
+// line at a time. It is the REPL host's input source, kept here because reading
+// from a file descriptor is the one job that touches pkg/bootstrap.
+func NewStdinReader() @LineReader
+
+// LineResult is one ReadLine outcome: the line's characters (the terminating
+// newline stripped) and an Eof flag. Eof is true only when the input is exhausted
+// at a line boundary, in which case Line is empty; a final line with content but
+// no trailing newline is returned with Eof false, and the following call then
+// reports Eof. It is a single struct (rather than a multi-value return) because a
+// vtable-dispatched interface method returning a tuple is currently miscompiled —
+// see the note in pkg/host/host.bn.
+type LineResult struct {
+	Line @[]char
+	Eof  bool
+}
+
+// LineReader reads its input one line at a time, yielding a LineResult per call.
+// This is the host's stdin seam — the only line-reading path that reaches
+// pkg/bootstrap.
+interface LineReader {
+	ReadLine() LineResult
+}
+
 // ReadFile reads the entire contents of the file at path, returning the bytes
 // and an ok flag (false if the file cannot be opened or read). It opens,
 // reads to end, and closes via pkg/bootstrap.

@@ -1,0 +1,75 @@
+// Command basic is the interactive minbasic host: it drives the embeddable
+// pkg/basic REPL session over standard input and output. It wires two output
+// seams to stdout — the engine's framing (banner, prompts, diagnostics) through
+// a ReplIO sink, and the BASIC program's own PRINT output through the host
+// ConsoleOut — and reads one line at a time from stdin via the host LineReader.
+// It is the thin outer shell (stream wiring + the Init/Step drive loop) around
+// the interpreter core; the core never touches a file descriptor.
+package "main"
+
+import "pkg/basic"
+import "pkg/bootstrap"
+import "pkg/host"
+
+// frameOut writes engine framing text to standard output. It is the ReplIO
+// normal-output channel: the banner, the prompts, and LIST output flow through
+// here. It returns the number of bytes written (the bootstrap.Write result).
+func frameOut(s *[]readonly char) int {
+	return bootstrap.Write(bootstrap.STDOUT, s)
+}
+
+// frameErr writes an engine diagnostic to standard output. Routing diagnostics
+// to stdout (rather than stderr) keeps a piped session's transcript a single
+// ordered stream, so compiled and interpreted runs diff byte-for-byte.
+func frameErr(s *[]readonly char) int {
+	return bootstrap.Write(bootstrap.STDOUT, s)
+}
+
+// newIO builds the ReplIO framing sink, wiring both channels to standard output.
+func newIO() basic.ReplIO {
+	var io basic.ReplIO
+	io.WriteOut = frameOut
+	io.WriteErr = frameErr
+	return io
+}
+
+// prompt renders the primary prompt for the next input line. The engine never
+// bakes prompt strings (Depth drives the choice); a BASIC session is always at
+// Depth 0, so the host shows the single primary prompt "> " before each read.
+func prompt() {
+	bootstrap.Write(bootstrap.STDOUT, "> ")
+}
+
+// main constructs the session (framing sink + program-output console), reports
+// any setup errors, then drives Init followed by the read/Step loop: render the
+// prompt, read one line from stdin, feed it to Step, and stop when Step reports
+// a clean end-of-input. The reader's Eof flag is forwarded to Step, which returns
+// STEP_EOF_CLEAN at a turn boundary; the loop then exits.
+func main() {
+	var sess @basic.ReplSession
+	var errs @[]basic.ReplError
+	sess, errs = basic.NewSession(newIO(), host.NewConsole())
+	reportSetupErrors(errs)
+	var reader @host.LineReader = host.NewStdinReader()
+	var r basic.StepResult = sess.Init()
+	for r.Status != basic.STEP_EOF_CLEAN {
+		prompt()
+		var lr host.LineResult = reader.ReadLine()
+		r = sess.Step(lr.Line, lr.Eof)
+	}
+}
+
+// reportSetupErrors prints any constructor-time errors to standard error and
+// exits nonzero. NewSession returns none today, but surfacing them as values
+// (rather than the engine printing + exiting) is the contract; the host decides
+// how to react.
+func reportSetupErrors(errs @[]basic.ReplError) {
+	if len(errs) == 0 {
+		return
+	}
+	for i := 0; i < len(errs); i++ {
+		bootstrap.Write(bootstrap.STDERR, errs[i].Msg)
+		bootstrap.Write(bootstrap.STDERR, "\n")
+	}
+	bootstrap.Exit(1)
+}

@@ -1,0 +1,9 @@
+minbasic — ECMA-55 Minimal BASIC
+READY
+> > ?line 20: unknown keyword: PRONT
+> 10 PRINT "OK"
+> > 10 PRINT "OK"
+30 PRINT "STILL HERE"
+> OK
+STILL HERE
+> 

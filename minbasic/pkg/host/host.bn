@@ -27,6 +27,67 @@ func NewConsole() @io.ConsoleOut {
 	return out
 }
 
+// stdinReader reads lines from standard input. It reads one byte per read(2)
+// call (a line-oriented REPL needs no buffering, and leaving unconsumed bytes in
+// a shared buffer is the kind of statefulness this seam avoids) and assembles a
+// line up to the next '\n'. sawEof latches once read(2) reports end-of-input, so
+// a subsequent ReadLine returns the eof signal without another syscall. This is
+// the only line-reading type that depends on pkg/bootstrap.
+type stdinReader struct {
+	sawEof bool
+}
+
+// NewStdinReader returns a LineReader bound to standard input.
+func NewStdinReader() @LineReader {
+	var r @stdinReader = make(stdinReader)
+	r.sawEof = false
+	var lr @LineReader = r
+	return lr
+}
+
+// ReadLine reads the next line from standard input. It accumulates bytes until a
+// '\n' (excluded from the result) or end-of-input. Eof is true only when the
+// input was already exhausted at a line boundary (an empty line returned); a
+// final unterminated line is returned with Eof false, and the next call reports
+// Eof. char and uint8 are the same byte, so the read byte stores directly.
+//
+// The result is a single LineResult struct rather than a (line, eof) tuple
+// because returning a multi-value tuple from a vtable-dispatched interface method
+// is currently miscompiled (the call site drops the sret buffer and emits an
+// `extractvalue void`, which is invalid IR); a single-struct return compiles
+// correctly in both modes.
+func (r @stdinReader) ReadLine() LineResult {
+	var res LineResult
+	if r.sawEof {
+		res.Line = make_slice(char, 0)
+		res.Eof = true
+		return res
+	}
+	var b buf.CharBuf = buf.New()
+	var one @[]uint8 = make_slice(uint8, 1)
+	var got bool = false
+	for {
+		var n int = bootstrap.Read(bootstrap.STDIN, one)
+		if n <= 0 {
+			r.sawEof = true
+			res.Line = b.Freeze()
+			res.Eof = !got
+			return res
+		}
+		got = true
+		if one[0] == cast(uint8, '\n') {
+			res.Line = b.Freeze()
+			res.Eof = false
+			return res
+		}
+		if one[0] != cast(uint8, '\r') {
+			b = b.WriteByte(cast(char, one[0]))
+		}
+	}
+}
+
+impl @stdinReader : LineReader
+
 // READ_CHUNK is the buffer size used per read(2) call when slurping a file.
 const READ_CHUNK int = 4096
 

@@ -1,0 +1,157 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// dispatchLine routes one input line. A line whose first non-blank character is
+// a digit edits the stored program (editLine); a blank line is ignored;
+// everything else is an immediate command (RUN / LIST / NEW) or an immediate
+// BASIC statement executed against the persistent session state. Classification
+// is on the raw text — the leading-digit test distinguishes a program edit from
+// a direct statement without any keyword lookahead.
+func (s @basicSession) dispatchLine(text @[]char) {
+	var i int = skipBlank(text, 0)
+	if i >= len(text) {
+		return
+	}
+	if isDigit(text[i]) {
+		s.editLine(text)
+		return
+	}
+	s.immediateLine(text)
+}
+
+// editLine handles a numbered program-edit line: it splits off the line number,
+// and on a bare number (no statement after it) deletes that line, otherwise
+// parses the statement and inserts/replaces the line in the store. A parse error
+// is reported through the diagnostics sink and the line is NOT stored. No
+// execution happens — editing the store is the whole effect.
+func (s @basicSession) editLine(text @[]char) {
+	var num int
+	var rest @[]char
+	var ok bool
+	num, rest, ok = splitLineNumber(text)
+	if !ok {
+		s.writeErr(buf.CopyStr("each line must begin with a line number 1..9999"))
+		return
+	}
+	if isBlank(rest) {
+		s.prog.remove(num)
+		return
+	}
+	var p @parser = newParser(rest)
+	var stmt @Stmt = p.parseStmt()
+	if p.hasErr {
+		s.writeErr(lineDiag(num, p.err))
+		return
+	}
+	s.prog.put(num, trimSpaces(rest), stmt)
+}
+
+// immediateLine handles a direct (un-numbered) line: the REPL commands RUN /
+// LIST / NEW are recognized first (the line is exactly that word, case-folded),
+// then anything else is parsed as a single BASIC statement and executed now
+// against the persistent session state.
+func (s @basicSession) immediateLine(text @[]char) {
+	var word @[]char = trimSpaces(text)
+	if charsEqFold(word, "RUN") {
+		s.runProgram()
+		return
+	}
+	if charsEqFold(word, "LIST") {
+		s.listProgram()
+		return
+	}
+	if charsEqFold(word, "NEW") {
+		s.newProgram()
+		return
+	}
+	s.runImmediate(text)
+}
+
+// runProgram (RUN) clears the variable state, then executes the stored program
+// from its lowest line, sending PRINT output to the injected ConsoleOut. The
+// resulting variable state is RETAINED in the session, so a subsequent immediate
+// PRINT can inspect a program's final values. An empty program is a clean no-op.
+// END/STOP or a fatal runtime error returns control to the prompt (a fatal
+// prints its `?…` diagnostic through ConsoleOut and stops the run, not the
+// session). The print column is reset to 0 first, since RUN starts a fresh
+// output line.
+func (s @basicSession) runProgram() {
+	s.col = 0
+	if s.prog.isEmpty() {
+		return
+	}
+	s.env = runProgramInto(s.prog.snapshot(), s.out)
+}
+
+// listProgram (LIST) prints the stored program through the FRAMING sink, each
+// line as `<number> <text>` in ascending order (the store keeps them sorted).
+// An empty program lists nothing. LIST is engine framing, not program output, so
+// it goes through ReplIO.WriteOut — distinct from the BASIC program's PRINT.
+func (s @basicSession) listProgram() {
+	var lines @[]@storedLine = s.prog.lines
+	for i := 0; i < len(lines); i++ {
+		var b buf.CharBuf = buf.New()
+		b = b.WriteInt(lines[i].Num)
+		b = b.WriteByte(' ')
+		b = b.WriteStr(lines[i].Text)
+		b = b.WriteByte('\n')
+		s.writeOut(b.Bytes())
+	}
+}
+
+// newProgram (NEW) clears BOTH the stored program and the variable state,
+// returning the session to its freshly-constructed condition. The print column
+// is reset too, since no output line is in progress afterward.
+func (s @basicSession) newProgram() {
+	s.prog.clear()
+	s.env = newEnv(0)
+	s.col = 0
+}
+
+// skipBlank returns the index of the first non-space, non-tab character at or
+// after `start`, or len(text) if the rest is blank.
+func skipBlank(text @[]char, start int) int {
+	var i int = start
+	for i < len(text) && (text[i] == ' ' || text[i] == '\t') {
+		i = i + 1
+	}
+	return i
+}
+
+// trimSpaces returns a fresh slice of text with leading and trailing spaces and
+// tabs removed. Used to normalize a stored line's text (for LIST) and to isolate
+// a bare command word.
+func trimSpaces(text @[]char) @[]char {
+	var lo int = skipBlank(text, 0)
+	var hi int = len(text)
+	for hi > lo && (text[hi - 1] == ' ' || text[hi - 1] == '\t') {
+		hi = hi - 1
+	}
+	return sliceChars(text, lo, hi)
+}
+
+// charsEqFold reports whether managed-slice a equals the raw-slice literal b
+// case-insensitively for ASCII letters. Used to recognize the REPL commands
+// regardless of the case the user typed (the BASIC vocabulary itself is
+// upper-case, but a command word is matched leniently).
+func charsEqFold(a @[]char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if foldUpper(a[i]) != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// foldUpper maps an ASCII lower-case letter to upper case and leaves any other
+// character unchanged.
+func foldUpper(c char) char {
+	if c >= 'a' && c <= 'z' {
+		return c - 'a' + 'A'
+	}
+	return c
+}

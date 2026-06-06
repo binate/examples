@@ -1,0 +1,134 @@
+package "pkg/basic"
+
+// storedLine is one entry in the REPL's mutable program: the line number, the
+// verbatim statement text as the user typed it (the characters after the line
+// number, used by LIST), and the parsed statement (used by RUN). Keeping the
+// source text avoids reconstructing it from the AST when LISTing.
+type storedLine struct {
+	Num  int
+	Text @[]char
+	Stmt @Stmt
+}
+
+// progStore is the REPL's MUTABLE program: the stored BASIC lines kept in strict
+// ascending line-number order. It replaces the non-interactive runner's
+// parse-the-whole-file-at-once model — a numbered line entered at the prompt is
+// inserted, replaced, or deleted here without re-running anything. lines is a
+// managed-slice of storedLines, always sorted by Num with no duplicate numbers;
+// insertions and deletions preserve that invariant so a snapshot is run-ready.
+type progStore struct {
+	lines @[]@storedLine
+}
+
+// newProgStore builds an empty program store (no stored lines).
+func newProgStore() @progStore {
+	var p @progStore = make(progStore)
+	p.lines = make_slice(@storedLine, 0)
+	return p
+}
+
+// isEmpty reports whether the store holds no lines.
+func (p @progStore) isEmpty() bool {
+	return len(p.lines) == 0
+}
+
+// findIndex returns the index of the stored line whose number is num, or -1 if
+// no line with that number is stored. A linear scan suffices: the store is small
+// (an interactively-entered program) and edits are infrequent.
+func (p @progStore) findIndex(num int) int {
+	for i := 0; i < len(p.lines); i++ {
+		if p.lines[i].Num == num {
+			return i
+		}
+	}
+	return -1
+}
+
+// put inserts or replaces the line numbered num (verbatim text `text`, parsed
+// `stmt`), keeping the store sorted ascending. If a line with that number
+// already exists it is overwritten in place (an edit); otherwise the new line is
+// inserted at the position that preserves ascending order.
+func (p @progStore) put(num int, text @[]char, stmt @Stmt) {
+	var sl @storedLine = make(storedLine)
+	sl.Num = num
+	sl.Text = text
+	sl.Stmt = stmt
+	var at int = p.findIndex(num)
+	if at >= 0 {
+		p.lines[at] = sl
+		return
+	}
+	p.lines = insertSorted(p.lines, sl)
+}
+
+// remove deletes the stored line with number num, if present, returning true
+// when a line was removed and false when no such line existed (a bare line
+// number naming a line that was never stored — a harmless no-op).
+func (p @progStore) remove(num int) bool {
+	var at int = p.findIndex(num)
+	if at < 0 {
+		return false
+	}
+	p.lines = deleteAt(p.lines, at)
+	return true
+}
+
+// clear empties the store (the NEW command's program-clearing half).
+func (p @progStore) clear() {
+	p.lines = make_slice(@storedLine, 0)
+}
+
+// snapshot returns the stored program as an ascending @[]@Line ready to hand to
+// the run pipeline. Each Line carries the stored number and parsed statement;
+// the verbatim text is dropped (RUN does not need it). The result is freshly
+// built, so the caller may run it without disturbing the store.
+func (p @progStore) snapshot() @[]@Line {
+	var out @[]@Line = make_slice(@Line, len(p.lines))
+	for i := 0; i < len(p.lines); i++ {
+		var ln @Line = make(Line)
+		ln.Num = p.lines[i].Num
+		ln.Stmt = p.lines[i].Stmt
+		out[i] = ln
+	}
+	return out
+}
+
+// insertSorted returns lines with sl inserted at the first position whose stored
+// number exceeds sl.Num, preserving ascending order. sl.Num is assumed absent
+// from lines (put handles the replace case before calling this).
+func insertSorted(lines @[]@storedLine, sl @storedLine) @[]@storedLine {
+	var n int = len(lines)
+	var out @[]@storedLine = make_slice(@storedLine, n + 1)
+	var dst int = 0
+	var inserted bool = false
+	for i := 0; i < n; i++ {
+		if !inserted && lines[i].Num > sl.Num {
+			out[dst] = sl
+			dst = dst + 1
+			inserted = true
+		}
+		out[dst] = lines[i]
+		dst = dst + 1
+	}
+	if !inserted {
+		out[dst] = sl
+	}
+	return out
+}
+
+// deleteAt returns lines with the element at index `at` removed, shifting the
+// tail down by one. at is assumed in range (the caller located it via
+// findIndex).
+func deleteAt(lines @[]@storedLine, at int) @[]@storedLine {
+	var n int = len(lines)
+	var out @[]@storedLine = make_slice(@storedLine, n - 1)
+	var dst int = 0
+	for i := 0; i < n; i++ {
+		if i == at {
+			continue
+		}
+		out[dst] = lines[i]
+		dst = dst + 1
+	}
+	return out
+}
