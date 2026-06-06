@@ -179,17 +179,17 @@ written at `/tmp/minbasic-ecma55.md` (offer to vet + commit as
 
 ## 5. Milestones (each keeps the example green)
 
-**Status (2026-06-05).** M0 done. M1 is split into slices; **slice 1** —
-`run <prog.bas>` for `LET` / `PRINT` (numbers/strings, `,`/`;` zones, EOL
-suppression) / `REM` / `END` / `STOP`, plus full numeric/string expressions and
-the ECMA-55 numeric formatter — is **written but UNVERIFIED**: `bnc` OOMs
-compiling minbasic (~8.5 GB RSS, killed after ~15 min) on the current machine, so
-it could not be compiled, run, or linted, and the code may not be correct. That
-footprint is abnormal (M0 compiled in seconds; `bnc`/`bni` themselves build fine),
-tracked for investigation. The remaining M1 pieces (`GOTO`, `IF…THEN`,
-`FOR/NEXT`, `TAB`, the intrinsic functions) are later slices. Note minbasic needs
-a toolchain with the interface-vtable fix (in main, not the pinned `bnc-0.0.7`) —
-build against a main bundle via `BINATE_BUNDLE`.
+**Status (2026-06-05).** M0 done. **M1 slice 1** — `run <prog.bas>` for `LET` /
+`PRINT` (numbers/strings, `,`/`;` zones, EOL suppression) / `REM` / `END` /
+`STOP`, full numeric/string expressions, and the ECMA-55 numeric formatter — is
+**done and verified**: correct, byte-identical output in both compiled and
+interpreted modes (incl. `^` left-associativity, unary-minus-looser-than-`^`, the
+d=6 number format with leading/trailing spaces and `.5`/`.25` forms, and `,`
+print zones), and the hygiene suite (incl. `lint`) passes. The remaining M1
+pieces (`GOTO`, `IF…THEN`, `FOR/NEXT`, `TAB`, the intrinsic functions) are later
+slices. Note minbasic needs a toolchain with the interface-vtable fix AND the
+IR-gen OOM fix (both in main, not the pinned `bnc-0.0.7`) — build against a main
+bundle via `BINATE_BUNDLE`.
 
 - **M0 — skeleton + wiring.** Create `pkg/io`, the core package shell, and a
   trivial `cmd/run` that builds and prints a banner; confirm it builds compiled +
