@@ -1,0 +1,6 @@
+# Identifiers exempt from the .bni naming-convention check.
+# One `<path>:<identifier>` entry per line, relative to the examples repo root.
+# Comments start with #.
+#
+# Empty for now: the example sources export only conventionally-named
+# (uppercase) symbols, so no exceptions are needed yet.

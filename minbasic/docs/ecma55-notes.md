@@ -130,7 +130,7 @@ data-statement    = DATA datum (, datum)*       (datum = quoted-string / unquote
 restore-statement = RESTORE
 ```
 - All **DATA** statements in the program (in textual line order, left-to-right within a line) form **one global data sequence**. A DATA line is a no-op when reached during execution.
-- A **conceptual pointer** starts at the first datum at program start. **READ** assigns successive data to its variables, advancing the pointer past each. 
+- A **conceptual pointer** starts at the first datum at program start. **READ** assigns successive data to its variables, advancing the pointer past each.
 - **Type matching** (16.4): numeric variable needs an unquoted-string that is a valid numeric-constant; string variable accepts quoted or unquoted strings. An unquoted numeric-looking string may feed either a numeric or string variable.
 - **RESTORE** resets the pointer to the **beginning** of the data sequence.
 - **READ/DATA exceptions** (16.5):
@@ -252,7 +252,7 @@ A number is printed in one of two notations:
 
 **The canonical threshold example (d = 6):**
 - `10^-6` prints as **`.000001`** (still expressible in ≤ d digits unscaled, no accuracy loss).
-- `10^-7` prints as **`1.E-7`** (would lose accuracy unscaled → scaled form). 
+- `10^-7` prints as **`1.E-7`** (would lose accuracy unscaled → scaled form).
 
 So with d=6, the smallest magnitude shown in plain decimal is about `1E-6`; below that it switches to E-notation. On the large end, integers up to 6 digits print plain; larger values that need >d digits go to E-notation. (The exact crossover magnitudes scale with the chosen d.)
 
@@ -312,8 +312,8 @@ All take/return the single numeric type; trig in **radians**.
 | `ATN(x)` | arctangent, result in radians | range `−π/2 < ATN(x) < π/2`; total |
 | `RND` | next pseudo-random, **0 ≤ RND < 1**, uniform | **no argument**; see below |
 
-- **`RND`** takes **no argument** in Minimal BASIC (`RND`, not `RND(x)`). Returns the next value in an implementation-supplied uniform pseudo-random sequence in `[0,1)`. 
-  - **Without RANDOMIZE**: the sequence is **the same on every run** (reproducible). 
+- **`RND`** takes **no argument** in Minimal BASIC (`RND`, not `RND(x)`). Returns the next value in an implementation-supplied uniform pseudo-random sequence in `[0,1)`.
+  - **Without RANDOMIZE**: the sequence is **the same on every run** (reproducible).
   - **`RANDOMIZE`** (clause 20) reseeds to an **unpredictable** start.
 - **`INT` is floor (toward −∞)**, not truncation toward zero — `INT(-1.3) = -2`. Important.
 

@@ -6,6 +6,7 @@ package "main"
 import "pkg/basic"
 import "pkg/host"
 
+// main constructs the console I/O delegate and runs the BASIC program.
 func main() {
 	basic.Run(host.NewConsole())
 }

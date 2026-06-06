@@ -3,6 +3,7 @@ package "main"
 // Prints the first 11 Fibonacci numbers via the example-local pkg/seq.
 import "pkg/seq"
 
+// main prints the first 11 Fibonacci numbers, one per line.
 func main() {
 	var i int = 0
 	for i <= 10 {
