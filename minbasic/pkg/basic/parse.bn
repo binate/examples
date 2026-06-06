@@ -216,13 +216,37 @@ func (p @parser) consumeSep() int {
 	return SEP_NONE
 }
 
-// parsePrintItem parses one print-item: a string expression (string variable or
-// constant) or a numeric expression.
+// parsePrintItem parses one print-item: a TAB call, a string expression (string
+// variable or constant), or a numeric expression.
 func (p @parser) parsePrintItem() @Expr {
+	if p.cur.Kind == TOK_TAB {
+		return p.parseTabItem()
+	}
 	if p.cur.Kind == TOK_SVAR || p.cur.Kind == TOK_STRING {
 		return p.parseStringExpr()
 	}
 	return p.parseExpr()
+}
+
+// parseTabItem parses a `TAB ( numeric-expression )` print-item at the current
+// TOK_TAB, producing an EX_TAB node holding the column argument in X. A TAB item
+// only positions the cursor; it has no printable value.
+func (p @parser) parseTabItem() @Expr {
+	p.advance()
+	var e @Expr = make(Expr)
+	e.Kind = EX_TAB
+	if p.cur.Kind != TOK_LPAREN {
+		p.fail(buf.CopyStr("TAB: expected '('"))
+		return e
+	}
+	p.advance()
+	e.X = p.parseExpr()
+	if p.cur.Kind != TOK_RPAREN {
+		p.fail(buf.CopyStr("TAB: expected ')'"))
+		return e
+	}
+	p.advance()
+	return e
 }
 
 // parseNumberLit converts the current TOK_NUMBER's text to a float64 constant.

@@ -12,6 +12,8 @@ package "pkg/basic"
 // EX_SVAR      Name (string variable name, e.g. "A$")
 // EX_BINARY    Op (TOK_PLUS..TOK_CARET), X (left), Y (right)
 // EX_UNARY     Op (TOK_PLUS or TOK_MINUS), X (operand)
+// EX_CALL      Op (FN_* function code), X (argument, nil for RND)
+// EX_TAB       X (the TAB column argument); a PRINT-list item, never a value
 const (
 	EX_NUM int = iota
 	EX_STR
@@ -19,6 +21,8 @@ const (
 	EX_SVAR
 	EX_BINARY
 	EX_UNARY
+	EX_CALL
+	EX_TAB
 )
 
 // Expr is one expression node. Kind selects which fields are meaningful (see the

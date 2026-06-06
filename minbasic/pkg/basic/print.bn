@@ -13,7 +13,7 @@ func (r @runtime) execPrint(s @Stmt) {
 		return
 	}
 	var suppressEOL bool = false
-	for i := 0; i < len(s.Items); i++ {
+	for i := 0; i < len(s.Items) && !r.fatal; i++ {
 		r.emitItem(s.Items[i])
 		var sep int = s.Seps[i]
 		if sep == SEP_COMMA {
@@ -25,18 +25,27 @@ func (r @runtime) execPrint(s @Stmt) {
 			suppressEOL = false
 		}
 	}
-	if !suppressEOL {
+	if !suppressEOL && !r.fatal {
 		r.emit(buf.CopyStr("\n"))
 	}
 }
 
-// emitItem emits one print-item: a string item verbatim, a numeric item through
-// the ECMA-55 numeric formatter (sign space + digits + trailing space).
+// emitItem emits one print-item: a TAB positions the cursor (printing nothing),
+// a string item is emitted verbatim, and a numeric item goes through the ECMA-55
+// numeric formatter (sign space + digits + trailing space). A numeric item is
+// evaluated before formatting; if the evaluation raises a fatal exception (a
+// not-yet-supported function), nothing is emitted for the item — the partially
+// computed value is not real output.
 func (r @runtime) emitItem(e @Expr) {
-	if e.Kind == EX_SVAR || e.Kind == EX_STR {
+	if e.Kind == EX_TAB {
+		r.emitTab(e.X)
+	} else if e.Kind == EX_SVAR || e.Kind == EX_STR {
 		r.emit(copyChars(r.evalStr(e)))
 	} else {
-		r.emit(formatNumber(r.evalNum(e)))
+		var v float64 = r.evalNum(e)
+		if !r.fatal {
+			r.emit(formatNumber(v))
+		}
 	}
 }
 
@@ -49,8 +58,17 @@ func (r @runtime) toNextZone() {
 		r.emit(buf.CopyStr("\n"))
 		return
 	}
-	var pad @[]char = make_slice(char, next - r.col)
-	for i := 0; i < len(pad); i++ {
+	r.emitSpaces(next - r.col)
+}
+
+// emitSpaces emits n spaces through the sink (advancing the tracked column). A
+// nonpositive n emits nothing. Used for print-zone padding and TAB positioning.
+func (r @runtime) emitSpaces(n int) {
+	if n <= 0 {
+		return
+	}
+	var pad @[]char = make_slice(char, n)
+	for i := 0; i < n; i++ {
 		pad[i] = ' '
 	}
 	r.emit(pad)

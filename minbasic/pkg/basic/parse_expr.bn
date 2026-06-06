@@ -56,8 +56,8 @@ func (p @parser) parseFactor() @Expr {
 	return x
 }
 
-// parsePrimary parses a primary: a numeric variable, a numeric constant, or a
-// parenthesized expression.
+// parsePrimary parses a primary: a numeric variable, a numeric constant, a
+// supplied-function reference, or a parenthesized expression.
 func (p @parser) parsePrimary() @Expr {
 	if p.cur.Kind == TOK_NUMBER {
 		return p.parseNumberLit()
@@ -68,6 +68,9 @@ func (p @parser) parsePrimary() @Expr {
 		e.Name = p.cur.Text
 		p.advance()
 		return e
+	}
+	if p.cur.Kind == TOK_FUNC {
+		return p.parseFuncCall()
 	}
 	if p.cur.Kind == TOK_LPAREN {
 		p.advance()
@@ -81,6 +84,34 @@ func (p @parser) parsePrimary() @Expr {
 	}
 	p.fail(buf.CopyStr("expected a numeric primary"))
 	return make(Expr)
+}
+
+// parseFuncCall parses a supplied-function reference at the current TOK_FUNC: a
+// bare `RND` (no argument), or `NAME ( numeric-expression )` for the other ten
+// functions. The resulting EX_CALL node carries the FN_* code in Op and the
+// argument (nil for RND) in X. Evaluation of the not-yet-supported functions is
+// deferred to runtime (see evalCall).
+func (p @parser) parseFuncCall() @Expr {
+	var fn int = funcCode(p.cur.Text)
+	p.advance()
+	var e @Expr = make(Expr)
+	e.Kind = EX_CALL
+	e.Op = fn
+	if !funcTakesArg(fn) {
+		return e
+	}
+	if p.cur.Kind != TOK_LPAREN {
+		p.fail(buf.CopyStr("function call: expected '('"))
+		return e
+	}
+	p.advance()
+	e.X = p.parseExpr()
+	if p.cur.Kind != TOK_RPAREN {
+		p.fail(buf.CopyStr("function call: expected ')'"))
+		return e
+	}
+	p.advance()
+	return e
 }
 
 // binExpr builds a binary expression node with the given operator and operands.

@@ -39,8 +39,21 @@ func powf(a float64, b float64) float64 {
 // STEP_* status describing how control proceeds: STEP_NEXT to fall through to
 // the next line, STEP_JUMP if the statement set r.pc itself (GOTO/IF/FOR/NEXT),
 // STEP_END to terminate (END/STOP), or STEP_ERROR after setting *errMsg on a
-// fatal runtime error. PRINT output is emitted through the runtime's sink.
+// fatal runtime error. A fatal exception parked mid-expression (r.fatal — a TAB
+// argument < 1 or a not-yet-supported function) overrides the status with
+// STEP_ERROR. PRINT output is emitted through the runtime's sink.
 func (r @runtime) step(errMsg *@[]char) int {
+	var status int = r.dispatch(errMsg)
+	if r.fatal {
+		*errMsg = r.fatalMsg
+		return STEP_ERROR
+	}
+	return status
+}
+
+// dispatch executes the statement at the program counter by kind and returns its
+// STEP_* status, without consulting the parked-fatal flag (step does that).
+func (r @runtime) dispatch(errMsg *@[]char) int {
 	var s @Stmt = r.prog[r.pc].Stmt
 	if s.Kind == ST_REM {
 		return STEP_NEXT
@@ -68,7 +81,9 @@ func (r @runtime) step(errMsg *@[]char) int {
 // execLet executes a LET assignment, returning STEP_NEXT on success. A
 // '$'-suffixed target name is a string variable (string RHS); otherwise a
 // numeric variable (numeric RHS). Assigning a string longer than MAX_STR_LEN
-// chars is a fatal ECMA-55 error: it sets *errMsg and returns STEP_ERROR.
+// chars is a fatal ECMA-55 error: it sets *errMsg and returns STEP_ERROR. A
+// numeric RHS that raises a fatal exception (a not-yet-supported function)
+// leaves the target unchanged — step turns the parked fatal into STEP_ERROR.
 func (r @runtime) execLet(s @Stmt, errMsg *@[]char) int {
 	if s.Name[len(s.Name) - 1] == '$' {
 		var val @[]char = r.evalStr(s.Value)
@@ -78,7 +93,10 @@ func (r @runtime) execLet(s @Stmt, errMsg *@[]char) int {
 		}
 		r.env.setStr(s.Name, copyChars(val))
 	} else {
-		r.env.setNum(s.Name, r.evalNum(s.Value))
+		var v float64 = r.evalNum(s.Value)
+		if !r.fatal {
+			r.env.setNum(s.Name, v)
+		}
 	}
 	return STEP_NEXT
 }

@@ -179,19 +179,21 @@ written at `/tmp/minbasic-ecma55.md` (offer to vet + commit as
 
 ## 5. Milestones (each keeps the example green)
 
-**Status (2026-06-05).** M0 done. **M1 slice 1** (`LET` / `PRINT` /
-numeric+string expressions / the ECMA-55 numeric formatter) and **slice 2a**
-(control flow: `GOTO`/`GO TO`, `IF <rel> THEN <line>` with relational
-expressions, `FOR`/`NEXT` with the exact ECMA-55 block-equivalence — zero-trip,
-`v==limit` runs the body, limit/step evaluated once, final value past the limit)
-are **done and verified**: correct, byte-identical output in both compiled and
-interpreted modes, hygiene 7/7 (incl. `lint`). Remaining in M1: **slice 2b** —
-`TAB` and the intrinsic functions. `ABS`/`SGN`/`INT`/`RND` are straightforward;
-the transcendentals (`SQR`/`SIN`/`COS`/`TAN`/`ATN`/`EXP`/`LOG`) are **deferred
-until `pkg/std/math` ships them** (the bundle has no float math — not rolling our
-own). minbasic needs a toolchain with the interface-vtable + IR-gen-OOM fixes
-(both in main, not the pinned `bnc-0.0.7`) — build against a main bundle via
-`BINATE_BUNDLE`.
+**Status (2026-06-05).** M0 done. **M1 slices 1, 2a, 2b** are done and verified
+(byte-identical in both modes, hygiene 7/7): slice 1 = `LET` / `PRINT` /
+numeric+string expressions / the ECMA-55 numeric formatter; slice 2a = control
+flow (`GOTO`, `IF <rel> THEN <line>`, `FOR`/`NEXT` with the exact block
+equivalence — zero-trip, `v==limit` runs the body, limit/step evaluated once);
+slice 2b = `TAB` + the deterministic intrinsics `ABS`/`SGN`/`INT`. So the
+**non-interactive deterministic core (M1) is complete except the math-dependent
+intrinsics**: the transcendentals (`SQR`/`SIN`/`COS`/`TAN`/`ATN`/`EXP`/`LOG`) are
+parsed but deferred until `pkg/std/math` ships them (the bundle has no float
+math — not rolling our own), and `RND`/`RANDOMIZE` are deferred (need a PRNG +
+entropy decision); all of these reserve their names and surface a clean
+`?<fn> not yet supported` fatal. Next: **M2** (`GOSUB`/`RETURN`, `ON…GOTO`,
+`READ`/`DATA`/`RESTORE`, `DIM`+arrays+`OPTION BASE`, `DEF FN`). minbasic needs a
+main toolchain (interface-vtable + IR-gen-OOM fixes, both in main, not the pinned
+`bnc-0.0.7`) — build against a main bundle via `BINATE_BUNDLE`.
 
 - **M0 — skeleton + wiring.** Create `pkg/io`, the core package shell, and a
   trivial `cmd/run` that builds and prints a banner; confirm it builds compiled +

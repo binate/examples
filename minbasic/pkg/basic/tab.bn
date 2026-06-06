@@ -1,0 +1,57 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// floorf returns the largest integer not greater than x, as a float64 — the
+// floor toward −∞ used by the ECMA-55 INT function and the TAB reduction.
+// Truncation toward zero (the int cast) already floors a nonnegative value; for
+// a negative value with a fractional part, floor is one less than the
+// truncation. (Values are assumed within the int range, which holds for this
+// interpreter's programs; out-of-range magnitudes are an open item alongside the
+// rest of the numeric library.)
+func floorf(x float64) float64 {
+	var t float64 = cast(float64, cast(int, x))
+	if t > x {
+		return t - 1.0
+	}
+	return t
+}
+
+// roundf returns x rounded to the nearest integer, ties rounded up (toward +∞),
+// as a float64 — the rounding ECMA-55 applies to a TAB argument before using it
+// as a column. It is floor(x + 0.5), so 1.5 → 2 and -1.5 → -1.
+func roundf(x float64) float64 {
+	return floorf(x + 0.5)
+}
+
+// emitTab positions the print cursor for a TAB(arg) print-item (ECMA-55 clause
+// 14.4). The argument is rounded to the nearest integer n. n < 1 is a fatal
+// exception. If n exceeds the margin it is reduced modulo the margin so
+// 1 ≤ n ≤ MARGIN. The cursor then moves to column n (1-based): if it is at or
+// before column n on the current line, spaces fill up to it; if it is already
+// past column n, an end-of-line is emitted and spaces fill to column n on the
+// fresh line. TAB itself prints nothing.
+func (r @runtime) emitTab(arg @Expr) {
+	var n int = cast(int, roundf(r.evalNum(arg)))
+	if r.fatal {
+		return
+	}
+	if n < 1 {
+		r.setFatal(buf.CopyStr("TAB argument less than 1"))
+		return
+	}
+	if n > MARGIN {
+		// Reduce into 1..MARGIN: n - MARGIN*INT((n-1)/MARGIN). With n >= 1 the
+		// quotient is nonnegative, so integer division equals the floor (INT).
+		n = n - MARGIN*((n - 1) / MARGIN)
+	}
+	// Column n (1-based) is reached when the cursor has emitted n-1 characters
+	// (r.col is the 0-based count already on the line).
+	var target int = n - 1
+	if r.col <= target {
+		r.emitSpaces(target - r.col)
+		return
+	}
+	r.emit(buf.CopyStr("\n"))
+	r.emitSpaces(target)
+}

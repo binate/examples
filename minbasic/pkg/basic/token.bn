@@ -59,6 +59,14 @@ const (
 	TOK_LE
 	TOK_GE
 	TOK_NE
+	// TOK_TAB is the PRINT-list `TAB` keyword (`TAB ( numeric-expression )`); it
+	// is a print-item that only positions the cursor.
+	TOK_TAB
+	// TOK_FUNC is a supplied numeric-function name (ABS/ATN/COS/EXP/INT/LOG/RND/
+	// SGN/SIN/SQR/TAN); Token.Text holds the name. These three-letter names are
+	// reserved — they cannot collide with a variable, which is at most a letter
+	// plus a digit.
+	TOK_FUNC
 	// TOK_ERROR marks a lexing failure; Token.Text holds the diagnostic.
 	TOK_ERROR
 )

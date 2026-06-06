@@ -1,0 +1,133 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// FN_* identify the eleven ECMA-55 supplied numeric functions (clause 9). The
+// code is stored in an EX_CALL node's Op field. FN_RND alone takes no argument
+// (a bare `RND`); the other ten take a single numeric argument `NAME(expr)`.
+const (
+	FN_ABS int = iota
+	FN_ATN
+	FN_COS
+	FN_EXP
+	FN_INT
+	FN_LOG
+	FN_RND
+	FN_SGN
+	FN_SIN
+	FN_SQR
+	FN_TAN
+)
+
+// funcCode maps a three-letter word to its FN_* code, or -1 if the word is not a
+// supplied-function name. The lexer uses this to classify a letter-run as a
+// function reference (TOK_FUNC) rather than a variable.
+func funcCode(word @[]char) int {
+	if charsEq(word, "ABS") {
+		return FN_ABS
+	} else if charsEq(word, "ATN") {
+		return FN_ATN
+	} else if charsEq(word, "COS") {
+		return FN_COS
+	} else if charsEq(word, "EXP") {
+		return FN_EXP
+	} else if charsEq(word, "INT") {
+		return FN_INT
+	} else if charsEq(word, "LOG") {
+		return FN_LOG
+	}
+	return funcCodeRest(word)
+}
+
+// funcCodeRest maps the remaining supplied-function names (RND/SGN/SIN/SQR/TAN)
+// to their FN_* code, or -1. Split from funcCode so neither if/else-if chain
+// grows unwieldy.
+func funcCodeRest(word @[]char) int {
+	if charsEq(word, "RND") {
+		return FN_RND
+	} else if charsEq(word, "SGN") {
+		return FN_SGN
+	} else if charsEq(word, "SIN") {
+		return FN_SIN
+	} else if charsEq(word, "SQR") {
+		return FN_SQR
+	} else if charsEq(word, "TAN") {
+		return FN_TAN
+	}
+	return -1
+}
+
+// funcTakesArg reports whether the function with code fn takes a parenthesized
+// numeric argument. Every supplied function does except RND, which is a bare
+// keyword in Minimal BASIC (`RND`, not `RND(x)`).
+func funcTakesArg(fn int) bool {
+	return fn != FN_RND
+}
+
+// funcName returns the source spelling of the function with code fn, for use in
+// diagnostics.
+func funcName(fn int) @[]char {
+	if fn == FN_ABS {
+		return buf.CopyStr("ABS")
+	} else if fn == FN_ATN {
+		return buf.CopyStr("ATN")
+	} else if fn == FN_COS {
+		return buf.CopyStr("COS")
+	} else if fn == FN_EXP {
+		return buf.CopyStr("EXP")
+	} else if fn == FN_INT {
+		return buf.CopyStr("INT")
+	} else if fn == FN_LOG {
+		return buf.CopyStr("LOG")
+	}
+	return funcNameRest(fn)
+}
+
+// funcNameRest returns the source spelling for the remaining function codes
+// (RND/SGN/SIN/SQR/TAN). Split from funcName to keep each chain short.
+func funcNameRest(fn int) @[]char {
+	if fn == FN_RND {
+		return buf.CopyStr("RND")
+	} else if fn == FN_SGN {
+		return buf.CopyStr("SGN")
+	} else if fn == FN_SIN {
+		return buf.CopyStr("SIN")
+	} else if fn == FN_SQR {
+		return buf.CopyStr("SQR")
+	}
+	return buf.CopyStr("TAN")
+}
+
+// evalCall evaluates an EX_CALL node. Only ABS/SGN/INT are implemented; the
+// transcendentals (ATN/COS/EXP/LOG/SIN/SQR/TAN) and RND need a float-math
+// library / PRNG that has not landed (pkg/std/math), so calling one is a fatal
+// runtime error: it records the diagnostic on the runtime and returns 0 (the
+// step loop reports the fatal and stops).
+func (r @runtime) evalCall(e @Expr) float64 {
+	if e.Op == FN_ABS {
+		return absf(r.evalNum(e.X))
+	} else if e.Op == FN_SGN {
+		return sgn(r.evalNum(e.X))
+	} else if e.Op == FN_INT {
+		return floorf(r.evalNum(e.X))
+	}
+	r.setFatal(deferredFuncDiag(e.Op))
+	return 0.0
+}
+
+// absf returns the absolute value of x (the ECMA-55 ABS function).
+func absf(x float64) float64 {
+	if x < 0.0 {
+		return -x
+	}
+	return x
+}
+
+// deferredFuncDiag builds the fatal diagnostic for a supplied function that is
+// parsed but not yet evaluable, naming the function and the pending dependency.
+func deferredFuncDiag(fn int) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr(funcName(fn))
+	b = b.WriteStr(" not yet supported (pending pkg/std/math)")
+	return b.Freeze()
+}
