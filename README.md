@@ -33,6 +33,16 @@ BUILDER_VERSION=latest ./scripts/build-compiled.sh hello/cmd/hello   # override 
 `latest` resolves the newest published release; bundles are sha256-verified and
 cached under `~/.cache/binate/builders/`.
 
+To build against a toolchain you built yourself — e.g. a binate `main` checkout,
+ahead of the latest release — point at its bundle directory directly:
+
+```sh
+BINATE_BUNDLE=/path/to/bundle ./scripts/build-compiled.sh hello/cmd/hello
+```
+
+`BINATE_BUNDLE` skips the versioned download entirely; the directory just needs
+the bundle layout (`bin/`, `lib/`).
+
 ## Scripts
 
 ```

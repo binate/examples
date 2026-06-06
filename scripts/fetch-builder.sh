@@ -17,6 +17,12 @@
 # (override the base with BINATE_CACHE_DIR) — the same layout the binate
 # repo's fetcher uses, so the cache is shared. A cache hit skips the
 # download (and is trusted without re-verifying).
+#
+# Set BINATE_BUNDLE=<dir> to bypass all of the above and use a pre-built
+# bundle directly (e.g. one built from a binate `main` checkout) — no
+# version, download, or verification. The directory must have the usual
+# bundle layout (bin/<tool>, lib/). This is how to build the examples
+# against a fresh `main` toolchain without cutting a release.
 set -e
 
 mode=bin
@@ -34,6 +40,29 @@ case "$tool" in
     bnc|bni|bnas|bnlint) ;;
     *) echo "fetch-builder: unknown --tool: $tool" >&2; exit 2 ;;
 esac
+
+# Bundle-path override: point at a pre-built bundle directly (e.g. one built
+# from a binate `main` checkout) and skip the versioned download/verify/cache
+# entirely. The directory must have the usual bundle layout (bin/<tool>, lib/).
+# Takes precedence over BUILDER_VERSION; the default release path below is
+# unchanged when BINATE_BUNDLE is unset.
+if [ -n "${BINATE_BUNDLE:-}" ]; then
+    BUNDLE="$(cd "$BINATE_BUNDLE" 2>/dev/null && pwd)" || {
+        echo "fetch-builder: BINATE_BUNDLE='$BINATE_BUNDLE' is not a directory" >&2
+        exit 1; }
+    [ -d "$BUNDLE/bin" ] && [ -d "$BUNDLE/lib" ] || {
+        echo "fetch-builder: BINATE_BUNDLE='$BUNDLE' is not a bundle (need bin/ and lib/)" >&2
+        exit 1; }
+    if [ "$mode" = lib ]; then
+        echo "$BUNDLE/lib"
+    else
+        [ -x "$BUNDLE/bin/$tool" ] || {
+            echo "fetch-builder: BINATE_BUNDLE='$BUNDLE' has no executable bin/$tool" >&2
+            exit 1; }
+        echo "$BUNDLE/bin/$tool"
+    fi
+    exit 0
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
