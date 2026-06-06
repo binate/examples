@@ -78,6 +78,15 @@ type Rel struct {
 // ST_FOR       Name (control variable), Value (initial), Limit, Step (Step nil
 //              ⇒ default +1)
 // ST_NEXT      Name (control variable that must match the open FOR)
+// ST_GOSUB     Target (subroutine entry line; the return point is the line
+//              after the GOSUB)
+// ST_RETURN    (none — pops the GOSUB return stack)
+// ST_ON        Value (the selector expression), Targets (the listed line
+//              numbers, selected 1-based by the rounded selector)
+// ST_READ      Names (the variable-list targets, "$"-suffixed for string vars)
+// ST_DATA      Data (this line's data, part of the global sequence; a no-op
+//              when reached during execution)
+// ST_RESTORE   (none — resets the data pointer to the start)
 const (
 	ST_LET int = iota
 	ST_PRINT
@@ -88,6 +97,12 @@ const (
 	ST_IF
 	ST_FOR
 	ST_NEXT
+	ST_GOSUB
+	ST_RETURN
+	ST_ON
+	ST_READ
+	ST_DATA
+	ST_RESTORE
 )
 
 // PRINT-separator kinds, stored per item in Stmt.Seps. SEP_NONE marks the last
@@ -105,10 +120,13 @@ const (
 // kind table above). Items/Seps are parallel: Seps[i] is the separator following
 // Items[i]. A PRINT list ending in a separator has len(Seps) == len(Items) with
 // the final entry SEP_COMMA/SEP_SEMI; otherwise the final Seps entry is SEP_NONE.
-// Target is a GOTO/IF jump target line number; Cond is an IF test; Limit/Step
-// are a FOR loop's limit and step expressions. HasStep is false when the FOR
-// omits its STEP clause (the runtime then uses the default increment +1) and
-// Step is unused.
+// Target is a GOTO/IF/GOSUB jump target line number; Cond is an IF test;
+// Limit/Step are a FOR loop's limit and step expressions. HasStep is false when
+// the FOR omits its STEP clause (the runtime then uses the default increment +1)
+// and Step is unused. Targets is an ON…GOTO line-number list (selected 1-based
+// by the rounded Value selector). Names is a READ variable-list (each entry a
+// numeric or "$"-suffixed string variable name). Data is a DATA line's data,
+// merged into the program's global data sequence at load.
 type Stmt struct {
 	Kind    int
 	Name    @[]char
@@ -120,6 +138,9 @@ type Stmt struct {
 	Limit   @Expr
 	Step    @Expr
 	HasStep bool
+	Targets @[]int
+	Names   @[]@[]char
+	Data    @[]@datum
 }
 
 // Line is one parsed program line: its line number (1..9999) and its statement.

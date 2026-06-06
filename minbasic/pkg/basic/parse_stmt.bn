@@ -2,22 +2,53 @@ package "pkg/basic"
 
 import "pkg/binate/buf"
 
-// parseGoto parses `GOTO <line>` or `GO TO <line>`. The leading keyword is
-// either the single word TOK_GOTO or the word TOK_GO followed by TOK_TO. The
-// target is a line-number reference, which the runtime resolves against the
-// program's line table (a nonexistent target is a fatal runtime error).
+// parseGoto parses the single-word `GOTO <line>`. The target is a line-number
+// reference, which the runtime resolves against the program's line table (a
+// nonexistent target is a fatal runtime error).
 func (p @parser) parseGoto() @Stmt {
-	if p.cur.Kind == TOK_GO {
-		p.advance()
-		if p.cur.Kind != TOK_TO {
-			p.fail(buf.CopyStr("GO: expected TO"))
-			return simpleStmt(ST_REM)
-		}
-	}
 	p.advance()
+	return p.finishGoto()
+}
+
+// parseGosub parses the single-word `GOSUB <line>`, the entry to a subroutine.
+func (p @parser) parseGosub() @Stmt {
+	p.advance()
+	return p.finishGosub()
+}
+
+// parseGoWord parses the two-word forms beginning with `GO`: `GO TO <line>`
+// (== GOTO) or `GO SUB <line>` (== GOSUB). The current token is TOK_GO.
+func (p @parser) parseGoWord() @Stmt {
+	p.advance()
+	if p.cur.Kind == TOK_TO {
+		p.advance()
+		return p.finishGoto()
+	}
+	if p.cur.Kind == TOK_SUB {
+		p.advance()
+		return p.finishGosub()
+	}
+	p.fail(buf.CopyStr("GO: expected TO or SUB"))
+	return simpleStmt(ST_REM)
+}
+
+// finishGoto parses the `<line>` target of a GOTO (the leading GOTO / GO TO is
+// already consumed) into an ST_GOTO statement.
+func (p @parser) finishGoto() @Stmt {
 	var target int = p.parseLineRef("GOTO")
 	var s @Stmt = make(Stmt)
 	s.Kind = ST_GOTO
+	s.Target = target
+	return s
+}
+
+// finishGosub parses the `<line>` target of a GOSUB (the leading GOSUB / GO SUB
+// is already consumed) into an ST_GOSUB statement. The runtime pushes the
+// return point (the line after the GOSUB) and jumps to this target.
+func (p @parser) finishGosub() @Stmt {
+	var target int = p.parseLineRef("GOSUB")
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_GOSUB
 	s.Target = target
 	return s
 }

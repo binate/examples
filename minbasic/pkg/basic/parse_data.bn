@@ -1,0 +1,117 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+import "pkg/stdx/slices"
+
+// parseOn parses `ON <numeric-expression> GO TO <line> (, <line>)*` (accepting
+// the single-word `GOTO` and the two-word `GO TO`). The selector expression is
+// evaluated and rounded at runtime to pick the 1-based target; an out-of-range
+// selection is a fatal exception (handled by execOnGoto). At least one target
+// line must be listed.
+func (p @parser) parseOn() @Stmt {
+	p.advance()
+	var sel @Expr = p.parseExpr()
+	if !p.expectGoto() {
+		return simpleStmt(ST_REM)
+	}
+	var targets @[]int = p.parseLineRefList("ON")
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_ON
+	s.Value = sel
+	s.Targets = targets
+	return s
+}
+
+// expectGoto consumes the `GOTO` / `GO TO` keyword that follows an ON selector,
+// reporting and returning false if it is absent. ON…GOSUB is not part of this
+// slice, so only GOTO is accepted here.
+func (p @parser) expectGoto() bool {
+	if p.cur.Kind == TOK_GOTO {
+		p.advance()
+		return true
+	}
+	if p.cur.Kind == TOK_GO {
+		p.advance()
+		if p.cur.Kind != TOK_TO {
+			p.fail(buf.CopyStr("ON: expected TO after GO"))
+			return false
+		}
+		p.advance()
+		return true
+	}
+	p.fail(buf.CopyStr("ON: expected GOTO or GO TO"))
+	return false
+}
+
+// parseLineRefList parses a comma-separated list of one or more line-number
+// references (the ON…GOTO target list). `ctx` names the enclosing statement for
+// diagnostics. On error it records the failure and returns the targets parsed so
+// far.
+func (p @parser) parseLineRefList(ctx @[]char) @[]int {
+	var targets @[]int = make_slice(int, 0)
+	targets = slices.Append[int](targets, p.parseLineRef(ctx))
+	for !p.hasErr && p.cur.Kind == TOK_COMMA {
+		p.advance()
+		targets = slices.Append[int](targets, p.parseLineRef(ctx))
+	}
+	return targets
+}
+
+// parseRead parses `READ <variable-list>` — one or more numeric or string
+// variables separated by commas. Each target's name is stored ("$"-suffixed for
+// a string variable); the runtime assigns successive data to them.
+func (p @parser) parseRead() @Stmt {
+	p.advance()
+	var names @[]@[]char = p.parseVarList()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_READ
+	s.Names = names
+	return s
+}
+
+// parseVarList parses a comma-separated list of one or more variables (numeric
+// TOK_VAR or string TOK_SVAR), returning their names. A non-variable token is a
+// parse error.
+func (p @parser) parseVarList() @[]@[]char {
+	var names @[]@[]char = make_slice(@[]char, 0)
+	names = p.appendVarName(names)
+	for !p.hasErr && p.cur.Kind == TOK_COMMA {
+		p.advance()
+		names = p.appendVarName(names)
+	}
+	return names
+}
+
+// appendVarName consumes the current token as a variable name (TOK_VAR or
+// TOK_SVAR) and appends it to names, or records a parse error and leaves names
+// unchanged.
+func (p @parser) appendVarName(names @[]@[]char) @[]@[]char {
+	if p.cur.Kind != TOK_VAR && p.cur.Kind != TOK_SVAR {
+		p.fail(buf.CopyStr("READ: expected a variable"))
+		return names
+	}
+	var name @[]char = p.cur.Text
+	p.advance()
+	return slices.Append[@[]char](names, name)
+}
+
+// parseData parses a `DATA datum (, datum)*` line. The datum list is scanned
+// directly from the raw line (not re-tokenized), because an unquoted datum may
+// contain characters the expression lexer does not accept; the lexer is
+// positioned just past "DATA". A DATA line is a no-op at execution; its data
+// joins the program's global sequence at load.
+func (p @parser) parseData() @Stmt {
+	var data @[]@datum
+	var derr @[]char
+	var dok bool
+	data, derr, dok = p.lex.scanDataLine()
+	if !dok {
+		p.fail(derr)
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_DATA
+	s.Data = data
+	return s
+}

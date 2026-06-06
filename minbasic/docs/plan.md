@@ -190,10 +190,11 @@ intrinsics**: the transcendentals (`SQR`/`SIN`/`COS`/`TAN`/`ATN`/`EXP`/`LOG`) ar
 parsed but deferred until `pkg/std/math` ships them (the bundle has no float
 math — not rolling our own), and `RND`/`RANDOMIZE` are deferred (need a PRNG +
 entropy decision); all of these reserve their names and surface a clean
-`?<fn> not yet supported` fatal. Next: **M2** (`GOSUB`/`RETURN`, `ON…GOTO`,
-`READ`/`DATA`/`RESTORE`, `DIM`+arrays+`OPTION BASE`, `DEF FN`). minbasic needs a
-main toolchain (interface-vtable + IR-gen-OOM fixes, both in main, not the pinned
-`bnc-0.0.7`) — build against a main bundle via `BINATE_BUNDLE`.
+`?<fn> not yet supported` fatal. **M2 slice 1** (`GOSUB`/`RETURN`, `ON…GOTO`,
+`READ`/`DATA`/`RESTORE`) is done and verified. **M2 remaining**: `DIM` + arrays +
+`OPTION BASE`, then single-line `DEF FN`. minbasic needs a main toolchain
+(interface-vtable + IR-gen-OOM fixes, both in main, not the pinned `bnc-0.0.7`) —
+build against a main bundle via `BINATE_BUNDLE`.
 
 - **M0 — skeleton + wiring.** Create `pkg/io`, the core package shell, and a
   trivial `cmd/run` that builds and prints a banner; confirm it builds compiled +

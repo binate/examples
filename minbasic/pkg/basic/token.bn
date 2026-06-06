@@ -39,6 +39,21 @@ const (
 	TOK_FOR
 	TOK_STEP
 	TOK_NEXT
+	// TOK_GOSUB is the single-word `GOSUB`; TOK_SUB is the SUB word of the
+	// two-word `GO SUB` (TOK_GO then TOK_SUB). TOK_RETURN is RETURN. These spell
+	// GOSUB/RETURN (clause 12).
+	TOK_GOSUB
+	TOK_SUB
+	TOK_RETURN
+	// TOK_ON introduces `ON numeric-expression GO TO …` (clause 12).
+	TOK_ON
+	// TOK_READ, TOK_DATA, TOK_RESTORE are the READ/DATA/RESTORE keywords
+	// (clauses 16, 17). DATA's datum list is not tokenized here — it is scanned
+	// from the raw line (see scanDataLine), since an unquoted datum may contain
+	// characters the expression lexer does not accept.
+	TOK_READ
+	TOK_DATA
+	TOK_RESTORE
 	// TOK_PLUS .. TOK_CARET are the arithmetic operators.
 	TOK_PLUS
 	TOK_MINUS

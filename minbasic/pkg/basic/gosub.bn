@@ -1,0 +1,120 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// gosubStack is the GOSUB return stack (ECMA-55 clause 12): each entry is the
+// program index to resume at when the matching RETURN runs — the line AFTER the
+// GOSUB. retPCs is a managed-slice grown by push; top is the live entry count
+// (entries at indices >= top are stale). GOSUB and RETURN counts need not
+// balance over a run; a RETURN with top == 0 is a fatal exception.
+type gosubStack struct {
+	retPCs @[]int
+	top    int
+}
+
+// newGosubStack builds an empty GOSUB return stack.
+func newGosubStack() @gosubStack {
+	var s @gosubStack = make(gosubStack)
+	s.retPCs = make_slice(int, 0)
+	s.top = 0
+	return s
+}
+
+// push records retPC — the program index to resume at on the matching RETURN.
+func (s @gosubStack) push(retPC int) {
+	if s.top < len(s.retPCs) {
+		s.retPCs[s.top] = retPC
+	} else {
+		s.retPCs = appendInt(s.retPCs, retPC)
+	}
+	s.top = s.top + 1
+}
+
+// isEmpty reports whether there is no pending GOSUB to return from.
+func (s @gosubStack) isEmpty() bool {
+	return s.top == 0
+}
+
+// pop removes and returns the top return index. The caller must ensure the
+// stack is non-empty (isEmpty is false).
+func (s @gosubStack) pop() int {
+	s.top = s.top - 1
+	return s.retPCs[s.top]
+}
+
+// appendInt returns a managed-slice with v appended (a local helper so the
+// GOSUB stack need not name the generic slices.Append at each call site).
+func appendInt(xs @[]int, v int) @[]int {
+	var n int = len(xs)
+	var out @[]int = make_slice(int, n + 1)
+	for i := 0; i < n; i++ {
+		out[i] = xs[i]
+	}
+	out[n] = v
+	return out
+}
+
+// execGosub enters a subroutine (ECMA-55 clause 12): it pushes the return index
+// (the program line after this GOSUB) and transfers control to the target line.
+// A target that does not exist is a fatal error (also caught at load). On
+// success it sets r.pc to the target's index and returns STEP_JUMP.
+func (r @runtime) execGosub(s @Stmt, errMsg *@[]char) int {
+	var idx int = r.lineMap.lookup(s.Target)
+	if idx < 0 {
+		*errMsg = noSuchLine(s.Target)
+		return STEP_ERROR
+	}
+	r.gosubs.push(r.pc + 1)
+	r.pc = idx
+	return STEP_JUMP
+}
+
+// execReturn returns from the most recent GOSUB (ECMA-55 clause 12): it pops the
+// return stack and resumes at the recorded index (the line after that GOSUB). A
+// RETURN with no pending GOSUB is a fatal exception: it sets *errMsg and returns
+// STEP_ERROR.
+func (r @runtime) execReturn(errMsg *@[]char) int {
+	if r.gosubs.isEmpty() {
+		*errMsg = buf.CopyStr("RETURN without GOSUB")
+		return STEP_ERROR
+	}
+	r.pc = r.gosubs.pop()
+	return STEP_JUMP
+}
+
+// execOnGoto executes an ON…GOTO (ECMA-55 clause 12): it evaluates the selector,
+// rounds it to the nearest integer k, and transfers control to the k-th listed
+// line (1-based, left to right). A k outside 1..len(Targets) is a fatal
+// exception; an evaluation that itself raised a fatal exception is propagated by
+// the step loop (r.fatal). The selected target's existence was validated at
+// load, but is re-checked here for safety.
+func (r @runtime) execOnGoto(s @Stmt, errMsg *@[]char) int {
+	var k int = cast(int, roundf(r.evalNum(s.Value)))
+	if r.fatal {
+		return STEP_NEXT
+	}
+	if k < 1 || k > len(s.Targets) {
+		*errMsg = onIndexDiag(k, len(s.Targets))
+		return STEP_ERROR
+	}
+	var target int = s.Targets[k - 1]
+	var idx int = r.lineMap.lookup(target)
+	if idx < 0 {
+		*errMsg = noSuchLine(target)
+		return STEP_ERROR
+	}
+	r.pc = idx
+	return STEP_JUMP
+}
+
+// onIndexDiag builds the fatal diagnostic for an ON…GOTO selector k that falls
+// outside the 1..count range of listed line-numbers.
+func onIndexDiag(k int, count int) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("ON index out of range: ")
+	b = b.WriteInt(k)
+	b = b.WriteStr(" (have ")
+	b = b.WriteInt(count)
+	b = b.WriteStr(" target(s))")
+	return b.Freeze()
+}

@@ -1,0 +1,251 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+import "pkg/std/strconv"
+
+// datum is one element of the program's global data sequence (ECMA-55 clauses
+// 16, 17). Text holds the datum's characters: for a quoted datum, the interior
+// verbatim (spaces significant); for an unquoted datum, the comma-delimited run
+// trimmed of surrounding spaces (the spec's `padded-datum`). Quoted records
+// whether the source wrote quotes: a quoted datum may only feed a string
+// variable, while an unquoted datum may feed a string variable or — when it
+// parses as a numeric constant — a numeric variable.
+type datum struct {
+	Text   @[]char
+	Quoted bool
+}
+
+// newDatum builds a datum carrying text (taking ownership) and the quoted flag.
+func newDatum(text @[]char, quoted bool) @datum {
+	var d @datum = make(datum)
+	d.Text = text
+	d.Quoted = quoted
+	return d
+}
+
+// scanDataLine scans the raw characters after a DATA keyword into this line's
+// data, following ECMA-55's `datum (, datum)*` with `datum = quoted-string /
+// unquoted-string`. The lexer's position is just past "DATA" when called. An
+// unquoted datum is the run up to the next comma (or end of line), trimmed of
+// surrounding spaces; a quoted datum is the verbatim characters between quotes.
+// On a malformed datum (an unterminated quote, or stray text after a closing
+// quote) it returns ok == false with a diagnostic.
+func (l @lexer) scanDataLine() (@[]@datum, @[]char, bool) {
+	var data @[]@datum = make_slice(@datum, 0)
+	for {
+		l.skipSpaces()
+		var d @datum
+		var derr @[]char
+		var dok bool
+		d, derr, dok = l.scanDatum()
+		if !dok {
+			return data, derr, false
+		}
+		data = appendDatum(data, d)
+		l.skipSpaces()
+		if l.pos >= len(l.src) {
+			return data, make_slice(char, 0), true
+		}
+		if l.src[l.pos] != ',' {
+			return data, buf.CopyStr("DATA: expected ',' between data"), false
+		}
+		l.pos = l.pos + 1
+	}
+}
+
+// scanDatum scans a single datum at the lexer's current position (leading
+// spaces already skipped): a quoted string if the next char is '"', else an
+// unquoted run up to the next comma or end of line, trimmed of trailing spaces.
+func (l @lexer) scanDatum() (@datum, @[]char, bool) {
+	if l.pos < len(l.src) && l.src[l.pos] == '"' {
+		return l.scanQuotedDatum()
+	}
+	return l.scanUnquotedDatum()
+}
+
+// scanQuotedDatum scans a quoted datum (the opening quote is at the current
+// position), returning its verbatim interior. An unterminated quote is an
+// error.
+func (l @lexer) scanQuotedDatum() (@datum, @[]char, bool) {
+	l.pos = l.pos + 1
+	var b buf.CharBuf = buf.New()
+	for l.pos < len(l.src) && l.src[l.pos] != '"' {
+		b = b.WriteByte(l.src[l.pos])
+		l.pos = l.pos + 1
+	}
+	if l.pos >= len(l.src) {
+		return make(datum), buf.CopyStr("DATA: unterminated quoted datum"), false
+	}
+	l.pos = l.pos + 1
+	return newDatum(b.Freeze(), true), make_slice(char, 0), true
+}
+
+// scanUnquotedDatum scans an unquoted datum: the characters up to the next
+// comma or end of line, with trailing spaces trimmed (leading spaces were
+// skipped by the caller). The result is always ok — any character run is a
+// valid unquoted string at scan time; numeric-vs-string is resolved at READ.
+func (l @lexer) scanUnquotedDatum() (@datum, @[]char, bool) {
+	var start int = l.pos
+	for l.pos < len(l.src) && l.src[l.pos] != ',' {
+		l.pos = l.pos + 1
+	}
+	var end int = l.pos
+	for end > start && (l.src[end - 1] == ' ' || l.src[end - 1] == '\t') {
+		end = end - 1
+	}
+	return newDatum(sliceChars(l.src, start, end), false), make_slice(char, 0), true
+}
+
+// appendDatum returns a managed-slice with d appended (a local helper so the
+// data scanner need not name the generic slices.Append at every call site).
+func appendDatum(ds @[]@datum, d @datum) @[]@datum {
+	var n int = len(ds)
+	var out @[]@datum = make_slice(@datum, n + 1)
+	for i := 0; i < n; i++ {
+		out[i] = ds[i]
+	}
+	out[n] = d
+	return out
+}
+
+// collectData gathers every DATA line's data, in ascending line order and
+// left-to-right within a line, into the one global data sequence (ECMA-55
+// clause 16). Lines are already sorted ascending by the parser, so a single
+// forward pass yields the correct order.
+func collectData(prog @[]@Line) @[]@datum {
+	var seq @[]@datum = make_slice(@datum, 0)
+	for i := 0; i < len(prog); i++ {
+		var s @Stmt = prog[i].Stmt
+		if s.Kind == ST_DATA {
+			for j := 0; j < len(s.Data); j++ {
+				seq = appendDatum(seq, s.Data[j])
+			}
+		}
+	}
+	return seq
+}
+
+// numericDatum reports whether d's text is a valid ECMA-55 numeric constant
+// (so an unquoted datum may feed a numeric variable). A quoted datum is never
+// numeric, matching the spec: only an unquoted numeric-looking string parses
+// as a number. The grammar (clause 6.2) is matched exactly so that values
+// strconv.ParseFloat would accept but ECMA-55 does not (inf, nan, hex floats,
+// '_' separators) are still treated as string-only data.
+func numericDatum(d @datum) bool {
+	if d.Quoted {
+		return false
+	}
+	return isNumericConstant(d.Text)
+}
+
+// isNumericConstant reports whether s matches ECMA-55's numeric-constant
+// grammar (clause 6.2): an optional sign, a significand (`integer fraction?` or
+// just a `.integer` fraction), and an optional `E sign? integer` exponent. This
+// is the same shape lexNumber scans for a source numeric literal.
+func isNumericConstant(s @[]char) bool {
+	var i int = 0
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		i = i + 1
+	}
+	var digits int = 0
+	for i < len(s) && isDigit(s[i]) {
+		i = i + 1
+		digits = digits + 1
+	}
+	if i < len(s) && s[i] == '.' {
+		i = i + 1
+		for i < len(s) && isDigit(s[i]) {
+			i = i + 1
+			digits = digits + 1
+		}
+	}
+	if digits == 0 {
+		return false
+	}
+	return matchExponent(s, i)
+}
+
+// matchExponent reports whether s from index i onward is a valid (possibly
+// empty) numeric-constant exponent: nothing, or `E sign? integer` consuming the
+// whole remainder. A bare 'E' or an 'E' with no exponent digits is rejected.
+func matchExponent(s @[]char, i int) bool {
+	if i >= len(s) {
+		return true
+	}
+	if s[i] != 'E' {
+		return false
+	}
+	i = i + 1
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		i = i + 1
+	}
+	var expDigits int = 0
+	for i < len(s) && isDigit(s[i]) {
+		i = i + 1
+		expDigits = expDigits + 1
+	}
+	return expDigits > 0 && i == len(s)
+}
+
+// execRead executes a READ, assigning successive data from the global sequence
+// to its variable-list targets and advancing the data pointer past each
+// (ECMA-55 clause 16). It returns STEP_NEXT on success, or STEP_ERROR after
+// setting *errMsg on a fatal exception: out of data, a string (non-numeric)
+// datum read into a numeric variable, or a string datum longer than 18 chars.
+func (r @runtime) execRead(s @Stmt, errMsg *@[]char) int {
+	for i := 0; i < len(s.Names); i++ {
+		if r.dataPtr >= len(r.data) {
+			*errMsg = buf.CopyStr("out of data")
+			return STEP_ERROR
+		}
+		var d @datum = r.data[r.dataPtr]
+		r.dataPtr = r.dataPtr + 1
+		var status int = r.readInto(s.Names[i], d, errMsg)
+		if status != STEP_NEXT {
+			return status
+		}
+	}
+	return STEP_NEXT
+}
+
+// readInto assigns one datum d to the variable named by `name` (a numeric
+// variable, or a "$"-suffixed string variable). A numeric target requires a
+// numeric datum (clause 16: a string datum into a numeric variable is fatal); a
+// string target accepts any datum but is bounded to 18 chars (a longer datum is
+// fatal). On a fatal exception it sets *errMsg and returns STEP_ERROR.
+func (r @runtime) readInto(name @[]char, d @datum, errMsg *@[]char) int {
+	if name[len(name) - 1] == '$' {
+		if len(d.Text) > MAX_STR_LEN {
+			*errMsg = buf.CopyStr("string too long (> 18 chars)")
+			return STEP_ERROR
+		}
+		r.env.setStr(name, copyChars(d.Text))
+		return STEP_NEXT
+	}
+	if !numericDatum(d) {
+		*errMsg = buf.Concat("READ: non-numeric datum into numeric variable: ", d.Text)
+		return STEP_ERROR
+	}
+	r.env.setNum(name, datumValue(d))
+	return STEP_NEXT
+}
+
+// datumValue parses a numeric datum's text to its float64 value. The caller has
+// already confirmed (via numericDatum) that the text matches the numeric-constant
+// grammar, so strconv.ParseFloat cannot fail on syntax; a present error means
+// numeric overflow, whose ECMA-55 nonfatal recovery is signed machine infinity —
+// exactly the ±Inf ParseFloat returns. Either way the parsed value is used and
+// execution continues (underflow returns 0, also the specified recovery).
+func datumValue(d @datum) float64 {
+	var n float64
+	n, _ = strconv.ParseFloat(d.Text, 64)
+	return n
+}
+
+// execRestore resets the data pointer to the start of the global data sequence
+// (ECMA-55 clause 17), so a subsequent READ re-reads from the first datum. It
+// always proceeds to the next line.
+func (r @runtime) execRestore() int {
+	r.dataPtr = 0
+	return STEP_NEXT
+}

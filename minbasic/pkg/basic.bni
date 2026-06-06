@@ -4,10 +4,12 @@
 // a CLI, a conformance-test buffer, or a wasm host unchanged.
 //
 // This slice is a non-interactive runner: RunSource parses a whole program and
-// executes it, supporting line-numbered LET / PRINT / REM / END / STOP, numeric
-// and string expressions, and the ECMA-55 numeric PRINT format. Internal types
-// (tokens, AST, Value, env, lexer, parser, evaluator, formatter) are
-// package-internal and live only in the .bn files.
+// executes it, supporting line-numbered LET / PRINT / REM / END / STOP, the
+// control statements GOTO / IF…THEN / FOR…NEXT / GOSUB…RETURN / ON…GOTO, the
+// READ / DATA / RESTORE data statements, numeric and string expressions, and the
+// ECMA-55 numeric PRINT format. Internal types (tokens, AST, Value, env, lexer,
+// parser, evaluator, formatter) are package-internal and live only in the .bn
+// files.
 package "pkg/basic"
 
 import "pkg/basic/io"

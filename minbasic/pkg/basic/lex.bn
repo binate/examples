@@ -84,6 +84,29 @@ func controlKeywordKind(word @[]char) int {
 	} else if charsEq(word, "NEXT") {
 		return TOK_NEXT
 	}
+	return subroutineKeywordKind(word)
+}
+
+// subroutineKeywordKind returns the keyword token kind for the subroutine and
+// data keywords (SUB/RETURN/ON/READ/DATA/RESTORE), or -1 if word is not one of
+// them. (GO and TO are recognized in controlKeywordKind; `GO SUB` pairs TOK_GO
+// with TOK_SUB.) Split out so no if/else-if chain grows unwieldy.
+func subroutineKeywordKind(word @[]char) int {
+	if charsEq(word, "GOSUB") {
+		return TOK_GOSUB
+	} else if charsEq(word, "SUB") {
+		return TOK_SUB
+	} else if charsEq(word, "RETURN") {
+		return TOK_RETURN
+	} else if charsEq(word, "ON") {
+		return TOK_ON
+	} else if charsEq(word, "READ") {
+		return TOK_READ
+	} else if charsEq(word, "DATA") {
+		return TOK_DATA
+	} else if charsEq(word, "RESTORE") {
+		return TOK_RESTORE
+	}
 	return -1
 }
 

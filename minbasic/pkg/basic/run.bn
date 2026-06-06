@@ -27,7 +27,8 @@ func runProgram(prog @[]@Line, out @io.ConsoleOut) {
 		emitDiag(out, lineDiag(badLine, noSuchLine(badTarget)))
 		return
 	}
-	var r @runtime = newRuntime(out, prog, lm)
+	var data @[]@datum = collectData(prog)
+	var r @runtime = newRuntime(out, prog, lm, data)
 	for r.pc < len(prog) {
 		var errMsg @[]char
 		var status int = r.step(&errMsg)
@@ -43,17 +44,35 @@ func runProgram(prog @[]@Line, out @io.ConsoleOut) {
 	}
 }
 
-// checkTargets verifies at load time that every GOTO/IF target line exists. On
-// the first dangling reference it sets *badLine to the referencing line's number
-// and *badTarget to the missing target, then returns false. This surfaces a
-// broken jump as a clear diagnostic before any output is produced.
+// checkTargets verifies at load time that every control-statement target line
+// exists: the single target of GOTO/IF/GOSUB and every listed target of an
+// ON…GOTO. On the first dangling reference it sets *badLine to the referencing
+// line's number and *badTarget to the missing target, then returns false. This
+// surfaces a broken jump as a clear diagnostic before any output is produced.
 func checkTargets(prog @[]@Line, lm @lineMap, badLine *int, badTarget *int) bool {
 	for i := 0; i < len(prog); i++ {
 		var s @Stmt = prog[i].Stmt
-		if s.Kind == ST_GOTO || s.Kind == ST_IF {
-			if lm.lookup(s.Target) < 0 {
-				*badLine = prog[i].Num
-				*badTarget = s.Target
+		if !stmtTargetsExist(s, lm, badTarget) {
+			*badLine = prog[i].Num
+			return false
+		}
+	}
+	return true
+}
+
+// stmtTargetsExist reports whether every line-number a control statement names
+// exists in lm. On the first missing one it sets *badTarget and returns false;
+// statements with no line-number target trivially pass.
+func stmtTargetsExist(s @Stmt, lm @lineMap, badTarget *int) bool {
+	if s.Kind == ST_GOTO || s.Kind == ST_IF || s.Kind == ST_GOSUB {
+		if lm.lookup(s.Target) < 0 {
+			*badTarget = s.Target
+			return false
+		}
+	} else if s.Kind == ST_ON {
+		for j := 0; j < len(s.Targets); j++ {
+			if lm.lookup(s.Targets[j]) < 0 {
+				*badTarget = s.Targets[j]
 				return false
 			}
 		}

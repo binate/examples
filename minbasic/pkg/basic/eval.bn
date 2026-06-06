@@ -20,11 +20,13 @@ const MAX_STR_LEN int = 18
 // output sink; col the 0-based column the next character would occupy on the
 // current line (for PRINT zone spacing). prog is the line-ordered program;
 // lineMap resolves a line number to its index in prog (-1 if absent); pc is the
-// program counter (an index into prog); fors is the stack of open FOR loops.
-// fatal/fatalMsg carry a fatal exception raised mid-expression (a TAB argument
-// < 1, or a not-yet-supported function); they cannot be returned through the
-// float64-typed evaluators, so the value is parked here and the step loop
-// reports it after the statement.
+// program counter (an index into prog); fors is the stack of open FOR loops;
+// gosubs is the GOSUB return stack. data is the program's global DATA sequence
+// (collected at load) and dataPtr is the conceptual READ pointer into it (the
+// index of the next datum). fatal/fatalMsg carry a fatal exception raised
+// mid-expression (a TAB argument < 1, or a not-yet-supported function); they
+// cannot be returned through the float64-typed evaluators, so the value is
+// parked here and the step loop reports it after the statement.
 type runtime struct {
 	env      @env
 	out      @io.ConsoleOut
@@ -33,14 +35,18 @@ type runtime struct {
 	lineMap  @lineMap
 	pc       int
 	fors     @forStack
+	gosubs   @gosubStack
+	data     @[]@datum
+	dataPtr  int
 	fatal    bool
 	fatalMsg @[]char
 }
 
 // newRuntime builds a runtime over a fresh variable store writing to out, with
-// the program prog and its precomputed line-number map. The program counter
-// starts at the first line; the FOR stack starts empty.
-func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap) @runtime {
+// the program prog, its precomputed line-number map, and its global DATA
+// sequence. The program counter starts at the first line; the FOR and GOSUB
+// stacks start empty; the data pointer starts at the first datum.
+func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum) @runtime {
 	var r @runtime = make(runtime)
 	r.env = newEnv()
 	r.out = out
@@ -49,6 +55,9 @@ func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap) @runtime {
 	r.lineMap = lm
 	r.pc = 0
 	r.fors = newForStack()
+	r.gosubs = newGosubStack()
+	r.data = data
+	r.dataPtr = 0
 	r.fatal = false
 	return r
 }

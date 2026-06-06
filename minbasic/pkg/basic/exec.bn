@@ -74,7 +74,19 @@ func (r @runtime) dispatch(errMsg *@[]char) int {
 		return r.execFor(s)
 	} else if s.Kind == ST_NEXT {
 		return r.execNext(s, errMsg)
+	} else if s.Kind == ST_GOSUB {
+		return r.execGosub(s, errMsg)
+	} else if s.Kind == ST_RETURN {
+		return r.execReturn(errMsg)
+	} else if s.Kind == ST_ON {
+		return r.execOnGoto(s, errMsg)
+	} else if s.Kind == ST_READ {
+		return r.execRead(s, errMsg)
+	} else if s.Kind == ST_RESTORE {
+		return r.execRestore()
 	}
+	// ST_DATA (and any unhandled kind) is a no-op when reached: DATA is collected
+	// at load and contributes nothing to execution flow.
 	return STEP_NEXT
 }
 

@@ -72,14 +72,39 @@ func (p @parser) parseStmtBody() @Stmt {
 	} else if k == TOK_STOP {
 		p.advance()
 		return simpleStmt(ST_STOP)
-	} else if k == TOK_GOTO || k == TOK_GO {
+	} else if k == TOK_GOTO {
 		return p.parseGoto()
+	} else if k == TOK_GOSUB {
+		return p.parseGosub()
+	} else if k == TOK_GO {
+		return p.parseGoWord()
 	} else if k == TOK_IF {
 		return p.parseIf()
 	} else if k == TOK_FOR {
 		return p.parseFor()
 	} else if k == TOK_NEXT {
 		return p.parseNext()
+	}
+	return p.parseStmtBodyRest(k)
+}
+
+// parseStmtBodyRest dispatches the remaining statement keywords (RETURN, ON,
+// READ, DATA, RESTORE), split from parseStmtBody so neither if/else-if chain
+// grows unwieldy. A line that begins with no known keyword is an error (this
+// slice has no implicit-LET).
+func (p @parser) parseStmtBodyRest(k int) @Stmt {
+	if k == TOK_RETURN {
+		p.advance()
+		return simpleStmt(ST_RETURN)
+	} else if k == TOK_ON {
+		return p.parseOn()
+	} else if k == TOK_READ {
+		return p.parseRead()
+	} else if k == TOK_DATA {
+		return p.parseData()
+	} else if k == TOK_RESTORE {
+		p.advance()
+		return simpleStmt(ST_RESTORE)
 	}
 	p.fail(buf.CopyStr("expected a statement keyword"))
 	return simpleStmt(ST_REM)
