@@ -35,41 +35,52 @@ func powf(a float64, b float64) float64 {
 	return result
 }
 
-// execStmt executes one statement, emitting any PRINT output through the
-// runtime's sink. It returns true if the statement terminates the program
-// (END/STOP). On a fatal runtime error it sets *errMsg and returns true.
-func (r @runtime) execStmt(s @Stmt, errMsg *@[]char, failed *bool) bool {
+// step executes the statement at the current program counter and returns a
+// STEP_* status describing how control proceeds: STEP_NEXT to fall through to
+// the next line, STEP_JUMP if the statement set r.pc itself (GOTO/IF/FOR/NEXT),
+// STEP_END to terminate (END/STOP), or STEP_ERROR after setting *errMsg on a
+// fatal runtime error. PRINT output is emitted through the runtime's sink.
+func (r @runtime) step(errMsg *@[]char) int {
+	var s @Stmt = r.prog[r.pc].Stmt
 	if s.Kind == ST_REM {
-		return false
+		return STEP_NEXT
 	} else if s.Kind == ST_END {
-		return true
+		return STEP_END
 	} else if s.Kind == ST_STOP {
-		return true
+		return STEP_END
 	} else if s.Kind == ST_LET {
-		r.execLet(s, errMsg, failed)
-		return *failed
+		return r.execLet(s, errMsg)
 	} else if s.Kind == ST_PRINT {
 		r.execPrint(s)
-		return false
+		return STEP_NEXT
+	} else if s.Kind == ST_GOTO {
+		return r.execGoto(s, errMsg)
+	} else if s.Kind == ST_IF {
+		return r.execIf(s, errMsg)
+	} else if s.Kind == ST_FOR {
+		return r.execFor(s)
+	} else if s.Kind == ST_NEXT {
+		return r.execNext(s, errMsg)
 	}
-	return false
+	return STEP_NEXT
 }
 
-// execLet executes a LET assignment. A '$'-suffixed target name is a string
-// variable (string RHS); otherwise a numeric variable (numeric RHS). Assigning
-// a string longer than MAX_STR_LEN chars is a fatal ECMA-55 error.
-func (r @runtime) execLet(s @Stmt, errMsg *@[]char, failed *bool) {
+// execLet executes a LET assignment, returning STEP_NEXT on success. A
+// '$'-suffixed target name is a string variable (string RHS); otherwise a
+// numeric variable (numeric RHS). Assigning a string longer than MAX_STR_LEN
+// chars is a fatal ECMA-55 error: it sets *errMsg and returns STEP_ERROR.
+func (r @runtime) execLet(s @Stmt, errMsg *@[]char) int {
 	if s.Name[len(s.Name) - 1] == '$' {
 		var val @[]char = r.evalStr(s.Value)
 		if len(val) > MAX_STR_LEN {
 			*errMsg = buf.CopyStr("string too long (> 18 chars)")
-			*failed = true
-			return
+			return STEP_ERROR
 		}
 		r.env.setStr(s.Name, copyChars(val))
 	} else {
 		r.env.setNum(s.Name, r.evalNum(s.Value))
 	}
+	return STEP_NEXT
 }
 
 // copyChars returns a fresh owned copy of s, so a stored string variable does

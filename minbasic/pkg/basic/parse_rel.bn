@@ -1,0 +1,86 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// parseRelational parses a relational expression — the test of an IF…THEN. The
+// operand type is chosen from the first token: a string variable or constant
+// starts a string comparison (REL_EQ/REL_NE only), anything else a numeric
+// comparison (all six relations). Both operands must be the same type.
+func (p @parser) parseRelational() @Rel {
+	if p.cur.Kind == TOK_SVAR || p.cur.Kind == TOK_STRING {
+		return p.parseStringRel()
+	}
+	return p.parseNumericRel()
+}
+
+// parseNumericRel parses `numeric-expr relation numeric-expr` with any of the
+// six relations.
+func (p @parser) parseNumericRel() @Rel {
+	var x @Expr = p.parseExpr()
+	var op int = p.relOp()
+	if p.hasErr {
+		return make(Rel)
+	}
+	var y @Expr = p.parseExpr()
+	var r @Rel = make(Rel)
+	r.Op = op
+	r.IsStr = false
+	r.X = x
+	r.Y = y
+	return r
+}
+
+// parseStringRel parses `string-expr equality-relation string-expr`. ECMA-55
+// allows only '=' and '<>' for strings; an ordering relation (< > <= >=) on
+// strings is a fatal parse error.
+func (p @parser) parseStringRel() @Rel {
+	var x @Expr = p.parseStringExpr()
+	var op int = p.relOp()
+	if p.hasErr {
+		return make(Rel)
+	}
+	if op != REL_EQ && op != REL_NE {
+		p.fail(buf.CopyStr("strings may be compared only with '=' or '<>'"))
+		return make(Rel)
+	}
+	var y @Expr = p.parseStringExpr()
+	var r @Rel = make(Rel)
+	r.Op = op
+	r.IsStr = true
+	r.X = x
+	r.Y = y
+	return r
+}
+
+// relOp consumes the current token as a relational operator and returns its
+// REL_* code. A non-relational token is a parse error (relOp returns REL_EQ
+// after recording the failure).
+func (p @parser) relOp() int {
+	var k int = p.cur.Kind
+	var op int = relCode(k)
+	if op < 0 {
+		p.fail(buf.CopyStr("expected a relational operator (= < > <= >= <>)"))
+		return REL_EQ
+	}
+	p.advance()
+	return op
+}
+
+// relCode maps a relational-operator token kind to its REL_* code, or -1 if the
+// token is not a relational operator. '=' reuses TOK_EQ.
+func relCode(tokKind int) int {
+	if tokKind == TOK_EQ {
+		return REL_EQ
+	} else if tokKind == TOK_NE {
+		return REL_NE
+	} else if tokKind == TOK_LT {
+		return REL_LT
+	} else if tokKind == TOK_GT {
+		return REL_GT
+	} else if tokKind == TOK_LE {
+		return REL_LE
+	} else if tokKind == TOK_GE {
+		return REL_GE
+	}
+	return -1
+}

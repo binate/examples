@@ -1,0 +1,10 @@
+10 REM String-compare IF (= and <> only)
+20 LET A$ = "YES"
+30 LET B$ = "YES"
+40 LET C$ = "NO"
+50 IF A$ = B$ THEN 70
+60 PRINT "A AND B DIFFER"
+70 IF A$ <> C$ THEN 90
+80 PRINT "A AND C SAME"
+90 PRINT "A IS"; A$
+100 END

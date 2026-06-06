@@ -1,0 +1,55 @@
+package "pkg/basic"
+
+// evalRel evaluates a relational expression (an IF test) to its truth value.
+// Numeric relations compare the two operands' float64 values with the matching
+// order/equality test; string relations compare characters for equality only
+// (the parser has already rejected ordering relations on strings).
+func (r @runtime) evalRel(rel @Rel) bool {
+	if rel.IsStr {
+		return r.evalStrRel(rel)
+	}
+	return r.evalNumRel(rel)
+}
+
+// evalNumRel evaluates a numeric relational expression using all six relations.
+func (r @runtime) evalNumRel(rel @Rel) bool {
+	var a float64 = r.evalNum(rel.X)
+	var b float64 = r.evalNum(rel.Y)
+	if rel.Op == REL_EQ {
+		return a == b
+	} else if rel.Op == REL_NE {
+		return a != b
+	} else if rel.Op == REL_LT {
+		return a < b
+	} else if rel.Op == REL_GT {
+		return a > b
+	} else if rel.Op == REL_LE {
+		return a <= b
+	}
+	return a >= b
+}
+
+// evalStrRel evaluates a string relational expression. Only REL_EQ and REL_NE
+// reach here; equality is same-length plus identical characters (ECMA-55 has no
+// string ordering).
+func (r @runtime) evalStrRel(rel @Rel) bool {
+	var eq bool = charsEqual(r.evalStr(rel.X), r.evalStr(rel.Y))
+	if rel.Op == REL_NE {
+		return !eq
+	}
+	return eq
+}
+
+// charsEqual reports whether two managed character slices have the same length
+// and the same characters.
+func charsEqual(a @[]char, b @[]char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

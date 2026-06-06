@@ -1,0 +1,74 @@
+package "pkg/basic"
+
+// forFrame is one open FOR loop's saved state, per the ECMA-55 block
+// equivalence (§4): the control variable's name, the limit and step evaluated
+// once at loop entry, and BodyPC — the program-counter index of the line just
+// after the FOR (the loop body's top, where NEXT jumps back to).
+type forFrame struct {
+	Name   @[]char
+	Limit  float64
+	Step   float64
+	BodyPC int
+}
+
+// forStack is the stack of open FOR loops, innermost on top. Frames are a
+// managed-slice grown by push; Top is the live frame count (frames at indices
+// >= Top are stale and ignored). Proper nesting is enforced by NEXT matching
+// the top frame's control variable.
+type forStack struct {
+	frames @[]@forFrame
+	top    int
+}
+
+// newForStack builds an empty FOR stack.
+func newForStack() @forStack {
+	var s @forStack = make(forStack)
+	s.frames = make_slice(@forFrame, 0)
+	s.top = 0
+	return s
+}
+
+// push adds a new open-loop frame for control variable `name`, with the
+// loop's once-evaluated limit/step and the body-top PC `bodyPC`.
+func (s @forStack) push(name @[]char, limit float64, step float64, bodyPC int) {
+	var f @forFrame = make(forFrame)
+	f.Name = name
+	f.Limit = limit
+	f.Step = step
+	f.BodyPC = bodyPC
+	if s.top < len(s.frames) {
+		s.frames[s.top] = f
+	} else {
+		s.frames = appendFrame(s.frames, f)
+	}
+	s.top = s.top + 1
+}
+
+// isEmpty reports whether there are no open FOR loops.
+func (s @forStack) isEmpty() bool {
+	return s.top == 0
+}
+
+// peek returns the innermost open-loop frame. The caller must ensure the stack
+// is non-empty (isEmpty is false).
+func (s @forStack) peek() @forFrame {
+	return s.frames[s.top - 1]
+}
+
+// pop discards the innermost open-loop frame (called when a loop exits via its
+// NEXT). The caller must ensure the stack is non-empty.
+func (s @forStack) pop() {
+	s.top = s.top - 1
+}
+
+// appendFrame returns a managed-slice with f appended. (A local helper rather
+// than slices.Append so forStack need not name the generic at every call.)
+func appendFrame(fs @[]@forFrame, f @forFrame) @[]@forFrame {
+	var n int = len(fs)
+	var out @[]@forFrame = make_slice(@forFrame, n + 1)
+	for i := 0; i < n; i++ {
+		out[i] = fs[i]
+	}
+	out[n] = f
+	return out
+}

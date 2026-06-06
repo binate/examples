@@ -1,0 +1,11 @@
+10 REM FOR with positive STEP and a negative-STEP countdown
+20 FOR I = 0 TO 10 STEP 2
+30 PRINT I;
+40 NEXT I
+50 PRINT
+60 FOR J = 5 TO 1 STEP -1
+70 PRINT J;
+80 NEXT J
+90 PRINT
+100 PRINT "DONE I"; I; "J"; J
+110 END

@@ -72,6 +72,14 @@ func (p @parser) parseStmtBody() @Stmt {
 	} else if k == TOK_STOP {
 		p.advance()
 		return simpleStmt(ST_STOP)
+	} else if k == TOK_GOTO || k == TOK_GO {
+		return p.parseGoto()
+	} else if k == TOK_IF {
+		return p.parseIf()
+	} else if k == TOK_FOR {
+		return p.parseFor()
+	} else if k == TOK_NEXT {
+		return p.parseNext()
 	}
 	p.fail(buf.CopyStr("expected a statement keyword"))
 	return simpleStmt(ST_REM)

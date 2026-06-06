@@ -57,6 +57,31 @@ func keywordKind(word @[]char) int {
 	} else if charsEq(word, "STOP") {
 		return TOK_STOP
 	}
+	return controlKeywordKind(word)
+}
+
+// controlKeywordKind returns the keyword token kind for the control-flow
+// keywords (GOTO/GO/TO/IF/THEN/FOR/STEP/NEXT), or -1 if word is not one of
+// them. Split from keywordKind so neither function's if/else-if chain grows
+// unwieldy.
+func controlKeywordKind(word @[]char) int {
+	if charsEq(word, "GOTO") {
+		return TOK_GOTO
+	} else if charsEq(word, "GO") {
+		return TOK_GO
+	} else if charsEq(word, "TO") {
+		return TOK_TO
+	} else if charsEq(word, "IF") {
+		return TOK_IF
+	} else if charsEq(word, "THEN") {
+		return TOK_THEN
+	} else if charsEq(word, "FOR") {
+		return TOK_FOR
+	} else if charsEq(word, "STEP") {
+		return TOK_STEP
+	} else if charsEq(word, "NEXT") {
+		return TOK_NEXT
+	}
 	return -1
 }
 
@@ -198,9 +223,14 @@ func (l @lexer) lexString() Token {
 	return t
 }
 
-// lexSymbol scans a single-character operator/punctuation token.
+// lexSymbol scans an operator/punctuation token. Most are single characters;
+// the relational operators '<' and '>' may carry a following '=' or '>' to form
+// the two-character relations '<=', '>=', '<>'.
 func (l @lexer) lexSymbol(c char) Token {
 	l.pos = l.pos + 1
+	if c == '<' || c == '>' {
+		return l.lexRelational(c)
+	}
 	var t Token
 	if c == '+' {
 		t.Kind = TOK_PLUS
@@ -226,6 +256,33 @@ func (l @lexer) lexSymbol(c char) Token {
 		var bad @[]char = make_slice(char, 1)
 		bad[0] = c
 		return errTok(buf.Concat("unexpected character: ", bad))
+	}
+	return t
+}
+
+// lexRelational scans a relational operator beginning with c (already consumed,
+// '<' or '>'). It greedily takes a following '=' to form '<='/'>=' and a
+// following '>' after '<' to form '<>' (not-equal); a bare '<' or '>' is the
+// strict relation.
+func (l @lexer) lexRelational(c char) Token {
+	var t Token
+	if c == '<' {
+		if l.pos < len(l.src) && l.src[l.pos] == '=' {
+			l.pos = l.pos + 1
+			t.Kind = TOK_LE
+		} else if l.pos < len(l.src) && l.src[l.pos] == '>' {
+			l.pos = l.pos + 1
+			t.Kind = TOK_NE
+		} else {
+			t.Kind = TOK_LT
+		}
+		return t
+	}
+	if l.pos < len(l.src) && l.src[l.pos] == '=' {
+		l.pos = l.pos + 1
+		t.Kind = TOK_GE
+	} else {
+		t.Kind = TOK_GT
 	}
 	return t
 }

@@ -4,8 +4,9 @@ package "pkg/basic"
 // is tokenized independently), so there is no end-of-line token: the token
 // stream for a line ends with TOK_EOF.
 //
-// Keyword tokens cover only the statements this slice implements (LET, PRINT,
-// REM, END, STOP); other identifiers — variable names — are TOK_VAR / TOK_SVAR.
+// Keyword tokens cover the statements implemented through the control-flow
+// slice (LET, PRINT, REM, END, STOP, GOTO/GO TO, IF…THEN, FOR/NEXT); other
+// identifiers — variable names — are TOK_VAR / TOK_SVAR.
 const (
 	// TOK_EOF marks the end of a line's token stream.
 	TOK_EOF int = iota
@@ -19,12 +20,25 @@ const (
 	// TOK_SVAR is a string variable: a letter followed by '$' (A$..Z$).
 	// Token.Text holds the name including the '$'.
 	TOK_SVAR
-	// TOK_LET .. TOK_STOP are the statement keywords in scope for this slice.
+	// TOK_LET .. TOK_STOP are the simple statement keywords.
 	TOK_LET
 	TOK_PRINT
 	TOK_REM
 	TOK_END
 	TOK_STOP
+	// TOK_GOTO is the single-word `GOTO`; TOK_GO and TOK_TO are the separate
+	// words of the two-word spelling `GO TO`. TOK_TO also introduces a FOR
+	// statement's limit (`FOR v = a TO b`).
+	TOK_GOTO
+	TOK_GO
+	TOK_TO
+	// TOK_IF .. TOK_NEXT are the control-flow keywords: IF…THEN and FOR/NEXT
+	// (with the optional STEP clause).
+	TOK_IF
+	TOK_THEN
+	TOK_FOR
+	TOK_STEP
+	TOK_NEXT
 	// TOK_PLUS .. TOK_CARET are the arithmetic operators.
 	TOK_PLUS
 	TOK_MINUS
@@ -38,6 +52,13 @@ const (
 	TOK_EQ
 	TOK_COMMA
 	TOK_SEMI
+	// TOK_LT .. TOK_NE are the relational operators that appear only inside an
+	// IF…THEN test: '<', '>', '<=', '>=', '<>'. ('=' reuses TOK_EQ.)
+	TOK_LT
+	TOK_GT
+	TOK_LE
+	TOK_GE
+	TOK_NE
 	// TOK_ERROR marks a lexing failure; Token.Text holds the diagnostic.
 	TOK_ERROR
 )

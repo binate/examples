@@ -33,6 +33,30 @@ type Expr struct {
 	Y    @Expr
 }
 
+// REL_* identify a relational operator inside a relational-expression (an IF
+// test). The numeric relations use all six; string relations use only REL_EQ
+// and REL_NE (ECMA-55 forbids ordering strings).
+const (
+	REL_EQ int = iota
+	REL_NE
+	REL_LT
+	REL_GT
+	REL_LE
+	REL_GE
+)
+
+// Rel is a relational expression: two same-typed operands compared by Op. It is
+// NOT an Expr — Minimal BASIC has no boolean type, so a relation can only appear
+// as an IF…THEN test, never as a general value. IsStr selects the operand type:
+// when set, X/Y are string expressions compared with REL_EQ/REL_NE only;
+// otherwise X/Y are numeric expressions compared with any REL_*.
+type Rel struct {
+	Op    int
+	IsStr bool
+	X     @Expr
+	Y     @Expr
+}
+
 // Statement-node kinds. One Stmt per program line (ECMA-55 allows exactly one
 // statement per line).
 //
@@ -45,12 +69,21 @@ type Expr struct {
 // ST_REM       (none — a no-op comment line)
 // ST_END       (none — terminates; must be the highest line)
 // ST_STOP      (none — terminates anywhere)
+// ST_GOTO      Target (line number to transfer control to)
+// ST_IF        Cond (relational test), Target (line to jump to if true)
+// ST_FOR       Name (control variable), Value (initial), Limit, Step (Step nil
+//              ⇒ default +1)
+// ST_NEXT      Name (control variable that must match the open FOR)
 const (
 	ST_LET int = iota
 	ST_PRINT
 	ST_REM
 	ST_END
 	ST_STOP
+	ST_GOTO
+	ST_IF
+	ST_FOR
+	ST_NEXT
 )
 
 // PRINT-separator kinds, stored per item in Stmt.Seps. SEP_NONE marks the last
@@ -68,12 +101,21 @@ const (
 // kind table above). Items/Seps are parallel: Seps[i] is the separator following
 // Items[i]. A PRINT list ending in a separator has len(Seps) == len(Items) with
 // the final entry SEP_COMMA/SEP_SEMI; otherwise the final Seps entry is SEP_NONE.
+// Target is a GOTO/IF jump target line number; Cond is an IF test; Limit/Step
+// are a FOR loop's limit and step expressions. HasStep is false when the FOR
+// omits its STEP clause (the runtime then uses the default increment +1) and
+// Step is unused.
 type Stmt struct {
-	Kind  int
-	Name  @[]char
-	Value @Expr
-	Items @[]@Expr
-	Seps  @[]int
+	Kind    int
+	Name    @[]char
+	Value   @Expr
+	Items   @[]@Expr
+	Seps    @[]int
+	Target  int
+	Cond    @Rel
+	Limit   @Expr
+	Step    @Expr
+	HasStep bool
 }
 
 // Line is one parsed program line: its line number (1..9999) and its statement.

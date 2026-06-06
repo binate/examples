@@ -1,0 +1,130 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// parseGoto parses `GOTO <line>` or `GO TO <line>`. The leading keyword is
+// either the single word TOK_GOTO or the word TOK_GO followed by TOK_TO. The
+// target is a line-number reference, which the runtime resolves against the
+// program's line table (a nonexistent target is a fatal runtime error).
+func (p @parser) parseGoto() @Stmt {
+	if p.cur.Kind == TOK_GO {
+		p.advance()
+		if p.cur.Kind != TOK_TO {
+			p.fail(buf.CopyStr("GO: expected TO"))
+			return simpleStmt(ST_REM)
+		}
+	}
+	p.advance()
+	var target int = p.parseLineRef("GOTO")
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_GOTO
+	s.Target = target
+	return s
+}
+
+// parseIf parses `IF <relational-expression> THEN <line>`. THEN is followed by
+// a line number only — Minimal BASIC has no `IF…THEN <statement>` and no ELSE.
+// If the relation is true at runtime, control transfers to the target line;
+// otherwise execution falls through to the next line.
+func (p @parser) parseIf() @Stmt {
+	p.advance()
+	var cond @Rel = p.parseRelational()
+	if p.hasErr {
+		return simpleStmt(ST_REM)
+	}
+	if p.cur.Kind != TOK_THEN {
+		p.fail(buf.CopyStr("IF: expected THEN"))
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	var target int = p.parseLineRef("IF")
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_IF
+	s.Cond = cond
+	s.Target = target
+	return s
+}
+
+// parseFor parses `FOR <numeric-var> = <init> TO <limit> [STEP <step>]`. The
+// control variable must be a simple numeric variable. Limit and step are
+// numeric expressions; an absent STEP leaves Step nil so the runtime applies
+// the default increment of +1.
+func (p @parser) parseFor() @Stmt {
+	p.advance()
+	if p.cur.Kind != TOK_VAR {
+		p.fail(buf.CopyStr("FOR: expected a numeric control variable"))
+		return simpleStmt(ST_REM)
+	}
+	var name @[]char = p.cur.Text
+	p.advance()
+	if p.cur.Kind != TOK_EQ {
+		p.fail(buf.CopyStr("FOR: expected '='"))
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	return p.parseForRest(name)
+}
+
+// parseForRest parses the part of a FOR statement after `FOR v =`: the initial
+// value, the mandatory `TO <limit>`, and an optional `STEP <increment>`.
+func (p @parser) parseForRest(name @[]char) @Stmt {
+	var init @Expr = p.parseExpr()
+	if p.cur.Kind != TOK_TO {
+		p.fail(buf.CopyStr("FOR: expected TO"))
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	var limit @Expr = p.parseExpr()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_FOR
+	s.Name = name
+	s.Value = init
+	s.Limit = limit
+	if p.cur.Kind == TOK_STEP {
+		p.advance()
+		s.Step = p.parseExpr()
+		s.HasStep = true
+	}
+	return s
+}
+
+// parseNext parses `NEXT <numeric-var>`. The named control variable must match
+// the innermost open FOR; the runtime checks that pairing.
+func (p @parser) parseNext() @Stmt {
+	p.advance()
+	if p.cur.Kind != TOK_VAR {
+		p.fail(buf.CopyStr("NEXT: expected a numeric control variable"))
+		return simpleStmt(ST_REM)
+	}
+	var name @[]char = p.cur.Text
+	p.advance()
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_NEXT
+	s.Name = name
+	return s
+}
+
+// parseLineRef parses a line-number reference (a 1..9999 integer literal) used
+// as a GOTO/IF target. `ctx` names the enclosing statement for the diagnostic.
+// On error it records the failure and returns 0.
+func (p @parser) parseLineRef(ctx @[]char) int {
+	if p.cur.Kind != TOK_NUMBER {
+		p.fail(buf.Concat(ctx, ": expected a line number"))
+		return 0
+	}
+	var num int = 0
+	var t @[]char = p.cur.Text
+	for i := 0; i < len(t); i++ {
+		if !isDigit(t[i]) {
+			p.fail(buf.Concat(ctx, ": line number must be an integer"))
+			return 0
+		}
+		num = num * 10 + cast(int, t[i] - '0')
+	}
+	if num < 1 || num > 9999 {
+		p.fail(buf.Concat(ctx, ": line number must be 1..9999"))
+		return 0
+	}
+	p.advance()
+	return num
+}

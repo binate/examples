@@ -1,0 +1,144 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// execGoto transfers control to the GOTO target line. A target that does not
+// exist in the program is a fatal error (also detected at load, but re-checked
+// here for safety). On success it sets r.pc to the target's index and returns
+// STEP_JUMP.
+func (r @runtime) execGoto(s @Stmt, errMsg *@[]char) int {
+	var idx int = r.lineMap.lookup(s.Target)
+	if idx < 0 {
+		*errMsg = noSuchLine(s.Target)
+		return STEP_ERROR
+	}
+	r.pc = idx
+	return STEP_JUMP
+}
+
+// execIf evaluates the IF test: when true it transfers control to the target
+// line (STEP_JUMP); when false it falls through to the next line (STEP_NEXT). A
+// nonexistent target taken by a true test is a fatal error.
+func (r @runtime) execIf(s @Stmt, errMsg *@[]char) int {
+	if !r.evalRel(s.Cond) {
+		return STEP_NEXT
+	}
+	var idx int = r.lineMap.lookup(s.Target)
+	if idx < 0 {
+		*errMsg = noSuchLine(s.Target)
+		return STEP_ERROR
+	}
+	r.pc = idx
+	return STEP_JUMP
+}
+
+// execFor enters a FOR loop following the ECMA-55 block equivalence (§4): it
+// evaluates the limit and step ONCE (step default +1), sets the control
+// variable to the initial value, then applies the loop-exit test. If the test
+// is already true (a zero-trip loop), control skips the whole body and resumes
+// after the matching NEXT; otherwise the frame is pushed and execution falls
+// into the body.
+func (r @runtime) execFor(s @Stmt) int {
+	var limit float64 = r.evalNum(s.Limit)
+	var step float64 = 1.0
+	if s.HasStep {
+		step = r.evalNum(s.Step)
+	}
+	var v float64 = r.evalNum(s.Value)
+	r.env.setNum(s.Name, v)
+	if forExits(v, limit, step) {
+		r.pc = r.afterMatchingNext(s.Name)
+		return STEP_JUMP
+	}
+	r.fors.push(s.Name, limit, step, r.pc + 1)
+	r.pc = r.pc + 1
+	return STEP_JUMP
+}
+
+// execNext closes one iteration of the innermost FOR loop (ECMA-55 §4): it
+// steps the control variable, re-applies the exit test, and either jumps back
+// to the body top (loop continues) or pops the frame and falls through (loop
+// exits, leaving the control variable at the value that failed the test). A
+// NEXT with no open loop, or naming a variable other than the innermost loop's,
+// is a fatal error.
+func (r @runtime) execNext(s @Stmt, errMsg *@[]char) int {
+	if r.fors.isEmpty() {
+		*errMsg = buf.Concat("NEXT without FOR: ", s.Name)
+		return STEP_ERROR
+	}
+	var f @forFrame = r.fors.peek()
+	if !charsEqual(f.Name, s.Name) {
+		*errMsg = mismatchedNext(f.Name, s.Name)
+		return STEP_ERROR
+	}
+	var v float64 = r.env.getNum(s.Name) + f.Step
+	r.env.setNum(s.Name, v)
+	if forExits(v, f.Limit, f.Step) {
+		r.fors.pop()
+		r.pc = r.pc + 1
+		return STEP_JUMP
+	}
+	r.pc = f.BodyPC
+	return STEP_JUMP
+}
+
+// forExits reports whether a FOR loop's exit test is satisfied for control
+// value v: the ECMA-55 test (v - limit) * SGN(step) > 0 (strict). With step 0,
+// SGN(0) = 0 makes this always false, so the loop never exits on its own.
+func forExits(v float64, limit float64, step float64) bool {
+	return (v - limit) * sgn(step) > 0.0
+}
+
+// sgn is ECMA-55's SGN: -1 if x < 0, +1 if x > 0, 0 if x == 0.
+func sgn(x float64) float64 {
+	if x < 0.0 {
+		return -1.0
+	}
+	if x > 0.0 {
+		return 1.0
+	}
+	return 0.0
+}
+
+// afterMatchingNext returns the program index just past the NEXT that closes a
+// FOR loop on control variable `name` starting at the current pc, used to skip
+// a zero-trip loop's body. Nested FOR/NEXT pairs on other variables are stepped
+// over by depth counting. If no matching NEXT exists the loop runs to the end
+// of the program (one past the last line), where execution simply stops.
+func (r @runtime) afterMatchingNext(name @[]char) int {
+	var depth int = 0
+	for i := r.pc + 1; i < len(r.prog); i++ {
+		var st @Stmt = r.prog[i].Stmt
+		if st.Kind == ST_FOR {
+			depth = depth + 1
+		} else if st.Kind == ST_NEXT {
+			if depth == 0 && charsEqual(st.Name, name) {
+				return i + 1
+			}
+			if depth > 0 {
+				depth = depth - 1
+			}
+		}
+	}
+	return len(r.prog)
+}
+
+// noSuchLine builds the diagnostic for a GOTO/IF target line that is not present
+// in the program.
+func noSuchLine(num int) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("no such line: ")
+	b = b.WriteInt(num)
+	return b.Freeze()
+}
+
+// mismatchedNext builds the diagnostic for a NEXT whose control variable does
+// not match the innermost open FOR's variable.
+func mismatchedNext(want @[]char, got @[]char) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("NEXT ")
+	b = b.WriteStr(got)
+	b = b.WriteStr(" does not match FOR ")
+	b = b.WriteStr(want)
+	return b.Freeze()
+}

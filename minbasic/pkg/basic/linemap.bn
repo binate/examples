@@ -1,0 +1,37 @@
+package "pkg/basic"
+
+// LINE_MAP_SIZE is the size of the line-number lookup table: line numbers run
+// 1..9999, so index 0 is unused and indices 1..9999 map a line number to its
+// position in the program (a flat array, matching env's no-hashmap idiom).
+const LINE_MAP_SIZE int = 10000
+
+// lineMap resolves a BASIC line number to its index in the ordered program. idx
+// is indexed by line number; an entry of -1 means no such line exists. Built
+// once at load so GOTO/IF targets resolve in O(1) and missing targets are
+// detectable up front.
+type lineMap struct {
+	idx [LINE_MAP_SIZE]int
+}
+
+// buildLineMap constructs the line-number → program-index map for prog. Line
+// numbers are guaranteed 1..9999 and strictly ascending by the parser, so no
+// collision is possible.
+func buildLineMap(prog @[]@Line) @lineMap {
+	var lm @lineMap = make(lineMap)
+	for i := 0; i < LINE_MAP_SIZE; i++ {
+		lm.idx[i] = -1
+	}
+	for i := 0; i < len(prog); i++ {
+		lm.idx[prog[i].Num] = i
+	}
+	return lm
+}
+
+// lookup returns the program index of line number `num`, or -1 if no such line
+// exists. A num outside 1..9999 also returns -1 (it can never be a valid line).
+func (lm @lineMap) lookup(num int) int {
+	if num < 1 || num >= LINE_MAP_SIZE {
+		return -1
+	}
+	return lm.idx[num]
+}

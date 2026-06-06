@@ -16,21 +16,33 @@ const MARGIN int = 75
 // variable (clause 11.5): assigning a longer string is a fatal error.
 const MAX_STR_LEN int = 18
 
-// runtime is the per-RUN execution context: the variable store, the output
-// sink, and the current print-column position used for PRINT zone spacing. col
-// is the 0-based column the next character would occupy on the current line.
+// runtime is the per-RUN execution context. env is the variable store; out the
+// output sink; col the 0-based column the next character would occupy on the
+// current line (for PRINT zone spacing). prog is the line-ordered program;
+// lineMap resolves a line number to its index in prog (-1 if absent); pc is the
+// program counter (an index into prog); fors is the stack of open FOR loops.
 type runtime struct {
-	env  @env
-	out  @io.ConsoleOut
-	col  int
+	env     @env
+	out     @io.ConsoleOut
+	col     int
+	prog    @[]@Line
+	lineMap @lineMap
+	pc      int
+	fors    @forStack
 }
 
-// newRuntime builds a runtime over a fresh variable store writing to out.
-func newRuntime(out @io.ConsoleOut) @runtime {
+// newRuntime builds a runtime over a fresh variable store writing to out, with
+// the program prog and its precomputed line-number map. The program counter
+// starts at the first line; the FOR stack starts empty.
+func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap) @runtime {
 	var r @runtime = make(runtime)
 	r.env = newEnv()
 	r.out = out
 	r.col = 0
+	r.prog = prog
+	r.lineMap = lm
+	r.pc = 0
+	r.fors = newForStack()
 	return r
 }
 
