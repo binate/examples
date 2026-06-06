@@ -12,15 +12,18 @@ for the architecture, milestones, and open decisions, and
 
 ## Run (M0 skeleton)
 
+minbasic injects an `io.ConsoleOut` into the engine — the core never touches an
+fd. That needs a toolchain with the interface-vtable fix, which is in binate
+`main` but not in the pinned `bnc-0.0.7` release yet, so build against a
+`main`-built bundle (`BINATE_BUNDLE`, see the repo README):
+
 ```sh
-./scripts/run-compiled.sh    minbasic/cmd/run   # -> minbasic - ECMA-55 Minimal BASIC (skeleton)
-./scripts/run-interpreted.sh minbasic/cmd/run   # same, through the VM
+BINATE_BUNDLE=/path/to/main/bundle ./scripts/run-compiled.sh    minbasic/cmd/run
+BINATE_BUNDLE=/path/to/main/bundle ./scripts/run-interpreted.sh minbasic/cmd/run
+# -> minbasic - ECMA-55 Minimal BASIC (skeleton)
 ```
 
-> **Temporary I/O note.** minbasic's intended design injects an `io.ConsoleOut`
-> into the engine, but that path miscompiles on the pinned `bnc-0.0.7`: calling
-> an interface method with a 2-word slice argument drops the slice's length (both
-> backends), and the VM also mishandles an injected `@func` writer. Until the fix
-> ships in a release, output goes through a clearly-marked temporary static
-> `pkg/host.WriteOut`. See `docs/plan.md` and the CRITICAL entries in
-> `explorations/claude-todo.md`.
+> **Toolchain note.** On the pinned `bnc-0.0.7` the example *compiles* (CI stays
+> green) but produces wrong output at runtime: an interface method taking a
+> 2-word slice argument miscompiles in that release. It's fixed in `main`, so run
+> against a `main` bundle until the pin is bumped to a release carrying the fix.

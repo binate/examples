@@ -1,15 +1,11 @@
-// Command run is the non-interactive minbasic host: it runs a BASIC program.
-// (M0 skeleton: drives the banner; M1 reads a .bas file from the command line
-// and runs it.)
-//
-// TEMP: once the injected-io.ConsoleOut path compiles (see
-// explorations/claude-todo.md), this constructs the host delegate and injects
-// it: `basic.Run(host.NewConsole())`. For now the engine emits via a static host
-// call, so main just drives it.
+// Command run is the non-interactive minbasic host: it constructs the I/O
+// delegate and runs a BASIC program. (M0 skeleton: drives the banner; M1 reads a
+// .bas file from the command line and runs it.)
 package "main"
 
 import "pkg/basic"
+import "pkg/host"
 
 func main() {
-	basic.Run()
+	basic.Run(host.NewConsole())
 }

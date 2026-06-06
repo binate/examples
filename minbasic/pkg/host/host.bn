@@ -1,13 +1,27 @@
 package "pkg/host"
 
+import "pkg/basic/io"
 import "pkg/bootstrap"
 
-// WriteOut sends s to standard output with no added newline. char and uint8 are
-// the same byte, so the readonly char slice is accepted by bootstrap.Write
-// directly. This is the sole pkg/bootstrap call site in minbasic.
-//
-// TEMP static shape (see host.bni): becomes a bootstrapConsole : io.ConsoleOut
-// impl + NewConsole() @io.ConsoleOut once the injection path compiles correctly.
-func WriteOut(s *[]readonly char) int {
-	return bootstrap.Write(bootstrap.STDOUT, s)
+// bootstrapConsole writes through bootstrap.Write to a fixed file descriptor.
+// This is the only type in minbasic that depends on pkg/bootstrap.
+type bootstrapConsole struct {
+	fd int
+}
+
+// Write sends the characters of s to the console's fd with no added newline, so
+// PRINT's trailing-';' suppression and inline prompts work. char and uint8 are
+// the same byte, so the readonly char slice is accepted directly.
+func (c *bootstrapConsole) Write(s *[]readonly char) int {
+	return bootstrap.Write(c.fd, s)
+}
+
+impl *bootstrapConsole : io.ConsoleOut
+
+// NewConsole returns a ConsoleOut bound to standard output.
+func NewConsole() @io.ConsoleOut {
+	var c @bootstrapConsole = make(bootstrapConsole)
+	c.fd = bootstrap.STDOUT
+	var out @io.ConsoleOut = c
+	return out
 }

@@ -1,16 +1,8 @@
 // Package io is minbasic's I/O-injection seam: the interpreter core depends only
 // on these interfaces — never on a concrete sink nor on pkg/bootstrap. A host
 // supplies the implementation (a real console, a capture buffer for conformance
-// tests, a future wasm sink) and injects it into the engine.
-//
-// TARGET DESIGN — TEMPORARILY BYPASSED. Routing a BASIC program's PRINT output
-// through ConsoleOut.Write means passing a 2-word slice (*[]readonly char) by
-// value through an interface vtable method, which currently miscompiles: the
-// slice's len word is dropped, in BOTH backends (see explorations/claude-todo.md,
-// "2-word raw-slice param's len word ... through an interface vtable call").
-// Until that is fixed and a new bnc is released, the engine takes a @func writer
-// instead (the verified-clean path) — see pkg/basic.Run / pkg/host.NewWriter.
-// Swapping back to this interface is a mechanical change at that point.
+// tests, a future wasm sink) and injects it into the engine, keeping the core
+// free of any low-level I/O dependency.
 package "pkg/basic/io"
 
 // ConsoleOut is the sink for a BASIC program's PRINT output. The core formats
