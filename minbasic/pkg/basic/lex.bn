@@ -1,0 +1,242 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// lexer holds the per-line scan state: the source line being tokenized and the
+// current read position within it. A fresh lexer is made for each program line.
+type lexer struct {
+	src @[]char
+	pos int
+}
+
+// newLexer creates a lexer over the characters of line (excluding any newline).
+func newLexer(line @[]char) @lexer {
+	var l @lexer = make(lexer)
+	l.src = line
+	l.pos = 0
+	return l
+}
+
+// isDigit reports whether c is an ASCII decimal digit.
+func isDigit(c char) bool {
+	return c >= '0' && c <= '9'
+}
+
+// isAlpha reports whether c is an uppercase ASCII letter (ECMA-55's letter set).
+func isAlpha(c char) bool {
+	return c >= 'A' && c <= 'Z'
+}
+
+// errTok builds a TOK_ERROR token carrying msg.
+func errTok(msg @[]char) Token {
+	var t Token
+	t.Kind = TOK_ERROR
+	t.Text = msg
+	return t
+}
+
+// skipSpaces advances past spaces and tabs. ECMA-55 allows spaces between tokens
+// (and forbids them inside tokens); the lexer simply ignores inter-token spaces.
+func (l @lexer) skipSpaces() {
+	for l.pos < len(l.src) && (l.src[l.pos] == ' ' || l.src[l.pos] == '\t') {
+		l.pos = l.pos + 1
+	}
+}
+
+// keywordKind returns the keyword token kind for an all-letters run, or -1 if
+// the run is not a keyword in this slice's vocabulary.
+func keywordKind(word @[]char) int {
+	if charsEq(word, "LET") {
+		return TOK_LET
+	} else if charsEq(word, "PRINT") {
+		return TOK_PRINT
+	} else if charsEq(word, "REM") {
+		return TOK_REM
+	} else if charsEq(word, "END") {
+		return TOK_END
+	} else if charsEq(word, "STOP") {
+		return TOK_STOP
+	}
+	return -1
+}
+
+// charsEq reports whether managed-slice a equals the raw-slice literal b
+// character-for-character.
+func charsEq(a @[]char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// restOfLine returns the characters from the current position to end of line as
+// a fresh managed-slice. Used to capture a REM remark verbatim.
+func (l @lexer) restOfLine() @[]char {
+	var b buf.CharBuf = buf.New()
+	for l.pos < len(l.src) {
+		b = b.WriteByte(l.src[l.pos])
+		l.pos = l.pos + 1
+	}
+	return b.Freeze()
+}
+
+// next returns the next token from the line. At end of line it returns TOK_EOF.
+func (l @lexer) next() Token {
+	l.skipSpaces()
+	if l.pos >= len(l.src) {
+		var t Token
+		t.Kind = TOK_EOF
+		return t
+	}
+	var c char = l.src[l.pos]
+	if isAlpha(c) {
+		return l.lexWord()
+	}
+	if isDigit(c) || c == '.' {
+		return l.lexNumber()
+	}
+	if c == '"' {
+		return l.lexString()
+	}
+	return l.lexSymbol(c)
+}
+
+// lexWord scans a maximal run of letters. If the run is a keyword it yields the
+// keyword token; otherwise the run is a variable, which ECMA-55 limits to one
+// letter optionally followed by one digit (or a '$' for a string variable).
+func (l @lexer) lexWord() Token {
+	var start int = l.pos
+	for l.pos < len(l.src) && isAlpha(l.src[l.pos]) {
+		l.pos = l.pos + 1
+	}
+	var word @[]char = sliceChars(l.src, start, l.pos)
+	var kw int = keywordKind(word)
+	if kw >= 0 {
+		var t Token
+		t.Kind = kw
+		t.Text = word
+		return t
+	}
+	return l.finishVar(start)
+}
+
+// finishVar interprets the letter-run starting at index `start` (the lexer has
+// already advanced past the letters) as a variable. Only the first letter names
+// the variable; a trailing digit or '$' may extend it. Any extra letters mean
+// the run was an unknown keyword.
+func (l @lexer) finishVar(start int) Token {
+	if l.pos - start != 1 {
+		return errTok(buf.Concat("unknown keyword: ", sliceChars(l.src, start, l.pos)))
+	}
+	if l.pos < len(l.src) && l.src[l.pos] == '$' {
+		l.pos = l.pos + 1
+		var t Token
+		t.Kind = TOK_SVAR
+		t.Text = sliceChars(l.src, start, l.pos)
+		return t
+	}
+	if l.pos < len(l.src) && isDigit(l.src[l.pos]) {
+		l.pos = l.pos + 1
+	}
+	var t Token
+	t.Kind = TOK_VAR
+	t.Text = sliceChars(l.src, start, l.pos)
+	return t
+}
+
+// lexNumber scans a numeric constant: digits, an optional decimal point and
+// fraction, and an optional `E` exponent with optional sign. Validation of the
+// value is left to the parser/strconv.
+func (l @lexer) lexNumber() Token {
+	var start int = l.pos
+	for l.pos < len(l.src) && isDigit(l.src[l.pos]) {
+		l.pos = l.pos + 1
+	}
+	if l.pos < len(l.src) && l.src[l.pos] == '.' {
+		l.pos = l.pos + 1
+		for l.pos < len(l.src) && isDigit(l.src[l.pos]) {
+			l.pos = l.pos + 1
+		}
+	}
+	if l.pos < len(l.src) && l.src[l.pos] == 'E' {
+		l.pos = l.pos + 1
+		if l.pos < len(l.src) && (l.src[l.pos] == '+' || l.src[l.pos] == '-') {
+			l.pos = l.pos + 1
+		}
+		for l.pos < len(l.src) && isDigit(l.src[l.pos]) {
+			l.pos = l.pos + 1
+		}
+	}
+	var t Token
+	t.Kind = TOK_NUMBER
+	t.Text = sliceChars(l.src, start, l.pos)
+	return t
+}
+
+// lexString scans a quoted string constant. The opening quote is at the current
+// position; the value is the characters up to the closing quote (spaces are
+// significant). An unterminated string is an error.
+func (l @lexer) lexString() Token {
+	l.pos = l.pos + 1
+	var b buf.CharBuf = buf.New()
+	for l.pos < len(l.src) && l.src[l.pos] != '"' {
+		b = b.WriteByte(l.src[l.pos])
+		l.pos = l.pos + 1
+	}
+	if l.pos >= len(l.src) {
+		return errTok(buf.CopyStr("unterminated string constant"))
+	}
+	l.pos = l.pos + 1
+	var t Token
+	t.Kind = TOK_STRING
+	t.Text = b.Freeze()
+	return t
+}
+
+// lexSymbol scans a single-character operator/punctuation token.
+func (l @lexer) lexSymbol(c char) Token {
+	l.pos = l.pos + 1
+	var t Token
+	if c == '+' {
+		t.Kind = TOK_PLUS
+	} else if c == '-' {
+		t.Kind = TOK_MINUS
+	} else if c == '*' {
+		t.Kind = TOK_STAR
+	} else if c == '/' {
+		t.Kind = TOK_SLASH
+	} else if c == '^' {
+		t.Kind = TOK_CARET
+	} else if c == '(' {
+		t.Kind = TOK_LPAREN
+	} else if c == ')' {
+		t.Kind = TOK_RPAREN
+	} else if c == '=' {
+		t.Kind = TOK_EQ
+	} else if c == ',' {
+		t.Kind = TOK_COMMA
+	} else if c == ';' {
+		t.Kind = TOK_SEMI
+	} else {
+		var bad @[]char = make_slice(char, 1)
+		bad[0] = c
+		return errTok(buf.Concat("unexpected character: ", bad))
+	}
+	return t
+}
+
+// sliceChars returns the characters of src in [start, end) as a fresh
+// managed-slice (the result is owned by the caller).
+func sliceChars(src @[]char, start int, end int) @[]char {
+	var n int = end - start
+	var out @[]char = make_slice(char, n)
+	for i := 0; i < n; i++ {
+		out[i] = src[start + i]
+	}
+	return out
+}

@@ -1,0 +1,233 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+import "pkg/std/errors"
+import "pkg/std/strconv"
+import "pkg/stdx/slices"
+
+// parser parses one program line's token stream into a Stmt. It holds the
+// per-line lexer plus a one-token lookahead (cur). Errors are reported as
+// values: on failure a method sets `err` (and callers check hasErr).
+type parser struct {
+	lex    @lexer
+	cur    Token
+	err    @[]char
+	hasErr bool
+}
+
+// newParser builds a parser over the characters of a single program line (the
+// line number and any newline already stripped).
+func newParser(line @[]char) @parser {
+	var p @parser = make(parser)
+	p.lex = newLexer(line)
+	p.hasErr = false
+	p.advance()
+	return p
+}
+
+// advance pulls the next token into cur, surfacing any lexer error.
+func (p @parser) advance() {
+	p.cur = p.lex.next()
+	if p.cur.Kind == TOK_ERROR && !p.hasErr {
+		p.fail(p.cur.Text)
+	}
+}
+
+// fail records the first error message, leaving later calls no-ops so the
+// original diagnostic survives.
+func (p @parser) fail(msg @[]char) {
+	if !p.hasErr {
+		p.hasErr = true
+		p.err = msg
+	}
+}
+
+// parseStmt parses the line's single statement. ECMA-55 allows exactly one
+// statement per line, so trailing tokens after the statement are an error.
+func (p @parser) parseStmt() @Stmt {
+	var s @Stmt = p.parseStmtBody()
+	if p.hasErr {
+		return s
+	}
+	if p.cur.Kind != TOK_EOF {
+		p.fail(buf.CopyStr("unexpected token after statement"))
+	}
+	return s
+}
+
+// parseStmtBody dispatches on the leading keyword to the matching statement
+// parser. A line that does not begin with a known keyword is an error (this
+// slice has no implicit-LET).
+func (p @parser) parseStmtBody() @Stmt {
+	var k int = p.cur.Kind
+	if k == TOK_LET {
+		return p.parseLet()
+	} else if k == TOK_PRINT {
+		return p.parsePrint()
+	} else if k == TOK_REM {
+		return p.parseRem()
+	} else if k == TOK_END {
+		p.advance()
+		return simpleStmt(ST_END)
+	} else if k == TOK_STOP {
+		p.advance()
+		return simpleStmt(ST_STOP)
+	}
+	p.fail(buf.CopyStr("expected a statement keyword"))
+	return simpleStmt(ST_REM)
+}
+
+// simpleStmt builds a field-less statement of the given kind (END/STOP/REM).
+func simpleStmt(kind int) @Stmt {
+	var s @Stmt = make(Stmt)
+	s.Kind = kind
+	return s
+}
+
+// parseRem consumes the REM keyword and the rest of the line as commentary,
+// producing a no-op statement.
+func (p @parser) parseRem() @Stmt {
+	// The lexer is positioned just past "REM"; take the remainder verbatim so
+	// the comment text is not re-tokenized.
+	p.lex.restOfLine()
+	p.advance()
+	return simpleStmt(ST_REM)
+}
+
+// parseLet parses `LET <var> = <expr>`. The LET keyword is required. The target
+// may be a numeric variable (numeric RHS) or a string variable (string RHS);
+// the kinds must match.
+func (p @parser) parseLet() @Stmt {
+	p.advance()
+	var isStr bool = p.cur.Kind == TOK_SVAR
+	if p.cur.Kind != TOK_VAR && p.cur.Kind != TOK_SVAR {
+		p.fail(buf.CopyStr("LET: expected a variable"))
+		return simpleStmt(ST_REM)
+	}
+	var name @[]char = p.cur.Text
+	p.advance()
+	if p.cur.Kind != TOK_EQ {
+		p.fail(buf.CopyStr("LET: expected '='"))
+		return simpleStmt(ST_REM)
+	}
+	p.advance()
+	var rhs @Expr = p.parseTypedExpr(isStr)
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_LET
+	s.Name = name
+	s.Value = rhs
+	return s
+}
+
+// parseTypedExpr parses a string expression when wantStr is set, else a numeric
+// expression. (ECMA-55 string expressions are only a variable or a constant.)
+func (p @parser) parseTypedExpr(wantStr bool) @Expr {
+	if wantStr {
+		return p.parseStringExpr()
+	}
+	return p.parseExpr()
+}
+
+// parseStringExpr parses an ECMA-55 string expression: a string variable or a
+// string constant. There is no concatenation and there are no string functions.
+func (p @parser) parseStringExpr() @Expr {
+	var e @Expr = make(Expr)
+	if p.cur.Kind == TOK_SVAR {
+		e.Kind = EX_SVAR
+		e.Name = p.cur.Text
+		p.advance()
+		return e
+	}
+	if p.cur.Kind == TOK_STRING {
+		e.Kind = EX_STR
+		e.Str = p.cur.Text
+		p.advance()
+		return e
+	}
+	p.fail(buf.CopyStr("expected a string expression"))
+	return e
+}
+
+// parsePrint parses a PRINT statement and its print-list (items separated by
+// ',' or ';'). A trailing separator is recorded so the evaluator can suppress
+// the end-of-line; an empty list yields an items-less ST_PRINT (a blank line).
+func (p @parser) parsePrint() @Stmt {
+	p.advance()
+	var items @[]@Expr = make_slice(@Expr, 0)
+	var seps @[]int = make_slice(int, 0)
+	for !p.hasErr && !p.atPrintEnd() {
+		if p.cur.Kind == TOK_COMMA || p.cur.Kind == TOK_SEMI {
+			// A separator with no preceding item: ECMA-55 treats a missing
+			// print-item as the null string, so record an explicit empty item.
+			items = slices.Append[@Expr](items, emptyStrExpr())
+			seps = slices.Append[int](seps, sepKind(p.cur.Kind))
+			p.advance()
+		} else {
+			var it @Expr = p.parsePrintItem()
+			items = slices.Append[@Expr](items, it)
+			seps = slices.Append[int](seps, p.consumeSep())
+		}
+	}
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_PRINT
+	s.Items = items
+	s.Seps = seps
+	return s
+}
+
+// atPrintEnd reports whether the print-list is finished (end of line).
+func (p @parser) atPrintEnd() bool {
+	return p.cur.Kind == TOK_EOF
+}
+
+// emptyStrExpr builds an EX_STR node holding the empty string, used for a
+// print-list position that has a separator but no expression.
+func emptyStrExpr() @Expr {
+	var e @Expr = make(Expr)
+	e.Kind = EX_STR
+	e.Str = make_slice(char, 0)
+	return e
+}
+
+// sepKind maps a separator token kind to its SEP_* constant.
+func sepKind(tokKind int) int {
+	if tokKind == TOK_COMMA {
+		return SEP_COMMA
+	}
+	return SEP_SEMI
+}
+
+// consumeSep reads an optional trailing separator after a print-item, returning
+// its SEP_* kind, or SEP_NONE if the next token is the end of the list.
+func (p @parser) consumeSep() int {
+	if p.cur.Kind == TOK_COMMA || p.cur.Kind == TOK_SEMI {
+		var k int = sepKind(p.cur.Kind)
+		p.advance()
+		return k
+	}
+	return SEP_NONE
+}
+
+// parsePrintItem parses one print-item: a string expression (string variable or
+// constant) or a numeric expression.
+func (p @parser) parsePrintItem() @Expr {
+	if p.cur.Kind == TOK_SVAR || p.cur.Kind == TOK_STRING {
+		return p.parseStringExpr()
+	}
+	return p.parseExpr()
+}
+
+// parseNumberLit converts the current TOK_NUMBER's text to a float64 constant.
+func (p @parser) parseNumberLit() @Expr {
+	var e @Expr = make(Expr)
+	e.Kind = EX_NUM
+	var n float64
+	var perr @errors.Error
+	n, perr = strconv.ParseFloat(p.cur.Text, 64)
+	if present(perr) {
+		p.fail(buf.Concat("malformed numeric constant: ", p.cur.Text))
+	}
+	e.Num = n
+	p.advance()
+	return e
+}

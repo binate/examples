@@ -1,0 +1,8 @@
+10 REM string LET and PRINT
+20 LET A$ = "HELLO"
+30 LET B$ = "WORLD"
+40 PRINT A$; " "; B$
+50 PRINT "THE ANSWER IS"; 42
+60 LET C$ = ""
+70 PRINT C$; "DONE"
+80 END

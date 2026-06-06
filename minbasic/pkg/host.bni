@@ -9,3 +9,12 @@ import "pkg/basic/io"
 // NewConsole returns a ConsoleOut that writes a BASIC program's output to the
 // process's standard output.
 func NewConsole() @io.ConsoleOut
+
+// ReadFile reads the entire contents of the file at path, returning the bytes
+// and an ok flag (false if the file cannot be opened or read). It opens,
+// reads to end, and closes via pkg/bootstrap.
+func ReadFile(path *[]readonly char) (@[]char, bool)
+
+// Args returns the process command-line arguments as managed slices (the first
+// element is the program name, per the platform convention).
+func Args() @[]@[]char

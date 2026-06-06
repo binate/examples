@@ -1,0 +1,103 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// parseExpr parses a numeric expression following ECMA-55 clause 8 precedence
+// (highest to lowest): `^`, unary sign, `* /`, `+ -`. The grammar is
+//   numeric-expression = sign? term (sign term)*
+// so a unary sign appears only at the start of the expression or after a binary
+// `+`/`-`; it applies to the whole following term and therefore binds looser
+// than `^` (`-A^B = -(A^B)`). `+ -` and `* /` are left-associative.
+func (p @parser) parseExpr() @Expr {
+	var x @Expr = p.parseSignedTerm()
+	for !p.hasErr && (p.cur.Kind == TOK_PLUS || p.cur.Kind == TOK_MINUS) {
+		var op int = p.cur.Kind
+		p.advance()
+		var y @Expr = p.parseTerm()
+		x = binExpr(op, x, y)
+	}
+	return x
+}
+
+// parseSignedTerm parses an optional leading unary sign followed by a term. The
+// sign wraps the entire term (which may contain `^`), giving `-A^B = -(A^B)`.
+func (p @parser) parseSignedTerm() @Expr {
+	if p.cur.Kind == TOK_PLUS || p.cur.Kind == TOK_MINUS {
+		var op int = p.cur.Kind
+		p.advance()
+		var operand @Expr = p.parseTerm()
+		return unaryExpr(op, operand)
+	}
+	return p.parseTerm()
+}
+
+// parseTerm parses a term: factors joined by `*` / `/` (left-associative).
+func (p @parser) parseTerm() @Expr {
+	var x @Expr = p.parseFactor()
+	for !p.hasErr && (p.cur.Kind == TOK_STAR || p.cur.Kind == TOK_SLASH) {
+		var op int = p.cur.Kind
+		p.advance()
+		var y @Expr = p.parseFactor()
+		x = binExpr(op, x, y)
+	}
+	return x
+}
+
+// parseFactor parses a factor: primaries joined by `^`. ECMA-55 makes `^`
+// LEFT-associative (`A^B^C = (A^B)^C`) — unlike most languages — so the loop
+// folds left.
+func (p @parser) parseFactor() @Expr {
+	var x @Expr = p.parsePrimary()
+	for !p.hasErr && p.cur.Kind == TOK_CARET {
+		p.advance()
+		var y @Expr = p.parsePrimary()
+		x = binExpr(TOK_CARET, x, y)
+	}
+	return x
+}
+
+// parsePrimary parses a primary: a numeric variable, a numeric constant, or a
+// parenthesized expression.
+func (p @parser) parsePrimary() @Expr {
+	if p.cur.Kind == TOK_NUMBER {
+		return p.parseNumberLit()
+	}
+	if p.cur.Kind == TOK_VAR {
+		var e @Expr = make(Expr)
+		e.Kind = EX_VAR
+		e.Name = p.cur.Text
+		p.advance()
+		return e
+	}
+	if p.cur.Kind == TOK_LPAREN {
+		p.advance()
+		var inner @Expr = p.parseExpr()
+		if p.cur.Kind != TOK_RPAREN {
+			p.fail(buf.CopyStr("expected ')'"))
+			return inner
+		}
+		p.advance()
+		return inner
+	}
+	p.fail(buf.CopyStr("expected a numeric primary"))
+	return make(Expr)
+}
+
+// binExpr builds a binary expression node with the given operator and operands.
+func binExpr(op int, x @Expr, y @Expr) @Expr {
+	var e @Expr = make(Expr)
+	e.Kind = EX_BINARY
+	e.Op = op
+	e.X = x
+	e.Y = y
+	return e
+}
+
+// unaryExpr builds a unary expression node (unary '+' or '-').
+func unaryExpr(op int, x @Expr) @Expr {
+	var e @Expr = make(Expr)
+	e.Kind = EX_UNARY
+	e.Op = op
+	e.X = x
+	return e
+}

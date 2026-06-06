@@ -1,0 +1,94 @@
+package "pkg/basic"
+
+import "pkg/basic/io"
+
+// ZONE_WIDTH is the width of a print zone in character positions (ECMA-55's
+// implementation-defined value; we use the standard reference 15).
+const ZONE_WIDTH int = 15
+
+// NUM_ZONES is the number of print zones per line (the standard reference 5).
+const NUM_ZONES int = 5
+
+// MARGIN is the line width: NUM_ZONES * ZONE_WIDTH = 75 character positions.
+const MARGIN int = 75
+
+// MAX_STR_LEN is the ECMA-55 limit on a string datum assigned to a string
+// variable (clause 11.5): assigning a longer string is a fatal error.
+const MAX_STR_LEN int = 18
+
+// runtime is the per-RUN execution context: the variable store, the output
+// sink, and the current print-column position used for PRINT zone spacing. col
+// is the 0-based column the next character would occupy on the current line.
+type runtime struct {
+	env  @env
+	out  @io.ConsoleOut
+	col  int
+}
+
+// newRuntime builds a runtime over a fresh variable store writing to out.
+func newRuntime(out @io.ConsoleOut) @runtime {
+	var r @runtime = make(runtime)
+	r.env = newEnv()
+	r.out = out
+	r.col = 0
+	return r
+}
+
+// emit writes s through the sink and advances the tracked print column. A
+// newline resets the column to the start of the line.
+func (r @runtime) emit(s @[]char) {
+	r.out.Write(s)
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			r.col = 0
+		} else {
+			r.col = r.col + 1
+		}
+	}
+}
+
+// evalNum evaluates a numeric expression to its float64 value. Expression nodes
+// are dispatched by Kind with an if/else-if chain (the codebase idiom).
+func (r @runtime) evalNum(e @Expr) float64 {
+	if e.Kind == EX_NUM {
+		return e.Num
+	} else if e.Kind == EX_VAR {
+		return r.env.getNum(e.Name)
+	} else if e.Kind == EX_UNARY {
+		var v float64 = r.evalNum(e.X)
+		if e.Op == TOK_MINUS {
+			return -v
+		}
+		return v
+	} else if e.Kind == EX_BINARY {
+		return r.evalBinary(e)
+	}
+	// EX_STR / EX_SVAR cannot appear in a numeric context (the parser keeps
+	// numeric and string expressions apart); treat as 0.
+	return 0.0
+}
+
+// evalBinary evaluates a binary arithmetic expression.
+func (r @runtime) evalBinary(e @Expr) float64 {
+	var a float64 = r.evalNum(e.X)
+	var b float64 = r.evalNum(e.Y)
+	if e.Op == TOK_PLUS {
+		return a + b
+	} else if e.Op == TOK_MINUS {
+		return a - b
+	} else if e.Op == TOK_STAR {
+		return a * b
+	} else if e.Op == TOK_SLASH {
+		return a / b
+	}
+	return powf(a, b)
+}
+
+// evalStr evaluates a string expression to its characters. ECMA-55 string
+// expressions are only a string variable or a string constant.
+func (r @runtime) evalStr(e @Expr) @[]char {
+	if e.Kind == EX_SVAR {
+		return r.env.getStr(e.Name)
+	}
+	return e.Str
+}

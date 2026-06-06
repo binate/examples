@@ -1,0 +1,57 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// execPrint executes a PRINT statement: it emits each item (numbers via the
+// ECMA-55 formatter, strings verbatim), applies the separator after each item
+// (';' abuts, ',' advances to the next print zone), and emits an end-of-line
+// unless the print-list ends with a trailing separator. An empty list emits a
+// blank line.
+func (r @runtime) execPrint(s @Stmt) {
+	if len(s.Items) == 0 {
+		r.emit(buf.CopyStr("\n"))
+		return
+	}
+	var suppressEOL bool = false
+	for i := 0; i < len(s.Items); i++ {
+		r.emitItem(s.Items[i])
+		var sep int = s.Seps[i]
+		if sep == SEP_COMMA {
+			r.toNextZone()
+			suppressEOL = i == len(s.Items) - 1
+		} else if sep == SEP_SEMI {
+			suppressEOL = i == len(s.Items) - 1
+		} else {
+			suppressEOL = false
+		}
+	}
+	if !suppressEOL {
+		r.emit(buf.CopyStr("\n"))
+	}
+}
+
+// emitItem emits one print-item: a string item verbatim, a numeric item through
+// the ECMA-55 numeric formatter (sign space + digits + trailing space).
+func (r @runtime) emitItem(e @Expr) {
+	if e.Kind == EX_SVAR || e.Kind == EX_STR {
+		r.emit(copyChars(r.evalStr(e)))
+	} else {
+		r.emit(formatNumber(r.evalNum(e)))
+	}
+}
+
+// toNextZone advances output to the start of the next print zone. If the current
+// zone is the last on the line, it emits an end-of-line instead, wrapping to
+// column 0 of the next physical line (ECMA-55 clause 14).
+func (r @runtime) toNextZone() {
+	var next int = ((r.col / ZONE_WIDTH) + 1) * ZONE_WIDTH
+	if next >= MARGIN {
+		r.emit(buf.CopyStr("\n"))
+		return
+	}
+	var pad @[]char = make_slice(char, next - r.col)
+	for i := 0; i < len(pad); i++ {
+		pad[i] = ' '
+	}
+	r.emit(pad)
+}

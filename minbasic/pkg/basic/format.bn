@@ -1,0 +1,151 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+import "pkg/std/strconv"
+
+// FMT_SIG is the significance-width d: the number of significant decimal digits
+// printed (ECMA-55 requires d >= 6; we use the standard's reference value 6).
+const FMT_SIG int = 6
+
+// formatNumber renders n in ECMA-55 PRINT format (clause 14, significance-width
+// d=6) as a fresh managed-slice. The layout is: a leading sign char (space for
+// n >= 0, '-' for n < 0), the digits, then a single trailing space. The digit
+// portion is integer form when n is an integer representable in <= d digits;
+// otherwise plain decimal (up to d significant digits, trailing fractional zeros
+// trimmed, magnitude < 1 printed like ".5"); otherwise scaled E-notation.
+func formatNumber(n float64) @[]char {
+	var b buf.CharBuf = buf.New()
+	if n < 0.0 {
+		b = b.WriteByte('-')
+	} else {
+		b = b.WriteByte(' ')
+	}
+	var m float64 = n
+	if m < 0.0 {
+		m = -m
+	}
+	b = appendMagnitude(b, m)
+	b = b.WriteByte(' ')
+	return b.Freeze()
+}
+
+// appendMagnitude writes the digit portion (no sign, no trailing space) of a
+// nonnegative magnitude m, choosing integer / plain-decimal / scaled form.
+func appendMagnitude(b buf.CharBuf, m float64) buf.CharBuf {
+	if m == 0.0 {
+		return b.WriteByte('0')
+	}
+	// Obtain the value rounded to d significant digits as mantissa digits plus a
+	// decimal exponent via strconv's 'e' form: "d.ddddde±dd".
+	var sci @[]char = strconv.FormatFloat(m, 'e', FMT_SIG - 1, 64)
+	var digits @[]char
+	var exp int
+	digits, exp = splitSci(sci)
+	if exp >= FMT_SIG || exp < -FMT_SIG {
+		return appendScaled(b, digits, exp)
+	}
+	return appendUnscaled(b, digits, exp)
+}
+
+// splitSci parses strconv's 'e'-form output "d.ddddde±dd" (one leading digit, a
+// point, FMT_SIG-1 fraction digits, then a signed exponent) into the d
+// significant digits (point removed) and the integer base-10 exponent of the
+// leading digit.
+func splitSci(sci @[]char) (@[]char, int) {
+	var digits buf.CharBuf = buf.New()
+	var i int = 0
+	for i < len(sci) && sci[i] != 'e' {
+		if sci[i] != '.' {
+			digits = digits.WriteByte(sci[i])
+		}
+		i = i + 1
+	}
+	// sci[i] == 'e'; parse the signed exponent that follows.
+	i = i + 1
+	var neg bool = false
+	if i < len(sci) && (sci[i] == '+' || sci[i] == '-') {
+		neg = sci[i] == '-'
+		i = i + 1
+	}
+	var exp int = 0
+	for i < len(sci) {
+		exp = exp * 10 + cast(int, sci[i] - '0')
+		i = i + 1
+	}
+	if neg {
+		exp = -exp
+	}
+	return digits.Freeze(), exp
+}
+
+// trimZeros returns the prefix of digits with trailing '0' characters removed.
+// At least one digit is always retained.
+func trimZeros(digits @[]char) @[]char {
+	var end int = len(digits)
+	for end > 1 && digits[end - 1] == '0' {
+		end = end - 1
+	}
+	return sliceChars(digits, 0, end)
+}
+
+// appendUnscaled writes m in integer or plain-decimal form, given its d
+// significant digits and the exponent of the leading digit. exp >= 0 places the
+// decimal point exp+1 digits in; exp < 0 prints leading zeros after the point
+// (".5", ".000001") with no digit left of the point.
+func appendUnscaled(b buf.CharBuf, digits @[]char, exp int) buf.CharBuf {
+	var sig @[]char = trimZeros(digits)
+	if exp >= 0 {
+		return appendNonNegExp(b, sig, exp)
+	}
+	// Magnitude < 1: ".", then (-exp-1) leading zeros, then the digits.
+	b = b.WriteByte('.')
+	for i := 0; i < -exp - 1; i++ {
+		b = b.WriteByte('0')
+	}
+	return b.WriteStr(sig)
+}
+
+// appendNonNegExp writes a magnitude >= 1 with the decimal point exp+1 digits
+// from the left: an integer when all significant digits lie left of the point,
+// else an integer part, '.', and the remaining significant digits.
+func appendNonNegExp(b buf.CharBuf, sig @[]char, exp int) buf.CharBuf {
+	var intLen int = exp + 1
+	if len(sig) <= intLen {
+		// All significant digits are integral; pad with trailing zeros.
+		b = b.WriteStr(sig)
+		for i := len(sig); i < intLen; i++ {
+			b = b.WriteByte('0')
+		}
+		return b
+	}
+	for i := 0; i < intLen; i++ {
+		b = b.WriteByte(sig[i])
+	}
+	b = b.WriteByte('.')
+	for i := intLen; i < len(sig); i++ {
+		b = b.WriteByte(sig[i])
+	}
+	return b
+}
+
+// appendScaled writes m in scaled E-notation: "x.xxxxxE±dd" with significand
+// 1 <= x < 10 (up to d significant digits, trailing fractional zeros trimmed —
+// a significand of exactly 1 prints as "1."), an uppercase 'E', the exponent
+// sign, and the exponent digits.
+func appendScaled(b buf.CharBuf, digits @[]char, exp int) buf.CharBuf {
+	var sig @[]char = trimZeros(digits)
+	b = b.WriteByte(sig[0])
+	b = b.WriteByte('.')
+	for i := 1; i < len(sig); i++ {
+		b = b.WriteByte(sig[i])
+	}
+	b = b.WriteByte('E')
+	if exp < 0 {
+		b = b.WriteByte('-')
+		exp = -exp
+	} else {
+		b = b.WriteByte('+')
+	}
+	b = b.WriteStr(strconv.Itoa(exp))
+	return b
+}

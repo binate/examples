@@ -1,0 +1,23 @@
+package "pkg/basic"
+
+import "pkg/basic/io"
+
+// runProgram executes a parsed program sequentially from the lowest-numbered
+// line, stopping at END/STOP or a fatal runtime error. (This slice has no
+// control-flow statements, so execution is strictly top-to-bottom.) A fatal
+// runtime error is reported as a diagnostic line through out.
+func runProgram(prog @[]@Line, out @io.ConsoleOut) {
+	var r @runtime = newRuntime(out)
+	for i := 0; i < len(prog); i++ {
+		var errMsg @[]char
+		var failed bool = false
+		var done bool = r.execStmt(prog[i].Stmt, &errMsg, &failed)
+		if failed {
+			emitDiag(out, lineDiag(prog[i].Num, errMsg))
+			return
+		}
+		if done {
+			return
+		}
+	}
+}

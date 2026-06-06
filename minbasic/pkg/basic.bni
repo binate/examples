@@ -1,14 +1,20 @@
 // Package basic is the ECMA-55 Minimal BASIC interpreter core: lexer, parser,
 // program store, and evaluator. It reaches no low-level I/O — all program output
-// (and, later, input) flows through the injected pkg/basic/io interfaces, so the
-// same engine drives a CLI, a conformance-test buffer, or a wasm host unchanged.
+// flows through the injected pkg/basic/io interfaces, so the same engine drives
+// a CLI, a conformance-test buffer, or a wasm host unchanged.
 //
-// M0 skeleton: Run emits a banner through the injected sink. M1 grows it into the
-// real non-interactive program runner.
+// This slice is a non-interactive runner: RunSource parses a whole program and
+// executes it, supporting line-numbered LET / PRINT / REM / END / STOP, numeric
+// and string expressions, and the ECMA-55 numeric PRINT format. Internal types
+// (tokens, AST, Value, env, lexer, parser, evaluator, formatter) are
+// package-internal and live only in the .bn files.
 package "pkg/basic"
 
 import "pkg/basic/io"
 
-// Run drives the interpreter, sending all program output to out. (M0: emits a
-// banner; M1: lexes/parses/runs a stored program.)
-func Run(out @io.ConsoleOut)
+// RunSource parses the BASIC program text src and executes it, sending all
+// program output to out. On a parse error or a fatal runtime error it emits a
+// single clear diagnostic line through out and stops; partial output produced
+// before the error is preserved (ECMA-55 has no rollback). src is a raw
+// readonly char view of the source file's bytes.
+func RunSource(src *[]readonly char, out @io.ConsoleOut)

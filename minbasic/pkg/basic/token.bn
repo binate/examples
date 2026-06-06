@@ -1,0 +1,51 @@
+package "pkg/basic"
+
+// Token kinds produced by the lexer. The lexer runs per-line (each program line
+// is tokenized independently), so there is no end-of-line token: the token
+// stream for a line ends with TOK_EOF.
+//
+// Keyword tokens cover only the statements this slice implements (LET, PRINT,
+// REM, END, STOP); other identifiers — variable names — are TOK_VAR / TOK_SVAR.
+const (
+	// TOK_EOF marks the end of a line's token stream.
+	TOK_EOF int = iota
+	// TOK_NUMBER is a numeric constant; its text is in Token.Text.
+	TOK_NUMBER
+	// TOK_STRING is a string constant; Token.Text holds the unquoted contents.
+	TOK_STRING
+	// TOK_VAR is a simple numeric variable: a letter optionally followed by a
+	// digit (A..Z, A0..Z9). Token.Text holds the 1- or 2-char name.
+	TOK_VAR
+	// TOK_SVAR is a string variable: a letter followed by '$' (A$..Z$).
+	// Token.Text holds the name including the '$'.
+	TOK_SVAR
+	// TOK_LET .. TOK_STOP are the statement keywords in scope for this slice.
+	TOK_LET
+	TOK_PRINT
+	TOK_REM
+	TOK_END
+	TOK_STOP
+	// TOK_PLUS .. TOK_CARET are the arithmetic operators.
+	TOK_PLUS
+	TOK_MINUS
+	TOK_STAR
+	TOK_SLASH
+	TOK_CARET
+	// TOK_LPAREN / TOK_RPAREN are parentheses; TOK_EQ is '='; TOK_COMMA and
+	// TOK_SEMI are the PRINT-list separators.
+	TOK_LPAREN
+	TOK_RPAREN
+	TOK_EQ
+	TOK_COMMA
+	TOK_SEMI
+	// TOK_ERROR marks a lexing failure; Token.Text holds the diagnostic.
+	TOK_ERROR
+)
+
+// Token is one lexical token. Kind selects the category; Text carries the
+// literal/identifier text (or, for TOK_ERROR, the diagnostic message). Text is
+// empty for fixed-shape tokens such as operators and parentheses.
+type Token struct {
+	Kind int
+	Text @[]char
+}

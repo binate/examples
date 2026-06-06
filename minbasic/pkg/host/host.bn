@@ -1,6 +1,7 @@
 package "pkg/host"
 
 import "pkg/basic/io"
+import "pkg/binate/buf"
 import "pkg/bootstrap"
 
 // bootstrapConsole writes through bootstrap.Write to a fixed file descriptor.
@@ -24,4 +25,38 @@ func NewConsole() @io.ConsoleOut {
 	c.fd = bootstrap.STDOUT
 	var out @io.ConsoleOut = c
 	return out
+}
+
+// READ_CHUNK is the buffer size used per read(2) call when slurping a file.
+const READ_CHUNK int = 4096
+
+// ReadFile reads the whole file at path via bootstrap.Open/Read/Close. It
+// accumulates the bytes into a CharBuf, reading until end-of-file (a read of 0),
+// and returns the contents and an ok flag.
+func ReadFile(path *[]readonly char) (@[]char, bool) {
+	var fd int = bootstrap.Open(path, bootstrap.O_RDONLY)
+	if fd < 0 {
+		return make_slice(char, 0), false
+	}
+	var b buf.CharBuf = buf.New()
+	var chunk @[]uint8 = make_slice(uint8, READ_CHUNK)
+	for {
+		var n int = bootstrap.Read(fd, chunk)
+		if n < 0 {
+			bootstrap.Close(fd)
+			return make_slice(char, 0), false
+		}
+		if n == 0 {
+			bootstrap.Close(fd)
+			return b.Freeze(), true
+		}
+		for i := 0; i < n; i++ {
+			b = b.WriteByte(cast(char, chunk[i]))
+		}
+	}
+}
+
+// Args returns the process command-line arguments (bootstrap.Args wrapped).
+func Args() @[]@[]char {
+	return bootstrap.Args()
 }

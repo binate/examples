@@ -1,0 +1,83 @@
+package "pkg/basic"
+
+// Expression-node kinds. The AST follows the codebase idiom: a Kind enum plus
+// one wide struct (Expr) carrying the superset of fields; readers dispatch with
+// an if/else-if chain on Kind (not a switch, not interfaces).
+//
+// Kind         Fields used
+// ------------ ---------------------------------------------------
+// EX_NUM       Num (numeric constant value)
+// EX_STR       Str (string-constant characters)
+// EX_VAR       Name (numeric variable name, e.g. "A" or "A0")
+// EX_SVAR      Name (string variable name, e.g. "A$")
+// EX_BINARY    Op (TOK_PLUS..TOK_CARET), X (left), Y (right)
+// EX_UNARY     Op (TOK_PLUS or TOK_MINUS), X (operand)
+const (
+	EX_NUM int = iota
+	EX_STR
+	EX_VAR
+	EX_SVAR
+	EX_BINARY
+	EX_UNARY
+)
+
+// Expr is one expression node. Kind selects which fields are meaningful (see the
+// kind table above). Children are managed pointers so the tree owns its subtrees.
+type Expr struct {
+	Kind int
+	Num  float64
+	Str  @[]char
+	Name @[]char
+	Op   int
+	X    @Expr
+	Y    @Expr
+}
+
+// Statement-node kinds. One Stmt per program line (ECMA-55 allows exactly one
+// statement per line).
+//
+// Kind         Fields used
+// ------------ ---------------------------------------------------
+// ST_LET       Name (target var, "$"-suffixed for string), Value (RHS expr)
+// ST_PRINT     Items, Seps (item i is followed by separator Seps[i]); a
+//              trailing separator (len(Seps) == len(Items)) suppresses the
+//              end-of-line
+// ST_REM       (none — a no-op comment line)
+// ST_END       (none — terminates; must be the highest line)
+// ST_STOP      (none — terminates anywhere)
+const (
+	ST_LET int = iota
+	ST_PRINT
+	ST_REM
+	ST_END
+	ST_STOP
+)
+
+// PRINT-separator kinds, stored per item in Stmt.Seps. SEP_NONE marks the last
+// item of a list that has no trailing separator (so an end-of-line is emitted).
+const (
+	// SEP_NONE means no separator follows the item (end of an unsuppressed list).
+	SEP_NONE int = iota
+	// SEP_COMMA advances to the next print zone after the item.
+	SEP_COMMA
+	// SEP_SEMI abuts: nothing is emitted between this item and the next.
+	SEP_SEMI
+)
+
+// Stmt is one statement node. Kind selects which fields are meaningful (see the
+// kind table above). Items/Seps are parallel: Seps[i] is the separator following
+// Items[i]. A PRINT list ending in a separator has len(Seps) == len(Items) with
+// the final entry SEP_COMMA/SEP_SEMI; otherwise the final Seps entry is SEP_NONE.
+type Stmt struct {
+	Kind  int
+	Name  @[]char
+	Value @Expr
+	Items @[]@Expr
+	Seps  @[]int
+}
+
+// Line is one parsed program line: its line number (1..9999) and its statement.
+type Line struct {
+	Num  int
+	Stmt @Stmt
+}

@@ -1,0 +1,34 @@
+package "pkg/basic"
+
+// VAL_NUM tags a Value holding a BASIC number (an IEEE-754 double — ECMA-55's
+// single numeric type). VAL_STR tags a Value holding a string (0..18 chars).
+const (
+	VAL_NUM int = iota
+	VAL_STR
+)
+
+// Value is a BASIC runtime value: either a number (Kind == VAL_NUM, payload in
+// Num) or a string (Kind == VAL_STR, payload in Str). ECMA-55 has exactly these
+// two value categories — one numeric type plus a 0..18-char string. Str is only
+// meaningful for VAL_STR values.
+type Value struct {
+	Kind int
+	Num  float64
+	Str  @[]char
+}
+
+// numValue builds a numeric Value carrying n.
+func numValue(n float64) Value {
+	var v Value
+	v.Kind = VAL_NUM
+	v.Num = n
+	return v
+}
+
+// strValue builds a string Value carrying s (the value takes ownership of s).
+func strValue(s @[]char) Value {
+	var v Value
+	v.Kind = VAL_STR
+	v.Str = s
+	return v
+}

@@ -16,4 +16,7 @@ LIB="$("$SCRIPT_DIR/fetch-builder.sh" --lib)"
 set_paths "$EXAMPLE" "$LIB"
 
 echo "run-interpreted: $EXAMPLE/cmd/$SUB" >&2
-exec "$BNI" -I "$I" -L "$L" "$CMDDIR" "$@"
+# bni treats bare trailing paths as additional source files; program arguments
+# must follow a `--` separator (see cmd/bni/args.bn). The compiled binary takes
+# them directly, so this keeps `run prog.bas` working identically in both modes.
+exec "$BNI" -I "$I" -L "$L" "$CMDDIR" -- "$@"

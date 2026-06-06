@@ -1,12 +1,37 @@
-// Command run is the non-interactive minbasic host: it constructs the I/O
-// delegate and runs a BASIC program. (M0 skeleton: drives the banner; M1 reads a
-// .bas file from the command line and runs it.)
+// Command run is the non-interactive minbasic host: `run <prog.bas>` reads a
+// BASIC source file and executes it, routing all program output through the
+// console I/O delegate. It is the thin outer shell — argument handling, file
+// reading, and process exit — around the pkg/basic interpreter core.
 package "main"
 
 import "pkg/basic"
+import "pkg/bootstrap"
 import "pkg/host"
 
-// main constructs the console I/O delegate and runs the BASIC program.
+// main reads the program path from the command line, loads the source via the
+// host delegate, and runs it through pkg/basic. With no path argument it prints
+// a usage line and exits nonzero; an unreadable file is reported the same way.
+//
+// The program path is taken as the LAST argument of host.Args(). This is the one
+// element that lands identically in both execution modes: under the compiled
+// binary, Args() is the full argv (program name at index 0, then the path);
+// under the bytecode VM (bni), Args() is only the args after `--` (no program
+// name, just the path). Taking the last element selects the path uniformly. (The
+// argv0-present-vs-absent difference between modes is a bootstrap.Args()
+// discrepancy, not something this command can otherwise paper over.)
 func main() {
-	basic.Run(host.NewConsole())
+	var args @[]@[]char = host.Args()
+	if len(args) == 0 {
+		bootstrap.Write(bootstrap.STDERR, "usage: run <prog.bas>\n")
+		bootstrap.Exit(2)
+	}
+	var path @[]char = args[len(args) - 1]
+	var src @[]char
+	var ok bool
+	src, ok = host.ReadFile(path)
+	if !ok {
+		bootstrap.Write(bootstrap.STDERR, "run: cannot read file\n")
+		bootstrap.Exit(1)
+	}
+	basic.RunSource(src, host.NewConsole())
 }

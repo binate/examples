@@ -1,0 +1,8 @@
+10 REM integers and PRINT spacing
+20 PRINT 1; 2
+30 PRINT 1, 2
+40 PRINT 10; 20; 30
+50 LET A = 42
+60 PRINT A
+70 PRINT -5
+80 END
