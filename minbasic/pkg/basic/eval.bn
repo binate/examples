@@ -125,7 +125,11 @@ func (r @runtime) evalNum(e @Expr) float64 {
 	return 0.0
 }
 
-// evalBinary evaluates a binary arithmetic expression.
+// evalBinary evaluates a binary arithmetic expression. The `^` operator with a
+// non-integer exponent needs exp()/log() (pkg/std/math, not yet landed), so it
+// is a fatal "not yet supported" — the same deferral as the transcendental
+// intrinsics — rather than a silently wrong placeholder value. Integer exponents
+// are computed exactly by powf.
 func (r @runtime) evalBinary(e @Expr) float64 {
 	var a float64 = r.evalNum(e.X)
 	var b float64 = r.evalNum(e.Y)
@@ -138,7 +142,21 @@ func (r @runtime) evalBinary(e @Expr) float64 {
 	} else if e.Op == TOK_SLASH {
 		return a / b
 	}
+	if !integralExponent(b) {
+		r.setFatal(buf.CopyStr("non-integer ^ exponent not yet supported (pending pkg/std/math)"))
+		return 0.0
+	}
 	return powf(a, b)
+}
+
+// integralExponent reports whether the `^` exponent b is an integer value (so
+// the power can be computed exactly by repeated multiplication). 0^0 is defined
+// as 1 by ECMA-55, and b == 0 is integral, so it takes the exact path too.
+func integralExponent(b float64) bool {
+	if isNaN(b) || isInfinite(absf(b)) {
+		return false
+	}
+	return floorf(b) == b
 }
 
 // evalStr evaluates a string expression to its characters. ECMA-55 string

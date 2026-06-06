@@ -12,8 +12,17 @@ const FMT_SIG int = 6
 // n >= 0, '-' for n < 0), the digits, then a single trailing space. The digit
 // portion is integer form when n is an integer representable in <= d digits;
 // otherwise plain decimal (up to d significant digits, trailing fractional zeros
-// trimmed, magnitude < 1 printed like ".5"); otherwise scaled E-notation.
+// trimmed, magnitude < 1 printed like ".5"); otherwise scaled E-notation. The
+// overflow recovery value machine-infinity (clause 5.5 — the result of an
+// overflowing operation, e.g. division by zero) is rendered as "INF" with the
+// sign char; an undefined IEEE result (e.g. 0/0) is rendered "NAN". Both special
+// values are detected before the sign/magnitude split, since strconv's "Inf" /
+// "NaN" spellings do not fit the magnitude grammar and must not be split as
+// digits.
 func formatNumber(n float64) @[]char {
+	if isNaN(n) {
+		return buf.CopyStr(" NAN ")
+	}
 	var b buf.CharBuf = buf.New()
 	if n < 0.0 {
 		b = b.WriteByte('-')
@@ -24,9 +33,28 @@ func formatNumber(n float64) @[]char {
 	if m < 0.0 {
 		m = -m
 	}
-	b = appendMagnitude(b, m)
+	if isInfinite(m) {
+		b = b.WriteStr("INF")
+	} else {
+		b = appendMagnitude(b, m)
+	}
 	b = b.WriteByte(' ')
 	return b.Freeze()
+}
+
+// isInfinite reports whether the nonnegative magnitude m is machine infinity.
+// Infinity is the only nonzero value for which doubling does not change it
+// (m + m == m), so this needs no math library or platform constant.
+func isInfinite(m float64) bool {
+	return m != 0.0 && (m + m) == m
+}
+
+// isNaN reports whether n is an IEEE not-a-number. NaN is the only value not
+// equal to itself; the test is written as `!(n == n)` (rather than `n != n`)
+// because Binate's relational operators use ordered comparison, so both `==` and
+// `!=` yield false for a NaN operand — `!(n == n)` is the form that is true.
+func isNaN(n float64) bool {
+	return !(n == n)
 }
 
 // appendMagnitude writes the digit portion (no sign, no trailing space) of a

@@ -193,14 +193,14 @@ func matchExponent(s @[]char, i int) bool {
 // setting *errMsg on a fatal exception: out of data, a string (non-numeric)
 // datum read into a numeric variable, or a string datum longer than 18 chars.
 func (r @runtime) execRead(s @Stmt, errMsg *@[]char) int {
-	for i := 0; i < len(s.Names); i++ {
+	for i := 0; i < len(s.RTargets); i++ {
 		if r.dataPtr >= len(r.data) {
 			*errMsg = buf.CopyStr("out of data")
 			return STEP_ERROR
 		}
 		var d @datum = r.data[r.dataPtr]
 		r.dataPtr = r.dataPtr + 1
-		var status int = r.readInto(s.Names[i], d, errMsg)
+		var status int = r.readInto(s.RTargets[i], d, errMsg)
 		if status != STEP_NEXT {
 			return status
 		}
@@ -208,25 +208,31 @@ func (r @runtime) execRead(s @Stmt, errMsg *@[]char) int {
 	return STEP_NEXT
 }
 
-// readInto assigns one datum d to the variable named by `name` (a numeric
-// variable, or a "$"-suffixed string variable). A numeric target requires a
-// numeric datum (clause 16: a string datum into a numeric variable is fatal); a
-// string target accepts any datum but is bounded to 18 chars (a longer datum is
-// fatal). On a fatal exception it sets *errMsg and returns STEP_ERROR.
-func (r @runtime) readInto(name @[]char, d @datum, errMsg *@[]char) int {
-	if name[len(name) - 1] == '$' {
+// readInto assigns one datum d to a READ target t: a string variable (EX_SVAR),
+// a numeric variable (EX_VAR), or a numeric-array element (EX_AINDEX). A numeric
+// target requires a numeric datum (clause 16: a string datum into a numeric
+// variable is fatal); a string target accepts any datum but is bounded to 18
+// chars (a longer datum is fatal). A numeric-array element resolves its
+// subscripts, which may itself raise a fatal subscript/arity exception (then
+// turned into STEP_ERROR by the step loop). On a fatal exception it sets *errMsg
+// (for the type/length errors) and returns STEP_ERROR.
+func (r @runtime) readInto(t @Expr, d @datum, errMsg *@[]char) int {
+	if t.Kind == EX_SVAR {
 		if len(d.Text) > MAX_STR_LEN {
 			*errMsg = buf.CopyStr("string too long (> 18 chars)")
 			return STEP_ERROR
 		}
-		r.env.setStr(name, copyChars(d.Text))
+		r.env.setStr(t.Name, copyChars(d.Text))
 		return STEP_NEXT
 	}
 	if !numericDatum(d) {
 		*errMsg = buf.Concat("READ: non-numeric datum into numeric variable: ", d.Text)
 		return STEP_ERROR
 	}
-	r.env.setNum(name, datumValue(d))
+	if t.Kind == EX_AINDEX {
+		return r.storeArray(t, datumValue(d))
+	}
+	r.env.setNum(t.Name, datumValue(d))
 	return STEP_NEXT
 }
 

@@ -200,10 +200,14 @@ bar the deferred math-dependent intrinsics. **M3** (the embeddable REPL —
 `ConsoleIn` seam, atomic-validate + `?REDO FROM START` re-request, one shared
 stdin reader for the REPL and INPUT) are done and verified, and **all of M4 is
 complete** — `RND` is a reproducible fixed-seed PRNG; `RANDOMIZE` is
-parsed-but-deferred. Next: **M5** (NBS conformance harness) — plus the deferred
-transcendentals once `pkg/std/math` lands. (M3 ships a marked `*func` temp for the REPL sinks, tracked in `TODO.md` +
-`explorations/claude-todo.md` — restore `@func` when the destructor defect is
-fixed.) minbasic needs a main toolchain (interface-vtable + IR-gen-OOM fixes, both
+parsed-but-deferred. **M5** is done: 146 public-domain NBS test programs vendored
+under `tests/` with our own (regression-oracle) fixtures and a `run.sh`
+(compiled==interpreted==fixture). Follow-ups: the INPUT-driven NBS tests (~8); the
+transcendental/RND-battery NBS tests once `pkg/std/math` lands; two ECMA-55
+nonfatal-recovery gaps surfaced by the suite (TAB(n<1) and numeric-constant
+overflow — minbasic currently treats both as fatal); and restoring the `@func`
+REPL sinks (M3 ships a marked `*func` temp, tracked in `TODO.md` +
+`explorations/claude-todo.md`) once the destructor defect is fixed. minbasic needs a main toolchain (interface-vtable + IR-gen-OOM fixes, both
 in main, not the pinned `bnc-0.0.7`) — build against a main bundle via
 `BINATE_BUNDLE`.
 

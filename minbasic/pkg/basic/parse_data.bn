@@ -57,49 +57,52 @@ func (p @parser) parseLineRefList(ctx @[]char) @[]int {
 	return targets
 }
 
-// parseRead parses `READ <variable-list>` — one or more numeric or string
-// variables separated by commas. Each target's name is stored ("$"-suffixed for
-// a string variable); the runtime assigns successive data to them.
+// parseRead parses `READ <variable-list>` — one or more targets separated by
+// commas, each a numeric variable, string variable, or numeric-array element
+// `A(I)` (ECMA-55 clause 16.2, where a `variable` is a `simple-variable` or an
+// `array-element`). The runtime assigns successive data to them. READ and INPUT
+// share the same target grammar (parseTargetList), differing only in how the
+// data are sourced.
 func (p @parser) parseRead() @Stmt {
 	p.advance()
-	var names @[]@[]char = p.parseVarList()
+	var targets @[]@Expr = p.parseTargetList("READ")
 	var s @Stmt = make(Stmt)
 	s.Kind = ST_READ
-	s.Names = names
+	s.RTargets = targets
 	return s
 }
 
 // parseInput parses `INPUT <variable-list>` — one or more numeric, string, or
-// numeric-array-element targets separated by commas. Unlike READ (whose targets
-// are simple variables only), an INPUT target may be an array element `A(I)`,
-// just like a LET target; the runtime reads one reply line and assigns each
-// scanned datum to the corresponding target.
+// numeric-array-element targets separated by commas (an array element `A(I)` is
+// a valid target, just like in LET); the runtime reads one reply line and
+// assigns each scanned datum to the corresponding target.
 func (p @parser) parseInput() @Stmt {
 	p.advance()
-	var targets @[]@Expr = p.parseInputTargets()
+	var targets @[]@Expr = p.parseTargetList("INPUT")
 	var s @Stmt = make(Stmt)
 	s.Kind = ST_INPUT
 	s.InTargets = targets
 	return s
 }
 
-// parseInputTargets parses a comma-separated list of one or more INPUT targets,
-// returning their target expressions. On a malformed target it records a parse
-// error and returns the targets parsed so far.
-func (p @parser) parseInputTargets() @[]@Expr {
+// parseTargetList parses a comma-separated list of one or more assignable
+// targets (the READ/INPUT variable-list), returning their target expressions.
+// `ctx` names the enclosing statement for diagnostics. On a malformed target it
+// records a parse error and returns the targets parsed so far.
+func (p @parser) parseTargetList(ctx @[]char) @[]@Expr {
 	var targets @[]@Expr = make_slice(@Expr, 0)
-	targets = slices.Append[@Expr](targets, p.parseInputTarget())
+	targets = slices.Append[@Expr](targets, p.parseTarget(ctx))
 	for !p.hasErr && p.cur.Kind == TOK_COMMA {
 		p.advance()
-		targets = slices.Append[@Expr](targets, p.parseInputTarget())
+		targets = slices.Append[@Expr](targets, p.parseTarget(ctx))
 	}
 	return targets
 }
 
-// parseInputTarget parses one INPUT target: a string variable (EX_SVAR), or a
+// parseTarget parses one assignable target: a string variable (EX_SVAR), or a
 // numeric variable / array element (EX_VAR / EX_AINDEX via parseVarOrArray). Any
-// other token is a parse error.
-func (p @parser) parseInputTarget() @Expr {
+// other token is a parse error reported against `ctx` (the enclosing statement).
+func (p @parser) parseTarget(ctx @[]char) @Expr {
 	if p.cur.Kind == TOK_SVAR {
 		var e @Expr = make(Expr)
 		e.Kind = EX_SVAR
@@ -110,34 +113,8 @@ func (p @parser) parseInputTarget() @Expr {
 	if p.cur.Kind == TOK_VAR {
 		return p.parseVarOrArray()
 	}
-	p.fail(buf.CopyStr("INPUT: expected a variable"))
+	p.fail(buf.Concat(ctx, ": expected a variable"))
 	return make(Expr)
-}
-
-// parseVarList parses a comma-separated list of one or more variables (numeric
-// TOK_VAR or string TOK_SVAR), returning their names. A non-variable token is a
-// parse error.
-func (p @parser) parseVarList() @[]@[]char {
-	var names @[]@[]char = make_slice(@[]char, 0)
-	names = p.appendVarName(names)
-	for !p.hasErr && p.cur.Kind == TOK_COMMA {
-		p.advance()
-		names = p.appendVarName(names)
-	}
-	return names
-}
-
-// appendVarName consumes the current token as a variable name (TOK_VAR or
-// TOK_SVAR) and appends it to names, or records a parse error and leaves names
-// unchanged.
-func (p @parser) appendVarName(names @[]@[]char) @[]@[]char {
-	if p.cur.Kind != TOK_VAR && p.cur.Kind != TOK_SVAR {
-		p.fail(buf.CopyStr("READ: expected a variable"))
-		return names
-	}
-	var name @[]char = p.cur.Text
-	p.advance()
-	return slices.Append[@[]char](names, name)
 }
 
 // parseData parses a `DATA datum (, datum)*` line. The datum list is scanned
