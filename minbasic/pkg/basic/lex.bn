@@ -111,8 +111,8 @@ func subroutineKeywordKind(word @[]char) int {
 }
 
 // arrayKeywordKind returns the keyword token kind for the array-declaration
-// keywords (DIM, OPTION, BASE), or -1 if word is not one of them. Split out so
-// no if/else-if chain grows unwieldy.
+// keywords (DIM, OPTION, BASE) and the user-function keyword DEF, or -1 if word
+// is not one of them. Split out so no if/else-if chain grows unwieldy.
 func arrayKeywordKind(word @[]char) int {
 	if charsEq(word, "DIM") {
 		return TOK_DIM
@@ -120,6 +120,8 @@ func arrayKeywordKind(word @[]char) int {
 		return TOK_OPTION
 	} else if charsEq(word, "BASE") {
 		return TOK_BASE
+	} else if charsEq(word, "DEF") {
+		return TOK_DEF
 	}
 	return -1
 }
@@ -192,7 +194,21 @@ func (l @lexer) lexWord() Token {
 		t.Text = word
 		return t
 	}
+	if isFnName(word) {
+		var t Token
+		t.Kind = TOK_FN
+		t.Text = sliceChars(word, 2, 3)
+		return t
+	}
 	return l.finishVar(start)
+}
+
+// isFnName reports whether an all-letters run names a user-defined function
+// `FN<letter>`: exactly three letters, the first two `FN`. The `FN` prefix is
+// reserved (see TOK_FN), so such a run is always a function reference, never a
+// variable. (`DEF` is handled as a keyword before lexWord reaches this point.)
+func isFnName(word @[]char) bool {
+	return len(word) == 3 && word[0] == 'F' && word[1] == 'N'
 }
 
 // finishVar interprets the letter-run starting at index `start` (the lexer has

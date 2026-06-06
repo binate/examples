@@ -1,0 +1,40 @@
+package "pkg/basic"
+
+// evalFnCall evaluates a user-defined-function reference EX_FNCALL to its value
+// (ECMA-55 clause 10). Load-time validation (checkDefs) has already guaranteed
+// the function is defined, that its DEF precedes this reference, and that the
+// argument count matches, so this only computes the body. A no-parameter
+// function evaluates its body directly. A one-parameter function evaluates the
+// argument, then computes the body with the parameter bound to the argument (see
+// evalFnWithArg). If evaluating the argument raises a fatal exception, that
+// fatal is parked (setFatal) and the body is not evaluated; the result is 0.0
+// and the parked fatal aborts the statement.
+func (r @runtime) evalFnCall(e @Expr) float64 {
+	var slot int = fnIndex(e.Name)
+	if !r.defs.hasParam[slot] {
+		return r.evalNum(r.defs.body[slot])
+	}
+	var arg float64 = r.evalNum(e.X)
+	if r.fatal {
+		return 0.0
+	}
+	return r.evalFnWithArg(slot, arg)
+}
+
+// evalFnWithArg computes a one-parameter function's body with its parameter
+// bound to arg. The parameter is LOCAL to the definition: it shadows the global
+// simple variable of the same name only for the duration of the call, while any
+// other variable in the body refers to the global program variable. This is
+// implemented by saving the parameter's current global value, setting it to arg,
+// evaluating the body, then restoring the saved value — so the call cannot
+// clobber a program-global variable of the same name. The save/restore brackets
+// the body evaluation even when the body raises a fatal exception, leaving the
+// variable store consistent.
+func (r @runtime) evalFnWithArg(slot int, arg float64) float64 {
+	var idx int = r.defs.paramIdx[slot]
+	var saved float64 = r.env.nums[idx]
+	r.env.nums[idx] = arg
+	var result float64 = r.evalNum(r.defs.body[slot])
+	r.env.nums[idx] = saved
+	return result
+}

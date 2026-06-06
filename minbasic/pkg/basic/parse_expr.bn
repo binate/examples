@@ -68,6 +68,9 @@ func (p @parser) parsePrimary() @Expr {
 	if p.cur.Kind == TOK_FUNC {
 		return p.parseFuncCall()
 	}
+	if p.cur.Kind == TOK_FN {
+		return p.parseFnRef()
+	}
 	if p.cur.Kind == TOK_LPAREN {
 		p.advance()
 		var inner @Expr = p.parseExpr()
@@ -144,6 +147,31 @@ func (p @parser) parseFuncCall() @Expr {
 	}
 	if p.cur.Kind != TOK_LPAREN {
 		p.fail(buf.CopyStr("function call: expected '('"))
+		return e
+	}
+	p.advance()
+	e.X = p.parseExpr()
+	if p.cur.Kind != TOK_RPAREN {
+		p.fail(buf.CopyStr("function call: expected ')'"))
+		return e
+	}
+	p.advance()
+	return e
+}
+
+// parseFnRef parses a user-defined-function reference at the current TOK_FN: a
+// bare `FN<letter>` (no argument) or `FN<letter> ( <numeric-expression> )`. The
+// resulting EX_FNCALL node carries the function letter in Name and the argument
+// expression in X (nil for a bare reference). Whether the argument count matches
+// the function's definition (an argument given to a no-parameter function, or a
+// bare reference to a one-parameter function) is checked at load time, since the
+// definition may appear on a different line than this reference.
+func (p @parser) parseFnRef() @Expr {
+	var e @Expr = make(Expr)
+	e.Kind = EX_FNCALL
+	e.Name = p.cur.Text
+	p.advance()
+	if p.cur.Kind != TOK_LPAREN {
 		return e
 	}
 	p.advance()

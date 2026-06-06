@@ -87,6 +87,15 @@ const (
 	// reserved — they cannot collide with a variable, which is at most a letter
 	// plus a digit.
 	TOK_FUNC
+	// TOK_DEF is the DEF keyword introducing a single-line user-function
+	// definition (clause 10): `DEF FN<letter>[(<var>)] = <numeric-expression>`.
+	TOK_DEF
+	// TOK_FN is a user-defined-function name `FN<letter>` (FNA..FNZ); Token.Text
+	// holds the single function letter (the `FN` prefix stripped). It appears
+	// both in a DEF header and at a call site. The `FN` prefix is reserved, so a
+	// three-letter `FN`+letter run can never name a variable (at most a letter
+	// plus a digit).
+	TOK_FN
 	// TOK_ERROR marks a lexing failure; Token.Text holds the diagnostic.
 	TOK_ERROR
 )

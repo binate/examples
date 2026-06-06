@@ -34,8 +34,20 @@ func runProgram(prog @[]@Line, out @io.ConsoleOut) {
 		emitDiag(out, optMsg)
 		return
 	}
+	var defs @defStore
+	var defMsg @[]char
+	var defOk bool
+	defs, defMsg, defOk = collectDefs(prog)
+	if !defOk {
+		emitDiag(out, defMsg)
+		return
+	}
+	if !checkDefs(prog, defs, &defMsg) {
+		emitDiag(out, defMsg)
+		return
+	}
 	var data @[]@datum = collectData(prog)
-	var r @runtime = newRuntime(out, prog, lm, data, base)
+	var r @runtime = newRuntime(out, prog, lm, data, base, defs)
 	var dimMsg @[]char
 	if !applyDims(prog, r.env, &dimMsg) {
 		emitDiag(out, dimMsg)

@@ -109,6 +109,8 @@ func (p @parser) parseStmtBodyRest(k int) @Stmt {
 		return p.parseDim()
 	} else if k == TOK_OPTION {
 		return p.parseOption()
+	} else if k == TOK_DEF {
+		return p.parseDef()
 	}
 	p.fail(buf.CopyStr("expected a statement keyword"))
 	return simpleStmt(ST_REM)

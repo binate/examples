@@ -16,6 +16,8 @@ package "pkg/basic"
 // EX_TAB       X (the TAB column argument); a PRINT-list item, never a value
 // EX_AINDEX    Name (single-letter array name), Op (subscript count, 1 or 2),
 //              X (first subscript), Y (second subscript; used only when Op == 2)
+// EX_FNCALL    Name (the function letter, e.g. "A" for FNA), X (the argument
+//              expression, or nil for a no-parameter function reference)
 const (
 	EX_NUM int = iota
 	EX_STR
@@ -26,6 +28,7 @@ const (
 	EX_CALL
 	EX_TAB
 	EX_AINDEX
+	EX_FNCALL
 )
 
 // Expr is one expression node. Kind selects which fields are meaningful (see the
@@ -94,6 +97,11 @@ type Rel struct {
 //              reached during execution)
 // ST_OPTION    Target (the OPTION BASE lower bound, 0 or 1; processed at load, a
 //              no-op when reached during execution)
+// ST_DEF       Name (the function letter), HasParam (true when a parameter is
+//              declared), Param (the parameter variable name when HasParam),
+//              Value (the body expression); declarative — collected at load, a
+//              no-op when reached during execution (the body is evaluated only
+//              on a call)
 const (
 	ST_LET int = iota
 	ST_PRINT
@@ -112,6 +120,7 @@ const (
 	ST_RESTORE
 	ST_DIM
 	ST_OPTION
+	ST_DEF
 )
 
 // dimDecl is one array declaration inside a DIM statement: the single-letter
@@ -151,23 +160,28 @@ const (
 // array-element target (an EX_AINDEX expression) when the assignment writes
 // `A(...)`; it is unused (the scalar/string Name path is taken) otherwise.
 // Decls is a DIM line's array-declaration list, applied to the array store at
-// load. For ST_OPTION, Target holds the OPTION BASE lower bound (0 or 1).
+// load. For ST_OPTION, Target holds the OPTION BASE lower bound (0 or 1). For
+// ST_DEF, Name is the function letter, Value is the body expression, HasParam
+// records whether a parameter was declared, and Param is the parameter variable
+// name (used only when HasParam).
 type Stmt struct {
-	Kind    int
-	Name    @[]char
-	Value   @Expr
-	Items   @[]@Expr
-	Seps    @[]int
-	Target  int
-	Cond    @Rel
-	Limit   @Expr
-	Step    @Expr
-	HasStep bool
-	Targets @[]int
-	Names   @[]@[]char
-	Data    @[]@datum
-	LHS     @Expr
-	Decls   @[]@dimDecl
+	Kind     int
+	Name     @[]char
+	Value    @Expr
+	Items    @[]@Expr
+	Seps     @[]int
+	Target   int
+	Cond     @Rel
+	Limit    @Expr
+	Step     @Expr
+	HasStep  bool
+	Targets  @[]int
+	Names    @[]@[]char
+	Data     @[]@datum
+	LHS      @Expr
+	Decls    @[]@dimDecl
+	HasParam bool
+	Param    @[]char
 }
 
 // Line is one parsed program line: its line number (1..9999) and its statement.

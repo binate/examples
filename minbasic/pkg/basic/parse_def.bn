@@ -1,0 +1,60 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// parseDef parses a single-line user-function definition (ECMA-55 clause 10):
+//   DEF FN<letter> [ ( <simple-numeric-variable> ) ] = <numeric-expression>
+// The DEF keyword is already current. The function name is a TOK_FN (its Text is
+// the function letter). A parameter, when present, is a simple numeric variable
+// local to the body; an absent parameter list defines a no-argument function.
+// The body is a numeric expression, parsed but not evaluated here (evaluation
+// happens only when the function is called). The resulting ST_DEF carries the
+// function letter in Name, the parameter name in Param (with HasParam set), and
+// the body in Value.
+func (p @parser) parseDef() @Stmt {
+	p.advance()
+	if p.cur.Kind != TOK_FN {
+		p.fail(buf.CopyStr("DEF: expected a function name FN<letter>"))
+		return simpleStmt(ST_REM)
+	}
+	var s @Stmt = make(Stmt)
+	s.Kind = ST_DEF
+	s.Name = p.cur.Text
+	p.advance()
+	p.parseDefParam(s)
+	if p.hasErr {
+		return s
+	}
+	if p.cur.Kind != TOK_EQ {
+		p.fail(buf.CopyStr("DEF: expected '='"))
+		return s
+	}
+	p.advance()
+	s.Value = p.parseExpr()
+	return s
+}
+
+// parseDefParam parses the optional parameter list of a DEF: a single simple
+// numeric variable in parentheses, `( <var> )`. It sets s.HasParam and s.Param
+// when a parameter is present and leaves them unset for a no-argument function.
+// The parameter must be a simple numeric variable (a letter, optionally with a
+// digit); a string variable or array subscript is rejected.
+func (p @parser) parseDefParam(s @Stmt) {
+	if p.cur.Kind != TOK_LPAREN {
+		s.HasParam = false
+		return
+	}
+	p.advance()
+	if p.cur.Kind != TOK_VAR {
+		p.fail(buf.CopyStr("DEF: parameter must be a simple numeric variable"))
+		return
+	}
+	s.Param = p.cur.Text
+	s.HasParam = true
+	p.advance()
+	if p.cur.Kind != TOK_RPAREN {
+		p.fail(buf.CopyStr("DEF: expected ')' after parameter"))
+		return
+	}
+	p.advance()
+}

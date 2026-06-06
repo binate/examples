@@ -1,0 +1,69 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// NUM_DEFS is the size of the user-function table: one slot per letter A..Z, so
+// FNA..FNZ each have a slot (clause 10). Mirrors env's no-hashmap flat idiom.
+const NUM_DEFS int = 26
+
+// defStore holds a program's single-line user-defined functions as flat fixed
+// tables (no hashmap), one slot per letter A..Z. For each letter, defined
+// records whether a DEF for it appeared; hasParam records whether it was defined
+// with a parameter; paramIdx is the env.nums index of that parameter's variable
+// (used only when hasParam); body is the body expression AST (evaluated only on
+// a call); and defLine is the source line number of the DEF (used by the
+// load-time reference-before-DEF check). The store is built once at load (see
+// collectDefs) and is read-only during execution.
+type defStore struct {
+	defined  [NUM_DEFS]bool
+	hasParam [NUM_DEFS]bool
+	paramIdx [NUM_DEFS]int
+	body     [NUM_DEFS]@Expr
+	defLine  [NUM_DEFS]int
+}
+
+// fnIndex maps a one-character function-letter name (the Text of a TOK_FN /
+// EX_FNCALL / ST_DEF, e.g. "A" for FNA) to its slot 0..25 in a defStore. The
+// name is a single uppercase letter, guaranteed by the lexer.
+func fnIndex(name @[]char) int {
+	return cast(int, name[0] - 'A')
+}
+
+// collectDefs builds the program's defStore from its DEF statements, in program
+// order. It diagnoses a re-DEF (two DEFs of the same FN name): on the first such
+// conflict it sets *msg to a load diagnostic and returns ok == false. paramIdx
+// is computed from the parameter variable name via numIndex, matching the
+// env.nums layout so a call can save/restore the parameter's global slot.
+func collectDefs(prog @[]@Line) (@defStore, @[]char, bool) {
+	var ds @defStore = make(defStore)
+	for i := 0; i < len(prog); i++ {
+		var s @Stmt = prog[i].Stmt
+		if s.Kind != ST_DEF {
+			continue
+		}
+		var slot int = fnIndex(s.Name)
+		if ds.defined[slot] {
+			return ds, fnRedefDiag(prog[i].Num, s.Name), false
+		}
+		ds.defined[slot] = true
+		ds.hasParam[slot] = s.HasParam
+		if s.HasParam {
+			ds.paramIdx[slot] = numIndex(s.Param)
+		}
+		ds.body[slot] = s.Value
+		ds.defLine[slot] = prog[i].Num
+	}
+	return ds, make_slice(char, 0), true
+}
+
+// fnRedefDiag builds the load diagnostic for a second DEF of an already-defined
+// function name, locating the offending line.
+func fnRedefDiag(line int, name @[]char) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("line ")
+	b = b.WriteInt(line)
+	b = b.WriteStr(": function FN")
+	b = b.WriteStr(name)
+	b = b.WriteStr(" is already defined")
+	return b.Freeze()
+}

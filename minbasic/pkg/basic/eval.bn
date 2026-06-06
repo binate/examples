@@ -26,7 +26,9 @@ const MAX_STR_LEN int = 18
 // index of the next datum). fatal/fatalMsg carry a fatal exception raised
 // mid-expression (a TAB argument < 1, or a not-yet-supported function); they
 // cannot be returned through the float64-typed evaluators, so the value is
-// parked here and the step loop reports it after the statement.
+// parked here and the step loop reports it after the statement. defs is the
+// program's user-defined-function table (built at load), consulted when a
+// reference FN<letter> is evaluated.
 type runtime struct {
 	env      @env
 	out      @io.ConsoleOut
@@ -40,14 +42,17 @@ type runtime struct {
 	dataPtr  int
 	fatal    bool
 	fatalMsg @[]char
+	defs     @defStore
 }
 
 // newRuntime builds a runtime over a fresh variable store writing to out, with
-// the program prog, its precomputed line-number map, and its global DATA
-// sequence. base is the OPTION BASE array lower bound. The program counter
-// starts at the first line; the FOR and GOSUB stacks start empty; the data
-// pointer starts at the first datum; no array is dimensioned yet.
-func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum, base int) @runtime {
+// the program prog, its precomputed line-number map, its global DATA sequence,
+// and its user-defined-function table defs. base is the OPTION BASE array lower
+// bound. The program counter starts at the first line; the FOR and GOSUB stacks
+// start empty; the data pointer starts at the first datum; no array is
+// dimensioned yet.
+func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum, base int,
+	defs @defStore) @runtime {
 	var r @runtime = make(runtime)
 	r.env = newEnv(base)
 	r.out = out
@@ -60,6 +65,7 @@ func newRuntime(out @io.ConsoleOut, prog @[]@Line, lm @lineMap, data @[]@datum, 
 	r.data = data
 	r.dataPtr = 0
 	r.fatal = false
+	r.defs = defs
 	return r
 }
 
@@ -105,6 +111,8 @@ func (r @runtime) evalNum(e @Expr) float64 {
 		return r.evalCall(e)
 	} else if e.Kind == EX_AINDEX {
 		return r.evalArrayRef(e)
+	} else if e.Kind == EX_FNCALL {
+		return r.evalFnCall(e)
 	}
 	// EX_STR / EX_SVAR cannot appear in a numeric context (the parser keeps
 	// numeric and string expressions apart); treat as 0.

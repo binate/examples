@@ -1,0 +1,161 @@
+package "pkg/basic"
+
+import "pkg/binate/buf"
+
+// checkDefs validates every user-function reference in the program against the
+// definitions in ds (ECMA-55 clause 10). For each FN reference it enforces:
+//   - the function is defined (an undefined FN is a fatal load error);
+//   - the DEF appears on a strictly lower-numbered line than the reference
+//     (a reference before its DEF is an error);
+//   - a DEF's body does not reference the function being defined (no recursion;
+//     a direct self-reference is reported distinctly);
+//   - the argument count matches the definition (an argument given to a
+//     no-parameter function, or a bare reference to a one-parameter function,
+//     is an error).
+// On the first violation it sets *msg to a located diagnostic and returns false.
+func checkDefs(prog @[]@Line, ds @defStore, msg *@[]char) bool {
+	for i := 0; i < len(prog); i++ {
+		var s @Stmt = prog[i].Stmt
+		var selfSlot int = defSelfSlot(s)
+		if !checkStmtDefs(s, ds, prog[i].Num, selfSlot, msg) {
+			return false
+		}
+	}
+	return true
+}
+
+// defSelfSlot returns the defStore slot of the function a statement defines when
+// it is a DEF, or -1 otherwise. It identifies the line on which a reference to
+// that same function letter would be a (forbidden) self-reference.
+func defSelfSlot(s @Stmt) int {
+	if s.Kind == ST_DEF {
+		return fnIndex(s.Name)
+	}
+	return -1
+}
+
+// checkStmtDefs validates the FN references inside one statement's expressions.
+// line is the statement's source line number; selfSlot is the slot of the
+// function this line defines (-1 if it is not a DEF), used to detect a
+// self-reference in a DEF body. A DEF body is the only expression a DEF
+// contributes; every other statement contributes its general expression set.
+func checkStmtDefs(s @Stmt, ds @defStore, line int, selfSlot int, msg *@[]char) bool {
+	if s.Kind == ST_DEF {
+		return checkExprDefs(s.Value, ds, line, selfSlot, msg)
+	}
+	return checkExprListDefs(s, ds, line, selfSlot, msg)
+}
+
+// checkExprListDefs validates every expression a non-DEF statement may hold (LET
+// target/RHS, FOR limit/step, IF condition, the PRINT/ON/array-subscript
+// expressions). It stops at the first violation.
+func checkExprListDefs(s @Stmt, ds @defStore, line int, selfSlot int, msg *@[]char) bool {
+	if !checkExprDefs(s.LHS, ds, line, selfSlot, msg) {
+		return false
+	}
+	if !checkExprDefs(s.Value, ds, line, selfSlot, msg) {
+		return false
+	}
+	if !checkExprDefs(s.Limit, ds, line, selfSlot, msg) {
+		return false
+	}
+	if !checkExprDefs(s.Step, ds, line, selfSlot, msg) {
+		return false
+	}
+	if !checkRelDefs(s.Cond, ds, line, selfSlot, msg) {
+		return false
+	}
+	return checkItemsDefs(s.Items, ds, line, selfSlot, msg)
+}
+
+// checkItemsDefs validates the FN references in a PRINT-item list.
+func checkItemsDefs(items @[]@Expr, ds @defStore, line int, selfSlot int, msg *@[]char) bool {
+	for i := 0; i < len(items); i++ {
+		if !checkExprDefs(items[i], ds, line, selfSlot, msg) {
+			return false
+		}
+	}
+	return true
+}
+
+// checkRelDefs validates the FN references in both operands of a relational
+// expression (an IF test); a nil relation trivially passes.
+func checkRelDefs(rel @Rel, ds @defStore, line int, selfSlot int, msg *@[]char) bool {
+	if rel == nil {
+		return true
+	}
+	if !checkExprDefs(rel.X, ds, line, selfSlot, msg) {
+		return false
+	}
+	return checkExprDefs(rel.Y, ds, line, selfSlot, msg)
+}
+
+// checkExprDefs walks an expression tree, validating each EX_FNCALL it contains
+// against ds (see checkOneFnRef) and recursing into the children. A nil subtree
+// trivially passes. It stops at the first violation.
+func checkExprDefs(e @Expr, ds @defStore, line int, selfSlot int, msg *@[]char) bool {
+	if e == nil {
+		return true
+	}
+	if e.Kind == EX_FNCALL {
+		if !checkOneFnRef(e, ds, line, selfSlot, msg) {
+			return false
+		}
+	}
+	if !checkExprDefs(e.X, ds, line, selfSlot, msg) {
+		return false
+	}
+	return checkExprDefs(e.Y, ds, line, selfSlot, msg)
+}
+
+// checkOneFnRef validates a single FN reference node e on the given line. It
+// enforces, in order: no self-reference (the reference names the function this
+// DEF line defines); the function is defined; the DEF is on a strictly
+// lower-numbered line; and the argument count matches the definition. On a
+// violation it sets *msg and returns false.
+func checkOneFnRef(e @Expr, ds @defStore, line int, selfSlot int, msg *@[]char) bool {
+	var slot int = fnIndex(e.Name)
+	if slot == selfSlot {
+		*msg = fnDefDiag(line, e.Name, "must not reference itself (no recursion)")
+		return false
+	}
+	if !ds.defined[slot] {
+		*msg = fnDefDiag(line, e.Name, "is not defined")
+		return false
+	}
+	if ds.defLine[slot] >= line {
+		*msg = fnDefDiag(line, e.Name, "is referenced before its DEF")
+		return false
+	}
+	return checkFnArity(e, ds, slot, line, msg)
+}
+
+// checkFnArity verifies the reference e supplies an argument iff the function at
+// slot was defined with a parameter. A mismatch (an argument to a no-parameter
+// function, or a bare reference to a one-parameter function) sets *msg and
+// returns false.
+func checkFnArity(e @Expr, ds @defStore, slot int, line int, msg *@[]char) bool {
+	var hasArg bool = e.X != nil
+	if hasArg && !ds.hasParam[slot] {
+		*msg = fnDefDiag(line, e.Name, "takes no argument")
+		return false
+	}
+	if !hasArg && ds.hasParam[slot] {
+		*msg = fnDefDiag(line, e.Name, "requires an argument")
+		return false
+	}
+	return true
+}
+
+// fnDefDiag builds a located diagnostic for a user-function reference fault,
+// naming the line, the function (FN<letter>), and the reason.
+func fnDefDiag(line int, name @[]char, reason *[]readonly char) @[]char {
+	var b buf.CharBuf = buf.New()
+	b = b.WriteStr("line ")
+	b = b.WriteInt(line)
+	b = b.WriteStr(": function FN")
+	b = b.WriteStr(name)
+	b = b.WriteByte(' ')
+	b = b.WriteStr(reason)
+	return b.Freeze()
+}
