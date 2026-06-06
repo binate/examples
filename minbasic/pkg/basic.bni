@@ -1,0 +1,20 @@
+// Package basic is the ECMA-55 Minimal BASIC interpreter core: lexer, parser,
+// program store, and evaluator. The intended design reaches no low-level I/O —
+// all program output (and, later, input) flows through an injected
+// pkg/basic/io.ConsoleOut, so the same engine drives a CLI, a conformance-test
+// buffer, or a wasm host unchanged.
+//
+// M0 skeleton: Run emits a banner. M1 grows it into the real non-interactive
+// program runner.
+package "pkg/basic"
+
+// Run drives the interpreter. (M0: emits a banner; M1: lexes/parses/runs a
+// stored program.)
+//
+// TEMP: Run takes no injected sink and emits via the static pkg/host.WriteOut,
+// because the injected-io.ConsoleOut path currently miscompiles (the
+// iface-vtable 2-word-slice-arg drop, plus a VM nil-vtable bug on injected @func
+// writers — see explorations/claude-todo.md and pkg/basic/io). The core's
+// dependency on pkg/host is itself temporary: once injection works, this becomes
+// `Run(out @io.ConsoleOut)` and the core no longer imports pkg/host.
+func Run()

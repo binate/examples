@@ -1,0 +1,18 @@
+// Package host is minbasic's I/O delegate — the ONE place that reaches
+// pkg/bootstrap. It binds the engine's output to the process's standard streams,
+// so the interpreter core never touches an fd. When pkg/bootstrap is eventually
+// removed/renamed, only this package changes.
+package "pkg/host"
+
+// WriteOut sends the characters of s to standard output with no added newline
+// (so PRINT's trailing-';' suppression and inline prompts work later). Returns
+// the number of characters written.
+//
+// TEMP: the core calls this STATIC function directly. The intended design injects
+// an io.ConsoleOut into the engine, but that path currently miscompiles — calling
+// an interface method with a 2-word slice arg drops the slice's len word (both
+// backends), and the VM also mishandles an injected @func writer (nil vtable).
+// See explorations/claude-todo.md. Once both are fixed + released, output routes
+// through an injected io.ConsoleOut (a bootstrapConsole impl here) and the core
+// stops importing pkg/host.
+func WriteOut(s *[]readonly char) int

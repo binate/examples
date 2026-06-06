@@ -1,0 +1,17 @@
+package "pkg/basic"
+
+// TEMP import: the core should depend on pkg/basic/io (the ConsoleOut
+// abstraction), not on the concrete host delegate. This direct dependency exists
+// only until the injected-io.ConsoleOut path compiles correctly — see Run and
+// explorations/claude-todo.md.
+import "pkg/host"
+
+// Run drives the interpreter, routing all output to the host writer. M0
+// skeleton: emit a banner so the cmd -> basic -> host -> bootstrap wiring is
+// exercised before any interpreter logic exists.
+//
+// TEMP(iface-vtable + @func-VM miscompiles): emit directly via the host's static
+// writer. Target: out.Write(...) on an injected @io.ConsoleOut.
+func Run() {
+	host.WriteOut("minbasic - ECMA-55 Minimal BASIC (skeleton)\n")
+}

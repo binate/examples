@@ -1,0 +1,13 @@
+package "pkg/host"
+
+import "pkg/bootstrap"
+
+// WriteOut sends s to standard output with no added newline. char and uint8 are
+// the same byte, so the readonly char slice is accepted by bootstrap.Write
+// directly. This is the sole pkg/bootstrap call site in minbasic.
+//
+// TEMP static shape (see host.bni): becomes a bootstrapConsole : io.ConsoleOut
+// impl + NewConsole() @io.ConsoleOut once the injection path compiles correctly.
+func WriteOut(s *[]readonly char) int {
+	return bootstrap.Write(bootstrap.STDOUT, s)
+}
