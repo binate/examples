@@ -27,7 +27,7 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **153** are vendored. The other **55**
+Of the **208** NBS programs (P001..P208), **166** are vendored. The other **42**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
@@ -56,16 +56,20 @@ P073 P107 P108 P109 P110 P111 P112 P203.
 (P081, P084, P113 also contain `INPUT` but minbasic rejects them *before* the
 read — deterministic error tests — so they are kept.)
 
-### Excluded — nondeterministic / RND (13)
+### `RND` programs — kept as a minbasic-only regression oracle (13)
 
-The program uses the `RND` function. minbasic's RND is deterministic, but it is
-*our own* PRNG sequence (ECMA-55 leaves the sequence implementation-defined), so
-these cannot be dev-validated against bas55: P130 P133 P134 P135 P136 P137 P138
-P139 P140 P141 P145 P146 P149.
+P130 P133–P141, P145 P146 P149 use `RND`. minbasic's RND is deterministic (a
+fixed-seed xorshift64), so they run byte-identically in both modes and are kept
+as a pure minbasic regression oracle. They are NOT cross-validated against bas55:
+ECMA-55 leaves the RND sequence implementation-defined, so minbasic's output
+differs from bas55's by construction. (P145/P146/P149 are actually RND
+argument-list *error* tests — `RND` takes no argument — which minbasic rejects at
+parse. P137's chi-square poker test runs a long RND loop; see the `errMsg`
+note in `examples/TODO.md`.)
 
-(The two ECMA-55 nonfatal-recovery cases that were once held back here —
-`TAB(n) < 1` and numeric-constant overflow — are now handled and kept; see
-"bugs found and fixed" item 4 below.)
+(The two ECMA-55 nonfatal-recovery cases once held back — `TAB(n) < 1` and
+numeric-constant overflow — are likewise handled and kept; see "bugs found and
+fixed" item 4 below.)
 
 ## Cross-validation against bas55 (development oracle)
 

@@ -67,8 +67,16 @@ func runProgramInto(prog @[]@Line, out @io.ConsoleOut, err @io.ConsoleOut, inp @
 		emitDiag(err, dimMsg)
 		return r.env
 	}
+	// errMsg is declared ONCE here, not per-iteration inside the loop, to avoid a
+	// current native-backend defect: a default-initialized managed local declared
+	// in a loop body leaks ~native stack each iteration and overflows it after
+	// ~130k iterations (tracked in explorations/claude-todo.md), which crashes the
+	// compiled interpreter on long-running programs. Reusing one slot is safe —
+	// *errMsg is read only in the STEP_ERROR branch, immediately after the r.step
+	// that sets it. Move this back inside the loop once the backend defect is fixed
+	// (see examples/TODO.md).
+	var errMsg @[]char
 	for r.pc < len(prog) {
-		var errMsg @[]char
 		var status int = r.step(&errMsg)
 		if status == STEP_ERROR {
 			emitDiag(err, lineDiag(prog[r.pc].Num, errMsg))
