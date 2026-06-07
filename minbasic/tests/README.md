@@ -30,7 +30,7 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **204** are vendored. The other **4**
+Of the **208** NBS programs (P001..P208), **205** are vendored. The other **3**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
@@ -51,22 +51,14 @@ remain excluded:
   (and division by zero) is a separate change that would touch every fixture
   whose output contains `INF`/`NAN`, so it is held for a dedicated pass.
 
-### Excluded — INPUT program blocked on a minbasic conformance gap (1)
+### INPUT programs (all 8 kept)
 
-The other seven INPUT programs (P073 P107 P108 P109 P110 P111 P203) are now kept:
-each has a canned `input/<name>.in` reply stream that drives a correct, complete
-run (P107/P108/P109/P110 self-report PASS; P111 exercises the underflow-on-input
-→ zero recovery; P073 is OPTION-BASE-1 `DIM A(0)` exploratory output; P203 is the
-zones-and-margin visual test). One remains excluded because it surfaces a real
-(firsthand-verified) minbasic conformance gap — vendoring it would freeze
-knowingly-wrong output:
-
-- **P112** — INPUT-reply exception coverage: minbasic's unquoted-datum scanner
-  accepts input-replies ECMA-55 (clause 13) says must raise a nonfatal INPUT
-  exception — e.g. an *empty* unquoted datum between commas (`X,,Y` into
-  `INPUT A$,B$,C$` yields an empty `B$`). The program reports
-  `POSSIBLE TEST FAILURE IN 14 CASE(S)`. (Numeric targets are fine — `1;2` is
-  correctly rejected; the gap is the unquoted/string-datum scanner.)
+All eight INPUT programs are kept, each with a canned `input/<name>.in` reply
+stream that drives a correct, complete run: P107/P108/P109/P110 self-report PASS;
+P111 exercises underflow-on-input → zero recovery; P112 exercises the full INPUT
+exception/re-request battery (26 cases, each bad reply `?REDO`'d then re-supplied
+as zeros — see "bugs found and fixed" item 5); P073 is OPTION-BASE-1 `DIM A(0)`
+exploratory output; P203 is the zones-and-margin visual test.
 
 P203 is a *visual* zone/margin test: minbasic's output is ECMA-55-conformant, but
 its byte-level "first vs second" pairs differ by trailing whitespace in one case.
@@ -139,10 +131,9 @@ after the fix:
    numeric-magnitude splitter). They now print as ` INF ` / `-INF ` / ` NAN `.
    (Surfaced by P028, P031, P035, P101.)
 3. **Non-integer `^` exponent.** Previously returned a silent `1.0` placeholder
-   (wrong answer). It now raises a clean `?… not yet supported` fatal — the same
-   deferral as the transcendentals it depends on (exp()/log()), so such programs
-   land cleanly in the deferred-feature bucket instead of producing wrong output.
-   (Surfaced by P029, P032, P033, P170, etc.)
+   (wrong answer). It is now computed correctly as `a^b` via `pkg/std/math.Pow`; a
+   negative base with a non-integer exponent is the ECMA-55 fatal exception
+   (clause 8). (Surfaced by P032, P033, P170, etc.)
 4. **Nonfatal-exception recovery.** Two recoverable ECMA-55 exceptions were
    wrongly treated as fatal. (a) `TAB(n)` with a rounded `n < 1` (clause 14.4)
    terminated the run; it now recovers by using column 1 and continuing. (b) A
@@ -157,3 +148,13 @@ after the fix:
    inline and both modes stay byte-identical; a host wanting diagnostics off the
    program stream can pass a different sink. (Surfaced by P008 and P030, now
    kept.)
+5. **INPUT-reply validation.** The shared datum scanner accepts any run of
+   characters, but an INPUT reply is stricter (ECMA-55 clauses 4, 15). INPUT now
+   rejects (`?REDO FROM START`, the nonfatal re-request) a reply with a malformed
+   unquoted datum — an *empty* datum between commas (`A,,B`) or one holding a
+   character outside the unquoted-string set (`;`, `?`, `*`, `"`) — and a numeric
+   datum that *overflows* (`1E99999`), which clause 15 makes an INPUT exception
+   (unlike READ, where overflow recovers to machine infinity); underflow still
+   recovers to 0. Numeric and string-length checks were already enforced. (DATA
+   keeps the lenient scan — program-authored DATA isn't user input. Surfaced by
+   P112, now kept.)

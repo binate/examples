@@ -5,9 +5,10 @@ import "pkg/binate/buf"
 
 // execInput executes an INPUT statement (ECMA-55 clause 15). It repeatedly emits
 // the prompt, reads one reply line through the runtime's ConsoleIn, and tries to
-// satisfy the whole variable-list from that reply. Validation is atomic: the
-// reply's datum count must equal the target count and each datum's type must
-// match its target before any assignment happens. Any mismatch is a nonfatal
+// satisfy the whole variable-list from that reply. Validation is atomic: every
+// unquoted datum must be a well-formed ECMA-55 unquoted-string (clause 4), the
+// reply's datum count must equal the target count, and each datum's type must
+// match its target, all before any assignment happens. Any failure is a nonfatal
 // exception — the reply is discarded, a re-request notice is shown, and the read
 // repeats. End-of-input while awaiting a reply terminates the run cleanly
 // (STEP_END). On a valid reply each datum is assigned in order and execution
@@ -28,7 +29,7 @@ func (r @runtime) execInput(s @Stmt, errMsg *@[]char) int {
 		}
 		var dataOk bool
 		var data @[]@datum = scanReply(res.Text, &dataOk)
-		if dataOk && validInput(s.InTargets, data) {
+		if dataOk && validReply(data) && validInput(s.InTargets, data) {
 			return r.assignInput(s.InTargets, data)
 		}
 		r.emit(buf.CopyStr("?REDO FROM START\n"))
@@ -72,13 +73,64 @@ func validInput(targets @[]@Expr, data @[]@datum) bool {
 
 // datumFitsTarget reports whether datum d may be assigned to the INPUT target t:
 // a string target (EX_SVAR) takes any datum no longer than 18 characters; a
-// numeric target (EX_VAR or EX_AINDEX) takes only a datum that parses as a
-// numeric constant.
+// numeric target (EX_VAR or EX_AINDEX) takes a datum that parses as a numeric
+// constant AND does not overflow. ECMA-55 clause 15 lists "the evaluation of a
+// numeric datum causes an overflow" as an INPUT exception (re-request), in
+// contrast to READ/constant overflow, which recovers to machine infinity — so an
+// overflowing INPUT reply is rejected here. Underflow (ParseFloat returns 0 with
+// a range error) is accepted and recovered to 0, as clause 15 has no underflow
+// exception (this is what P111 checks).
 func datumFitsTarget(t @Expr, d @datum) bool {
 	if t.Kind == EX_SVAR {
 		return len(d.Text) <= MAX_STR_LEN
 	}
-	return numericDatum(d)
+	if !numericDatum(d) {
+		return false
+	}
+	var n float64
+	var perr @errors.Error
+	n, perr = strconv.ParseFloat(d.Text, 64)
+	return !(present(perr) && isInfinite(absf(n)))
+}
+
+// validReply reports whether every UNQUOTED datum in an input-reply is a
+// well-formed ECMA-55 unquoted-string (clause 4). The data scanner accepts any
+// run of characters between commas, but an input-reply is stricter than that:
+// `unquoted-string = plain-string-character (unquoted-string-character*
+// plain-string-character)?`, so an unquoted datum must be non-empty and may
+// contain only plain-string-characters (letter, digit, '+', '-', '.') and
+// interior spaces. An empty datum (e.g. between adjacent commas, `A,,B`) or one
+// holding an excluded character (`;`, `?`, `*`, `"`, …) makes the reply a
+// nonfatal INPUT exception, so it is re-requested. A quoted datum is exempt — its
+// only limit is the 18-character bound checked at assignment.
+func validReply(data @[]@datum) bool {
+	for i := 0; i < len(data); i++ {
+		if !data[i].Quoted && !isUnquotedString(data[i].Text) {
+			return false
+		}
+	}
+	return true
+}
+
+// isUnquotedString reports whether s is a non-empty ECMA-55 unquoted-string: at
+// least one character, each a plain-string-character or a space (the scanner has
+// already trimmed the leading/trailing spaces, so any space here is interior).
+func isUnquotedString(s @[]char) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] != ' ' && !isPlainStringChar(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// isPlainStringChar reports whether c is an ECMA-55 plain-string-character: a
+// letter, a digit, '+', '-', or '.'.
+func isPlainStringChar(c char) bool {
+	return isAlpha(c) || isDigit(c) || c == '+' || c == '-' || c == '.'
 }
 
 // assignInput assigns each validated datum to its INPUT target in order, after

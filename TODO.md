@@ -12,16 +12,6 @@
   every fixture whose output contains `INF`/`NAN` (regenerate those), so it's a
   dedicated pass.
 
-- **minbasic conformance: INPUT unquoted-datum scanner too permissive.**
-  `pkg/basic/data.bn`'s datum scanner (shared by INPUT and DATA/READ) accepts
-  unquoted input-replies ECMA-55 clause 13 requires be rejected as a nonfatal
-  INPUT exception. Firsthand-verified: `X,,Y` into `INPUT A$,B$,C$` yields an
-  empty `B$` (an empty datum between commas should `?REDO`). Likely also accepts
-  ECMA-55-excluded unquoted-string characters. NBS test P112 reports 14 such
-  cases and is held out of `tests/` on this. Fix: reject empty (and
-  excluded-character) unquoted datums; re-check whether DATA/READ should share
-  the rule. Then vendor P112.
-
 - **Move minbasic's `errMsg` back inside the run loop.**
   `minbasic/pkg/basic/run.bn` (`runProgramInto`) declares `var errMsg @[]char`
   ONCE outside the statement loop, not per-iteration, to dodge a native-backend
