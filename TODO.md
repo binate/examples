@@ -1,5 +1,17 @@
 # examples — TODO
 
+- **minbasic conformance: report computed overflow / division by zero.** minbasic
+  supplies machine infinity on a computed arithmetic/EXP overflow and on division
+  by zero (the correct recovery *value*) but does not *report* it as a nonfatal
+  exception (ECMA-55 8.5/3.5); it currently reports only constant overflow and
+  `TAB(n) < 1`. Also `0/0` yields `NAN` where ECMA-55 wants `+INF` (machine
+  infinity, sign of numerator). Implement computed-overflow + division-by-zero
+  detection in `pkg/basic/eval.bn` (`evalBinary`, and the EXP path), emitting a
+  `?line N: …` via `reportNonfatal` and continuing. NBS tests P122 (EXP overflow)
+  and P029 (arithmetic overflow) require this and are held out on it. It touches
+  every fixture whose output contains `INF`/`NAN` (regenerate those), so it's a
+  dedicated pass.
+
 - **minbasic conformance: INPUT unquoted-datum scanner too permissive.**
   `pkg/basic/data.bn`'s datum scanner (shared by INPUT and DATA/READ) accepts
   unquoted input-replies ECMA-55 clause 13 requires be rejected as a nonfatal
