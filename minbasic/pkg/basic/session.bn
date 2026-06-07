@@ -21,7 +21,7 @@ type basicSession struct {
 	out   @io.ConsoleOut
 	inp   @io.ConsoleIn
 	turns int
-	poll  *func() PollResult
+	poll  @func() PollResult
 }
 
 // NewSession builds a fresh interactive BASIC session (see the .bni). It returns
@@ -56,7 +56,7 @@ impl @basicSession : ReplSession
 // this version: the delegate is recorded but never invoked, so Step never
 // returns STEP_SUSPENDED / STEP_BROKE. It exists for shape fidelity with
 // pkg/binate/repl.
-func (s @basicSession) SetPoll(poll *func() PollResult) {
+func (s @basicSession) SetPoll(poll @func() PollResult) {
 	s.poll = poll
 }
 

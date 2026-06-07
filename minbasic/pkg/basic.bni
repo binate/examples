@@ -36,19 +36,9 @@ func RunSource(src *[]readonly char, out @io.ConsoleOut, err @io.ConsoleOut, inp
 // SEPARATE concern, handled by the injected pkg/basic/io.ConsoleOut, never by
 // this sink. (Duplicated from pkg/binate/repl.bni; the bundle does not expose
 // that package to examples, so the small contract is copied here.)
-//
-// The two sink channels are raw (`*func`) rather than the managed (`@func`) that
-// pkg/binate/repl uses, to dodge a current toolchain defect: the managed session
-// struct's destructor miscompiles when its sink fields are managed `@func` —
-// crashing with `func_value_dtor on nil` in BOTH backends (compiled SIGTRAP,
-// interpreted aborts). A simpler standalone struct of two `@func` fields does
-// NOT trigger it, so the trigger is the session's fuller managed-field layout
-// (the sinks mixed with other managed fields). These sinks are non-capturing
-// host functions, so a raw function value is semantically fine and the natural
-// fit; restore `@func` to match pkg/binate/repl once the defect is fixed.
 type ReplIO struct {
-	WriteOut *func(*[]readonly char) int
-	WriteErr *func(*[]readonly char) int
+	WriteOut @func(*[]readonly char) int
+	WriteErr @func(*[]readonly char) int
 }
 
 // ReplError is one setup-time error surfaced by NewSession. Returning these as
@@ -135,9 +125,8 @@ interface ReplSession {
 	// takes no arguments and returns a PollResult. In this version the seam is
 	// inert: the session STORES the delegate but NEVER invokes it, so Step never
 	// returns STEP_SUSPENDED / STEP_BROKE. Kept for shape fidelity with
-	// pkg/binate/repl. (Raw `*func` rather than its `@func`, for the same
-	// toolchain-defect reason noted on ReplIO.)
-	SetPoll(poll *func() PollResult)
+	// pkg/binate/repl.
+	SetPoll(poll @func() PollResult)
 }
 
 // NewSession builds a fresh interactive BASIC session: an empty program store, a
