@@ -146,11 +146,11 @@ func (r @runtime) evalNum(e @Expr) float64 {
 	return 0.0
 }
 
-// evalBinary evaluates a binary arithmetic expression. The `^` operator with a
-// non-integer exponent needs exp()/log() (pkg/std/math, not yet landed), so it
-// is a fatal "not yet supported" — the same deferral as the transcendental
-// intrinsics — rather than a silently wrong placeholder value. Integer exponents
-// are computed exactly by powf.
+// evalBinary evaluates a binary arithmetic expression. For the `^` operator an
+// integer exponent is computed exactly by repeated multiplication (powf); a
+// non-integer exponent is a^b = exp(b*ln a) via math.Pow, except that a negative
+// base with a non-integer exponent is the ECMA-55 fatal exception (clause 8 — the
+// result is not real).
 func (r @runtime) evalBinary(e @Expr) float64 {
 	var a float64 = r.evalNum(e.X)
 	var b float64 = r.evalNum(e.Y)
@@ -164,8 +164,11 @@ func (r @runtime) evalBinary(e @Expr) float64 {
 		return a / b
 	}
 	if !integralExponent(b) {
-		r.setFatal(buf.CopyStr("non-integer ^ exponent not yet supported (pending pkg/std/math)"))
-		return 0.0
+		if a < 0.0 {
+			r.setFatal(buf.CopyStr("negative number raised to a non-integer power"))
+			return 0.0
+		}
+		return math.Pow(a, b)
 	}
 	return powf(a, b)
 }

@@ -65,47 +65,13 @@ func funcTakesArg(fn int) bool {
 	return fn != FN_RND
 }
 
-// funcName returns the source spelling of the function with code fn, for use in
-// diagnostics.
-func funcName(fn int) @[]char {
-	if fn == FN_ABS {
-		return buf.CopyStr("ABS")
-	} else if fn == FN_ATN {
-		return buf.CopyStr("ATN")
-	} else if fn == FN_COS {
-		return buf.CopyStr("COS")
-	} else if fn == FN_EXP {
-		return buf.CopyStr("EXP")
-	} else if fn == FN_INT {
-		return buf.CopyStr("INT")
-	} else if fn == FN_LOG {
-		return buf.CopyStr("LOG")
-	}
-	return funcNameRest(fn)
-}
-
-// funcNameRest returns the source spelling for the remaining function codes
-// (RND/SGN/SIN/SQR/TAN). Split from funcName to keep each chain short.
-func funcNameRest(fn int) @[]char {
-	if fn == FN_RND {
-		return buf.CopyStr("RND")
-	} else if fn == FN_SGN {
-		return buf.CopyStr("SGN")
-	} else if fn == FN_SIN {
-		return buf.CopyStr("SIN")
-	} else if fn == FN_SQR {
-		return buf.CopyStr("SQR")
-	}
-	return buf.CopyStr("TAN")
-}
-
-// evalCall evaluates an EX_CALL node. ABS/SGN/INT/RND and SQR are implemented
-// (SQR via pkg/std/math.Sqrt; SQR of a negative argument is the ECMA-55 fatal
-// exception of clause 9, not a NaN). The remaining transcendentals
-// (ATN/COS/EXP/LOG/SIN/TAN) need math functions that have not landed yet, so
-// calling one is a fatal runtime error: it records the diagnostic on the runtime
-// and returns 0 (the step loop reports the fatal and stops). RND takes no
-// argument and draws from the runtime's PRNG.
+// evalCall evaluates an EX_CALL node — one of the eleven ECMA-55 supplied numeric
+// functions (clause 9). ABS/SGN/INT and RND are computed directly; the
+// transcendentals route to pkg/std/math (software, deterministic, so compiled and
+// interpreted agree). Two have ECMA-55 domain restrictions raised as FATAL
+// exceptions before the call (rather than returning the NaN math would): SQR of a
+// negative argument and LOG of a non-positive argument. RND takes no argument and
+// draws from the runtime's PRNG.
 func (r @runtime) evalCall(e @Expr) float64 {
 	if e.Op == FN_ABS {
 		return absf(r.evalNum(e.X))
@@ -122,8 +88,24 @@ func (r @runtime) evalCall(e @Expr) float64 {
 			return 0.0
 		}
 		return math.Sqrt(x)
+	} else if e.Op == FN_SIN {
+		return math.Sin(r.evalNum(e.X))
+	} else if e.Op == FN_COS {
+		return math.Cos(r.evalNum(e.X))
+	} else if e.Op == FN_TAN {
+		return math.Tan(r.evalNum(e.X))
+	} else if e.Op == FN_ATN {
+		return math.Atan(r.evalNum(e.X))
+	} else if e.Op == FN_EXP {
+		return math.Exp(r.evalNum(e.X))
+	} else if e.Op == FN_LOG {
+		var x float64 = r.evalNum(e.X)
+		if x <= 0.0 {
+			r.setFatal(buf.CopyStr("LOG of a non-positive number"))
+			return 0.0
+		}
+		return math.Log(x)
 	}
-	r.setFatal(deferredFuncDiag(e.Op))
 	return 0.0
 }
 
@@ -133,13 +115,4 @@ func absf(x float64) float64 {
 		return -x
 	}
 	return x
-}
-
-// deferredFuncDiag builds the fatal diagnostic for a supplied function that is
-// parsed but not yet evaluable, naming the function and the pending dependency.
-func deferredFuncDiag(fn int) @[]char {
-	var b buf.CharBuf = buf.New()
-	b = b.WriteStr(funcName(fn))
-	b = b.WriteStr(" not yet supported (pending pkg/std/math)")
-	return b.Freeze()
 }

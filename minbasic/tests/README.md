@@ -30,26 +30,26 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **172** are vendored. The other **36**
+Of the **208** NBS programs (P001..P208), **203** are vendored. The other **5**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
 
-### Excluded — deferred feature (34)
+### Excluded — deferred feature (3)
 
-The program reaches a `?… not yet supported` fatal: it uses a transcendental
-function or a non-integer `^` exponent, or `RANDOMIZE` (needs an entropy source
-we have deferred). `SQR` is now implemented (via `pkg/std/math.Sqrt`), so its
-SQR-only programs are kept; the other transcendentals await further
-`pkg/std/math` functions.
+The transcendental functions (SQR/SIN/COS/TAN/ATN/EXP/LOG) and the non-integer
+`^` exponent are now implemented (via `pkg/std/math`, a software/deterministic
+library, so compiled and interpreted agree), and their programs are kept. Three
+remain excluded:
 
-- transcendentals: SIN — P127 P165 · COS — P120 · TAN — P128 P129 P164 ·
-  ATN — P119 P183 · EXP — P121 P122 P123 P166 P169 P175 P181 ·
-  LOG — P124 P125 P126 P167 P171 P179 (P166 uses SQR but also EXP/LOG/TAN/ATN,
-  so it stays here until those land)
-- non-integer `^` exponent (needs exp()/log()): P025 P026 P029 P032 P033 P043
-  P170 P173 P174 P176 P177 P182
-- `RANDOMIZE`: P131
+- **P131** — `RANDOMIZE`: needs an entropy source we have deferred.
+- **P122** (EXP overflow) and **P029** (arithmetic overflow via `^`/`*`) are
+  overflow-*reporting* tests: minbasic supplies machine infinity on overflow (the
+  correct recovery *value*) but does not yet *report* a **computed**
+  arithmetic/function overflow as a nonfatal exception (ECMA-55 8.5/3.5). It does
+  report constant overflow and `TAB(n) < 1`; extending that to computed overflow
+  (and division by zero) is a separate change that would touch every fixture
+  whose output contains `INF`/`NAN`, so it is held for a dedicated pass.
 
 ### Excluded — INPUT programs blocked on a minbasic conformance gap (2)
 
