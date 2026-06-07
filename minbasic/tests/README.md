@@ -30,7 +30,7 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **203** are vendored. The other **5**
+Of the **208** NBS programs (P001..P208), **204** are vendored. The other **4**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
@@ -51,14 +51,15 @@ remain excluded:
   (and division by zero) is a separate change that would touch every fixture
   whose output contains `INF`/`NAN`, so it is held for a dedicated pass.
 
-### Excluded — INPUT programs blocked on a minbasic conformance gap (2)
+### Excluded — INPUT program blocked on a minbasic conformance gap (1)
 
-The other six INPUT programs (P073 P107 P108 P109 P110 P111) are now kept: each
-has a canned `input/<name>.in` reply stream that drives a correct, complete run
-(P107/P108/P109/P110 self-report PASS; P111 exercises the underflow-on-input →
-zero recovery; P073 is OPTION-BASE-1 `DIM A(0)` exploratory output). Two remain
-excluded because they surface a real (firsthand-verified) minbasic conformance
-gap — vendoring them would freeze knowingly-wrong output:
+The other seven INPUT programs (P073 P107 P108 P109 P110 P111 P203) are now kept:
+each has a canned `input/<name>.in` reply stream that drives a correct, complete
+run (P107/P108/P109/P110 self-report PASS; P111 exercises the underflow-on-input
+→ zero recovery; P073 is OPTION-BASE-1 `DIM A(0)` exploratory output; P203 is the
+zones-and-margin visual test). One remains excluded because it surfaces a real
+(firsthand-verified) minbasic conformance gap — vendoring it would freeze
+knowingly-wrong output:
 
 - **P112** — INPUT-reply exception coverage: minbasic's unquoted-datum scanner
   accepts input-replies ECMA-55 (clause 13) says must raise a nonfatal INPUT
@@ -66,10 +67,15 @@ gap — vendoring them would freeze knowingly-wrong output:
   `INPUT A$,B$,C$` yields an empty `B$`). The program reports
   `POSSIBLE TEST FAILURE IN 14 CASE(S)`. (Numeric targets are fine — `1;2` is
   correctly rejected; the gap is the unquoted/string-datum scanner.)
-- **P203** — PRINT zone/margin: a comma in the *last* print zone must generate a
-  clean end-of-line (clause 14), but minbasic pads the zone with trailing spaces
-  before the newline, so P203 section 203.3's "first vs second" line-pair (case
-  #4) differs by trailing whitespace. The earlier zone-advance cases all match.
+
+P203 is a *visual* zone/margin test: minbasic's output is ECMA-55-conformant, but
+its byte-level "first vs second" pairs differ by trailing whitespace in one case.
+That is correct behaviour — a comma "generates one or more spaces to set the
+columnar position to the beginning of the next print zone" (clause 14, eager) and
+the standard does not trim trailing spaces, so a line that advances through zones
+and then wraps keeps the (invisible) zone-fill spaces the test's simplified model
+omits. The last-zone comma itself generates a clean end-of-line (no pad), as
+required.
 
 (P081, P084, P113 also contain `INPUT` but minbasic rejects them *before* the
 read — deterministic error tests — so they are kept.)

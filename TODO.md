@@ -22,14 +22,6 @@
   excluded-character) unquoted datums; re-check whether DATA/READ should share
   the rule. Then vendor P112.
 
-- **minbasic conformance: PRINT comma in the last zone pads trailing spaces.**
-  `pkg/basic/print.bn` — a comma when the cursor is in the last print zone must
-  generate a clean end-of-line (ECMA-55 clause 14); minbasic emits zone-fill
-  spaces first, leaving trailing whitespace. Firsthand-verified via NBS P203
-  §203.3 case #4 (`H` + 59 trailing spaces vs the expected clean `H`); the
-  zone-advance cases (§203.1) are correct. Fix: on a last-zone comma, emit the
-  end-of-line without padding. Then vendor P203.
-
 - **Move minbasic's `errMsg` back inside the run loop.**
   `minbasic/pkg/basic/run.bn` (`runProgramInto`) declares `var errMsg @[]char`
   ONCE outside the statement loop, not per-iteration, to dodge a native-backend
