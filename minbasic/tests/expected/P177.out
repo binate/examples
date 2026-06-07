@@ -23,6 +23,8 @@ TO PASS THIS TEST:
 ABOUT TO EXECUTE:
    IF (-1E-33) ^ (-4444) = 0 ^ (-1E-33)
 
+?line 290: numeric overflow
+?line 290: numeric overflow
 IF OVERFLOW AND ZERO TO NEGATIVE POWER EXCEPTIONS
    WERE REPORTED, THEN
 *** TEST PASSED ***

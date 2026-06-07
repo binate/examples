@@ -22,6 +22,7 @@ ABOUT TO ATTEMPT EXECUTION OF:
 
 ITERATION      CONTROL-VARIABLES VALUES
 COUNT          ACTUAL         SHOULD BE
+?line 360: division by zero
  1             -1.5708        -1.5708 
  2             -.570796       -.570796 
 EXITING LOOP.

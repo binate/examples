@@ -20,4 +20,5 @@ TO PASS THIS TEST:
 ABOUT TO EXECUTE:
    ON 1E-33 / 0 GOTO ...
 
+?line 250: division by zero
 ?line 250: ON index out of range: 9223372036854775807 (have 3 target(s))

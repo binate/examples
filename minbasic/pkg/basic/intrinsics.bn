@@ -97,7 +97,8 @@ func (r @runtime) evalCall(e @Expr) float64 {
 	} else if e.Op == FN_ATN {
 		return math.Atan(r.evalNum(e.X))
 	} else if e.Op == FN_EXP {
-		return math.Exp(r.evalNum(e.X))
+		var x float64 = r.evalNum(e.X)
+		return r.overflowCheck(math.Exp(x), x, x)
 	} else if e.Op == FN_LOG {
 		var x float64 = r.evalNum(e.X)
 		if x <= 0.0 {

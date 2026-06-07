@@ -30,26 +30,19 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **205** are vendored. The other **3**
-are excluded because minbasic cannot run them deterministically *today*.
+Of the **208** NBS programs (P001..P208), **207** are vendored. The other **1**
+is excluded because minbasic cannot run it deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
 
-### Excluded — deferred feature (3)
+### Excluded — deferred feature (1)
 
 The transcendental functions (SQR/SIN/COS/TAN/ATN/EXP/LOG) and the non-integer
-`^` exponent are now implemented (via `pkg/std/math`, a software/deterministic
-library, so compiled and interpreted agree), and their programs are kept. Three
-remain excluded:
+`^` exponent are implemented (via `pkg/std/math`, a software/deterministic
+library, so compiled and interpreted agree). One program remains excluded:
 
-- **P131** — `RANDOMIZE`: needs an entropy source we have deferred.
-- **P122** (EXP overflow) and **P029** (arithmetic overflow via `^`/`*`) are
-  overflow-*reporting* tests: minbasic supplies machine infinity on overflow (the
-  correct recovery *value*) but does not yet *report* a **computed**
-  arithmetic/function overflow as a nonfatal exception (ECMA-55 8.5/3.5). It does
-  report constant overflow and `TAB(n) < 1`; extending that to computed overflow
-  (and division by zero) is a separate change that would touch every fixture
-  whose output contains `INF`/`NAN`, so it is held for a dedicated pass.
+- **P131** — `RANDOMIZE`: needs an entropy source we have deferred (it would need
+  Binate library support beyond `pkg/std/math`).
 
 ### INPUT programs (all 8 kept)
 
@@ -158,3 +151,13 @@ after the fix:
    recovers to 0. Numeric and string-length checks were already enforced. (DATA
    keeps the lenient scan — program-authored DATA isn't user input. Surfaced by
    P112, now kept.)
+6. **Computed-overflow & division-by-zero reporting.** A computed arithmetic or
+   `EXP` overflow (a finite-operand result reaching machine infinity) and division
+   by zero are nonfatal ECMA-55 exceptions (clause 8.5): each is now reported
+   (`?line N: numeric overflow` / `?line N: division by zero`) and execution
+   continues with machine infinity — division by zero takes the numerator's sign,
+   so `0/0` is `+INF` (it was `NAN`). Propagation of an already-infinite operand
+   is not re-reported. This also corrected P028, whose previously-frozen fixture
+   held a spurious self-`TEST FAILED` caused by the old `0/0 → NAN`. (Surfaced by
+   P028/P122/P029; the new reports also touch P031/P035/P167/P168/P174/P177/P180/
+   P183.)

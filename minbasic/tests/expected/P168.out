@@ -28,4 +28,5 @@ TO PASS THIS TEST:
 
 ABOUT TO EVALUATE Z(9999^9999), WHERE Z(I) = I + 100.
 
+?line 390: numeric overflow
 ?line 390: subscript out of range: Z(9223372036854775807)

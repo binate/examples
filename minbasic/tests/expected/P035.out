@@ -22,6 +22,7 @@ TO PASS THIS TEST:
                BEGIN TEST
 
 ABOUT TO COMPUTE -.01 * (10 ^ 99999)
+?line 250: numeric overflow
 RESULT = -INF 
 
 IF RESULT = (-.01 * MACHINE INFINITY)

@@ -146,31 +146,60 @@ func (r @runtime) evalNum(e @Expr) float64 {
 	return 0.0
 }
 
-// evalBinary evaluates a binary arithmetic expression. For the `^` operator an
-// integer exponent is computed exactly by repeated multiplication (powf); a
-// non-integer exponent is a^b = exp(b*ln a) via math.Pow, except that a negative
-// base with a non-integer exponent is the ECMA-55 fatal exception (clause 8 — the
-// result is not real).
+// evalBinary evaluates a binary arithmetic expression. A computed overflow (a
+// finite-operand result that reaches machine infinity) and division by zero are
+// nonfatal ECMA-55 exceptions (clause 8.5): each is reported and execution
+// continues with machine infinity — division by zero takes the numerator's sign,
+// so 0/0 is +INF. For the `^` operator an integer exponent is computed exactly by
+// repeated multiplication (powf); a non-integer exponent is a^b = exp(b*ln a) via
+// math.Pow, except that a negative base with a non-integer exponent is the
+// ECMA-55 fatal exception (clause 8 — the result is not real).
 func (r @runtime) evalBinary(e @Expr) float64 {
 	var a float64 = r.evalNum(e.X)
 	var b float64 = r.evalNum(e.Y)
 	if e.Op == TOK_PLUS {
-		return a + b
+		return r.overflowCheck(a + b, a, b)
 	} else if e.Op == TOK_MINUS {
-		return a - b
+		return r.overflowCheck(a - b, a, b)
 	} else if e.Op == TOK_STAR {
-		return a * b
+		return r.overflowCheck(a * b, a, b)
 	} else if e.Op == TOK_SLASH {
-		return a / b
+		if b == 0.0 {
+			r.reportNonfatal(buf.CopyStr("division by zero"))
+			return signedInf(a)
+		}
+		return r.overflowCheck(a / b, a, b)
 	}
 	if !integralExponent(b) {
 		if a < 0.0 {
 			r.setFatal(buf.CopyStr("negative number raised to a non-integer power"))
 			return 0.0
 		}
-		return math.Pow(a, b)
+		return r.overflowCheck(math.Pow(a, b), a, b)
 	}
-	return powf(a, b)
+	return r.overflowCheck(powf(a, b), a, b)
+}
+
+// overflowCheck reports a nonfatal arithmetic overflow (ECMA-55 clause 8.5) when
+// an operation on finite operands produces a non-finite (machine-infinity)
+// result, then returns that result — its IEEE sign is the algebraically correct
+// one. A result that is infinite only because an operand was already infinite is
+// propagation, not a new overflow, so it is not reported.
+func (r @runtime) overflowCheck(result float64, a float64, b float64) float64 {
+	if isInfinite(absf(result)) && !isInfinite(absf(a)) && !isInfinite(absf(b)) {
+		r.reportNonfatal(buf.CopyStr("numeric overflow"))
+	}
+	return result
+}
+
+// signedInf returns machine infinity with the sign of x (x >= 0, including +0, ->
+// +INF; x < 0 -> -INF) — the ECMA-55 division-by-zero recovery value (the sign of
+// the numerator).
+func signedInf(x float64) float64 {
+	if x < 0.0 {
+		return math.Inf(-1)
+	}
+	return math.Inf(1)
 }
 
 // integralExponent reports whether the `^` exponent b is an integer value (so
