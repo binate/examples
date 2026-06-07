@@ -22,10 +22,14 @@ fail=0
 for bas in "$SCRIPT_DIR"/nbs/*.BAS; do
     name="$(basename "${bas%.BAS}")"
     want="$SCRIPT_DIR/expected/$name.out"
-    # The interpreter reads any INPUT replies from stdin and a program text from
-    # its file argument, so </dev/null guarantees a deterministic, input-free run.
-    "$BIN" "$bas" </dev/null > "/tmp/nbs_${name}_c.out" 2>&1 || true
-    scripts/run-interpreted.sh minbasic/cmd/run "$bas" </dev/null \
+    # A program that reads INPUT draws its replies from stdin; a matching
+    # input/<name>.in file supplies a canned, deterministic reply stream. Programs
+    # with no INPUT (the common case) have no such file and run on /dev/null. The
+    # program text always comes from the file argument, so stdin is free for INPUT.
+    in="$SCRIPT_DIR/input/$name.in"
+    [ -f "$in" ] || in=/dev/null
+    "$BIN" "$bas" <"$in" > "/tmp/nbs_${name}_c.out" 2>&1 || true
+    scripts/run-interpreted.sh minbasic/cmd/run "$bas" <"$in" \
         > "/tmp/nbs_${name}_i.out" 2>/dev/null || true
     if [ ! -f "$want" ]; then
         echo "FAIL: $name (no fixture tests/expected/$name.out)"

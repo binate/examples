@@ -10,6 +10,9 @@ independent oracle.
 
 - `nbs/` — the vendored `P*.BAS` programs (public domain), the runnable-now subset.
 - `expected/` — `<name>.out`, the frozen expected output (minbasic's own bytes).
+- `input/` — `<name>.in`, the canned stdin reply stream for programs that read
+  `INPUT` (authored to drive a correct, complete run; absent for the common
+  no-`INPUT` case, which runs on `/dev/null`).
 - `run.sh` — the runner; `PROVENANCE.md` — licensing/credit.
 
 ## Running
@@ -27,7 +30,7 @@ nonzero on any failure.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **166** are vendored. The other **42**
+Of the **208** NBS programs (P001..P208), **172** are vendored. The other **36**
 are excluded because minbasic cannot run them deterministically *today*.
 Runnability was determined empirically (running each program through minbasic),
 not guessed. The breakdown:
@@ -48,10 +51,25 @@ SQR-only programs are kept; the other transcendentals await further
   P170 P173 P174 P176 P177 P182
 - `RANDOMIZE`: P131
 
-### Excluded — interactive INPUT (8)
+### Excluded — INPUT programs blocked on a minbasic conformance gap (2)
 
-The program reaches a live `INPUT` and reads stdin (out of scope for this cut):
-P073 P107 P108 P109 P110 P111 P112 P203.
+The other six INPUT programs (P073 P107 P108 P109 P110 P111) are now kept: each
+has a canned `input/<name>.in` reply stream that drives a correct, complete run
+(P107/P108/P109/P110 self-report PASS; P111 exercises the underflow-on-input →
+zero recovery; P073 is OPTION-BASE-1 `DIM A(0)` exploratory output). Two remain
+excluded because they surface a real (firsthand-verified) minbasic conformance
+gap — vendoring them would freeze knowingly-wrong output:
+
+- **P112** — INPUT-reply exception coverage: minbasic's unquoted-datum scanner
+  accepts input-replies ECMA-55 (clause 13) says must raise a nonfatal INPUT
+  exception — e.g. an *empty* unquoted datum between commas (`X,,Y` into
+  `INPUT A$,B$,C$` yields an empty `B$`). The program reports
+  `POSSIBLE TEST FAILURE IN 14 CASE(S)`. (Numeric targets are fine — `1;2` is
+  correctly rejected; the gap is the unquoted/string-datum scanner.)
+- **P203** — PRINT zone/margin: a comma in the *last* print zone must generate a
+  clean end-of-line (clause 14), but minbasic pads the zone with trailing spaces
+  before the newline, so P203 section 203.3's "first vs second" line-pair (case
+  #4) differs by trailing whitespace. The earlier zone-advance cases all match.
 
 (P081, P084, P113 also contain `INPUT` but minbasic rejects them *before* the
 read — deterministic error tests — so they are kept.)
