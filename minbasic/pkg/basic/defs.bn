@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // NUM_DEFS is the size of the user-function table: one slot per letter A..Z, so
 // FNA..FNZ each have a slot (clause 10). Mirrors env's no-hashmap flat idiom.

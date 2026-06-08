@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // The program's load-time array pass runs in two phases (see runProgram):
 // checkOption determines the OPTION BASE lower bound (needed before the variable

@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 import "pkg/std/math"
 
 // FN_* identify the eleven ECMA-55 supplied numeric functions (clause 9). The

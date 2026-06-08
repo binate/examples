@@ -1,7 +1,7 @@
 package "pkg/basic"
 
 import "pkg/basic/io"
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // execInput executes an INPUT statement (ECMA-55 clause 15). It repeatedly emits
 // the prompt, reads one reply line through the runtime's ConsoleIn, and tries to

@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 import "pkg/std/strconv"
 
 // FMT_SIG is the significance-width d: the number of significant decimal digits

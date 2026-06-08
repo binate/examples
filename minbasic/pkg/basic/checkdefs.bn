@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // checkDefs validates every user-function reference in the program against the
 // definitions in ds (ECMA-55 clause 10). For each FN reference it enforces:

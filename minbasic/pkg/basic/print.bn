@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // execPrint executes a PRINT statement: it emits each item (numbers via the
 // ECMA-55 formatter, strings verbatim), applies the separator after each item

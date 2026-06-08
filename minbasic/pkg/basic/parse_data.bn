@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 import "pkg/stdx/slices"
 
 // parseOn parses `ON <numeric-expression> GO TO <line> (, <line>)*` (accepting

@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // parseExpr parses a numeric expression following ECMA-55 clause 8 precedence
 // (highest to lowest): `^`, unary sign, `* /`, `+ -`. The grammar is

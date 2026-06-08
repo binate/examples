@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // execGoto transfers control to the GOTO target line. A target that does not
 // exist in the program is a fatal error (also detected at load, but re-checked

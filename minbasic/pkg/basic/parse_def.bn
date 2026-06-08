@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // parseDef parses a single-line user-function definition (ECMA-55 clause 10):
 //   DEF FN<letter> [ ( <simple-numeric-variable> ) ] = <numeric-expression>

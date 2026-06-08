@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 import "pkg/stdx/slices"
 
 // parseDim parses `DIM <decl> (, <decl>)*` where each decl is `<letter>(<int>)`

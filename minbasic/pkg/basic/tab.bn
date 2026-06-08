@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // floorf returns the largest integer not greater than x, as a float64 — the
 // floor toward −∞ used by the ECMA-55 INT function and the TAB reduction.

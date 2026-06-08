@@ -1,0 +1,134 @@
+package "pkg/buf"
+
+// INITIAL_CAP is the backing capacity allocated by New(). Tuned for short append
+// chains; grow doubles from here as needed.
+const INITIAL_CAP int = 64
+
+// New returns a CharBuf with a freshly allocated INITIAL_CAP backing and Len 0.
+func New() CharBuf {
+	var b CharBuf
+	b.Data = make_slice(char, INITIAL_CAP)
+	b.Len = 0
+	return b
+}
+
+// grow ensures room for `needed` more bytes, doubling capacity as needed. It
+// returns the updated CharBuf (with a new Data allocation when the old one was
+// too small; prior subslices of the old backing remain valid via refcount).
+func grow(b CharBuf, needed int) CharBuf {
+	var cap int = len(b.Data)
+	if b.Len + needed <= cap {
+		return b
+	}
+	var newCap int = cap
+	if newCap == 0 {
+		newCap = INITIAL_CAP
+	}
+	for newCap < b.Len + needed {
+		newCap = newCap * 2
+	}
+	var newData @[]char = make_slice(char, newCap)
+	for i := 0; i < b.Len; i++ {
+		newData[i] = b.Data[i]
+	}
+	b.Data = newData
+	return b
+}
+
+// WriteByte appends a single character to b, growing the backing if needed.
+func (b CharBuf) WriteByte(c char) CharBuf {
+	b = grow(b, 1)
+	b.Data[b.Len] = c
+	b.Len = b.Len + 1
+	return b
+}
+
+// WriteStr appends every byte of s to b.
+func (b CharBuf) WriteStr(s *[]readonly char) CharBuf {
+	var n int = len(s)
+	b = grow(b, n)
+	for i := 0; i < n; i++ {
+		b.Data[b.Len + i] = s[i]
+	}
+	b.Len = b.Len + n
+	return b
+}
+
+// WriteInt appends the decimal representation of n (with a leading '-' if
+// negative). The magnitude is computed via two's-complement uint64 so the
+// int-minimum boundary stringifies correctly (`0 - n` would overflow there).
+func (b CharBuf) WriteInt(n int) CharBuf {
+	if n == 0 {
+		return b.WriteByte('0')
+	}
+	var neg bool = false
+	var mag uint64 = 0
+	if n < 0 {
+		neg = true
+		mag = cast(uint64, 0) - cast(uint64, n)
+	} else {
+		mag = cast(uint64, n)
+	}
+	var digits [20]char
+	var count int = 0
+	for mag > cast(uint64, 0) {
+		digits[count] = cast(char,
+			cast(int, mag % cast(uint64, 10)) + cast(int, '0'))
+		mag = mag / cast(uint64, 10)
+		count = count + 1
+	}
+	if neg {
+		b = b.WriteByte('-')
+	}
+	for i := count - 1; i >= 0; i-- {
+		b = b.WriteByte(digits[i])
+	}
+	return b
+}
+
+// Bytes returns the written portion as a managed subslice of the backing. The
+// result shares storage with the buffer: a later write that triggers grow() does
+// not invalidate it (grow allocates fresh backing, keeping the old one alive via
+// refcount) but the result will not see writes made after this call.
+func (b CharBuf) Bytes() @[]char {
+	if b.Len < len(b.Data) {
+		return b.Data[0:b.Len]
+	}
+	return b.Data
+}
+
+// Freeze copies the written bytes into a new, exactly-sized managed slice that is
+// independent of the buffer's backing.
+func (b CharBuf) Freeze() @[]char {
+	var n int = b.Len
+	var result @[]char = make_slice(char, n)
+	var raw @[]char = b.Bytes()
+	for i := 0; i < n; i++ {
+		result[i] = raw[i]
+	}
+	return result
+}
+
+// CopyStr copies a raw slice into a new managed slice independent of the input.
+func CopyStr(s *[]readonly char) @[]char {
+	var n int = len(s)
+	var result @[]char = make_slice(char, n)
+	for i := 0; i < n; i++ {
+		result[i] = s[i]
+	}
+	return result
+}
+
+// Concat returns a fresh managed-slice containing a followed by b.
+func Concat(a *[]readonly char, b *[]readonly char) @[]char {
+	var lenA int = len(a)
+	var lenB int = len(b)
+	var s @[]char = make_slice(char, lenA + lenB)
+	for i := 0; i < lenA; i++ {
+		s[i] = a[i]
+	}
+	for i := 0; i < lenB; i++ {
+		s[lenA + i] = b[i]
+	}
+	return s
+}

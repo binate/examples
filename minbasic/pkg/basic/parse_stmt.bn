@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // parseGoto parses the single-word `GOTO <line>`. The target is a line-number
 // reference, which the runtime resolves against the program's line table (a

@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // powf computes a raised to the integer power b for the BASIC `^` operator.
 // ECMA-55 defines 0^0 = 1. The exponent is an integer value (the caller,

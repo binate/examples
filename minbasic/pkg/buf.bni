@@ -1,0 +1,49 @@
+// Package buf provides CharBuf, a small growable character buffer for building
+// strings incrementally, plus the CopyStr/Concat one-shot helpers. It is
+// minbasic's OWN self-contained utility, so the example depends only on its own
+// code and the public stdlib — not on any binate compiler-internal package. The
+// API is deliberately minimal (just what minbasic uses); a general,
+// carefully-designed string buffer belongs in the standard library, not here.
+//
+// CharBuf is a VALUE type: every Write returns the updated buffer, so chain the
+// calls or assign back — `b = b.WriteByte('x')`.
+package "pkg/buf"
+
+// CharBuf is a growable character buffer. Data is the backing managed-slice; Len
+// is how many bytes have been written (Len <= len(Data); the remainder is spare
+// capacity for growth).
+type CharBuf struct {
+	Data @[]char
+	Len  int
+}
+
+// New returns an empty CharBuf with a small initial backing capacity.
+func New() CharBuf
+
+// WriteByte appends a single character, growing the backing if needed. Returns
+// the (possibly grown) buffer — assign it back: `b = b.WriteByte('x')`.
+func (b CharBuf) WriteByte(c char) CharBuf
+
+// WriteStr appends every byte of the raw slice s. Returns the (possibly grown)
+// buffer.
+func (b CharBuf) WriteStr(s *[]readonly char) CharBuf
+
+// WriteInt appends the decimal text of n (a leading '-' if negative). Returns
+// the (possibly grown) buffer.
+func (b CharBuf) WriteInt(n int) CharBuf
+
+// Bytes returns the written portion as a managed subslice that shares the
+// backing — valid while the buffer lives, but a later write that grows the
+// backing will not be reflected. Use Freeze for an independent copy.
+func (b CharBuf) Bytes() @[]char
+
+// Freeze copies the written bytes into a new, exactly-sized managed slice that is
+// independent of the buffer's backing.
+func (b CharBuf) Freeze() @[]char
+
+// CopyStr returns a fresh managed-slice copy of the raw slice s, independent of
+// the input (safe to store in a data structure).
+func CopyStr(s *[]readonly char) @[]char
+
+// Concat returns a fresh managed-slice containing a followed by b.
+func Concat(a *[]readonly char, b *[]readonly char) @[]char

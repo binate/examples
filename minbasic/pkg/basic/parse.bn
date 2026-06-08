@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 import "pkg/std/errors"
 import "pkg/std/strconv"
 import "pkg/stdx/slices"

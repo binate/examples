@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // gosubStack is the GOSUB return stack (ECMA-55 clause 12): each entry is the
 // program index to resume at when the matching RETURN runs — the line AFTER the

@@ -1,7 +1,7 @@
 package "pkg/basic"
 
 import "pkg/basic/io"
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // runImmediate parses and executes one direct (un-numbered) BASIC statement
 // against the persistent session state. LET, PRINT, and INPUT — the statements

@@ -1,7 +1,7 @@
 package "pkg/basic"
 
 import "pkg/basic/io"
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // basicSession is the embeddable BASIC REPL engine: it implements ReplSession,
 // driving the shared lexer/parser/evaluator from a persistent, mutable session

@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // lexer holds the per-line scan state: the source line being tokenized and the
 // current read position within it. A fresh lexer is made for each program line.

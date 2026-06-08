@@ -1,8 +1,8 @@
 package "pkg/host"
 
 import "pkg/basic/io"
-import "pkg/binate/buf"
 import "pkg/bootstrap"
+import "pkg/buf"
 
 // bootstrapConsole writes through bootstrap.Write to a fixed file descriptor.
 // This is the only type in minbasic that depends on pkg/bootstrap.

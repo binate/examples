@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // dispatchLine routes one input line. A line whose first non-blank character is
 // a digit edits the stored program (editLine); a blank line is ignored;

@@ -1,6 +1,6 @@
 package "pkg/basic"
 
-import "pkg/binate/buf"
+import "pkg/buf"
 
 // parseRelational parses a relational expression — the test of an IF…THEN. The
 // operand type is chosen from the first token: a string variable or constant
