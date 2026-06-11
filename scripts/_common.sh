@@ -25,7 +25,12 @@ parse_cmd_path() {
 set_paths() {
     _root="$REPO_DIR/$1"
     _lib="$2"
-    I="$_root:$_lib:$_lib/ifaces/core:$_lib/ifaces/stdlib"
-    L="$_root:$_lib:$_lib/impls/core/common:$_lib/impls/core/libc:$_lib/impls/stdlib/common"
-    RT="$_lib/runtime/binate_runtime.c"
+    # binate-paths (shipped in the bundle's bin/, the sibling of lib/) is the
+    # single source of truth for the package search-path formula documented in
+    # BUNDLE-HOWTO.md.  --prepend puts the example dir ahead of the bundle's
+    # stdlib/runtime roots; --base points it at the bundle's lib/.
+    _bp="$(dirname "$_lib")/bin/binate-paths"
+    I="$("$_bp" --iface --base "$_lib" --prepend "$_root")"
+    L="$("$_bp" --impl --base "$_lib" --prepend "$_root")"
+    RT="$("$_bp" --runtime --base "$_lib")"
 }
