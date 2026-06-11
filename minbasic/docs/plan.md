@@ -28,7 +28,7 @@ building (so it never reddens the repo's `build-all`).
   impl — imports `pkg/bootstrap`. That isolation is the point: when
   `pkg/bootstrap` is eventually removed/renamed, only that one file changes.
 - **Builds against the released bundle only** (`BUILDER_VERSION`, currently
-  `bnc-0.0.7`) — no Binate source checkout. Must run **both compiled (`bnc`) and
+  `bnc-0.0.8`) — no Binate source checkout. Must run **both compiled (`bnc`) and
   interpreted (`bni`)**, byte-for-byte identical, like every other example here.
 
 ## 2. Feasibility — what's been verified (not assumed)
@@ -207,9 +207,10 @@ transcendental/RND-battery NBS tests once `pkg/std/math` lands; two ECMA-55
 nonfatal-recovery gaps surfaced by the suite (TAB(n<1) and numeric-constant
 overflow — minbasic currently treats both as fatal); and restoring the `@func`
 REPL sinks (M3 ships a marked `*func` temp, tracked in `TODO.md` +
-`explorations/claude-todo.md`) once the destructor defect is fixed. minbasic needs a main toolchain (interface-vtable + IR-gen-OOM fixes, both
-in main, not the pinned `bnc-0.0.7`) — build against a main bundle via
-`BINATE_BUNDLE`.
+`explorations/claude-todo.md`) once the destructor defect is fixed. The
+interface-vtable + IR-gen-OOM fixes minbasic needs shipped in `bnc-0.0.8`, so it
+builds + runs against the pinned release (no `main`-built `BINATE_BUNDLE`
+required); the full `tests/run.sh` suite passes on `bnc-0.0.8`.
 
 - **M0 — skeleton + wiring.** Create `pkg/io`, the core package shell, and a
   trivial `cmd/run` that builds and prints a banner; confirm it builds compiled +

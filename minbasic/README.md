@@ -10,20 +10,28 @@ slices, refcounting, errors-as-values).
 for the architecture, milestones, and open decisions, and
 [`docs/ecma55-notes.md`](docs/ecma55-notes.md) for the language digest.
 
-## Run (M0 skeleton)
+## Run
 
 minbasic injects an `io.ConsoleOut` into the engine — the core never touches an
-fd. That needs a toolchain with the interface-vtable fix, which is in binate
-`main` but not in the pinned `bnc-0.0.7` release yet, so build against a
-`main`-built bundle (`BINATE_BUNDLE`, see the repo README):
+fd. Build it against the pinned release bundle (`BUILDER_VERSION`), then run a
+BASIC program through it:
 
 ```sh
-BINATE_BUNDLE=/path/to/main/bundle ./scripts/run-compiled.sh    minbasic/cmd/run
-BINATE_BUNDLE=/path/to/main/bundle ./scripts/run-interpreted.sh minbasic/cmd/run
-# -> minbasic - ECMA-55 Minimal BASIC (skeleton)
+./scripts/build-compiled.sh minbasic/cmd/run
+out/minbasic/run minbasic/programs/integers.bas
+#  1  2
+#  1              2
+#  10  20  30
+#  42
+# -5
 ```
 
-> **Toolchain note.** On the pinned `bnc-0.0.7` the example *compiles* (CI stays
-> green) but produces wrong output at runtime: an interface method taking a
-> 2-word slice argument miscompiles in that release. It's fixed in `main`, so run
-> against a `main` bundle until the pin is bumped to a release carrying the fix.
+It also runs interpreted (`./scripts/run-interpreted.sh minbasic/cmd/run`), and
+`minbasic/tests/run.sh` checks every program in `programs/` against an expected
+fixture (compiled == interpreted == fixture).
+
+> **Toolchain note.** The interface-vtable fix that minbasic's
+> dependency-injected `io.ConsoleOut` relies on (an interface method taking a
+> 2-word slice argument was miscompiled in `bnc-0.0.7`) shipped in `bnc-0.0.8`,
+> so the example now runs correctly against the pinned release — no `main`-built
+> `BINATE_BUNDLE` required.
