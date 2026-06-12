@@ -1,5 +1,7 @@
 # Binate examples
 
+[![CI](https://github.com/binate/examples/actions/workflows/ci.yml/badge.svg)](https://github.com/binate/examples/actions/workflows/ci.yml)
+
 Example programs for the [Binate](https://github.com/binate) programming
 language and toolchain.
 
@@ -59,6 +61,25 @@ Compiled binaries land under `out/<example>/<sub>` (gitignored).
 ./scripts/run-interpreted.sh hello/cmd/hello     # same, through the VM
 ```
 
+## Tests
+
+Examples can carry **unit tests** — `*_test.bn` files next to the code, with
+`func TestXxx() testing.TestResult` functions (return `""` to pass, a message to
+fail; `import "pkg/builtins/testing"`). They run through the toolchain's own test
+support, in either mode:
+
+```
+scripts/run-tests-compiled.sh    <example>/<pkg>   bnc --test (compile + run)
+scripts/run-tests-interpreted.sh <example>/<pkg>   bni --test (bytecode VM)
+scripts/test-all.sh [compiled|interpreted|both]    run every *_test.bn package (CI)
+```
+
+The package argument is `<example>/<import-path>` (e.g. `minbasic/pkg/buf`).
+
+An example can also carry **end-to-end suites** — any executable `run.sh` under
+the example directory (e.g. `minbasic/tests/run.sh`, `minbasic/sessions/run.sh`).
+`scripts/e2e-all.sh` discovers and runs them all (also in CI).
+
 ## Examples
 
 Each example directory has its own `README.md` with run commands and expected
@@ -73,5 +94,5 @@ output.
   `pkg/host`) with `.bni` interface files and dependency-injected I/O. It carries
   its own program/REPL test suites (`minbasic/tests/`, `minbasic/sessions/`).
 
-See [`TODO.md`](TODO.md) for planned work (test scripts, a canary CI run against
-the latest release).
+See [`TODO.md`](TODO.md) for planned work (a canary CI run against the latest
+release, the unit-test coverage sweep).

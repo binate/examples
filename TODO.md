@@ -1,10 +1,11 @@
 # examples — TODO
 
-- **Tests.** Support `*_test.bn` in examples (not required per example).
-  Decide whether to run tests via `bni --test`, `bnc --test`, or both,
-  and add the scripts — strawman: `build-tests-compiled.sh`,
-  `run-tests-compiled.sh`, `run-tests-interpreted.sh`. Settle once we
-  have an example that actually carries tests.
+- **Unit-test coverage sweep.** The `*_test.bn` runner is in place
+  (`run-tests-compiled.sh` / `run-tests-interpreted.sh` / `test-all.sh`,
+  both `bnc --test` and `bni --test`, wired into CI) and `minbasic/pkg/buf`
+  is covered. Progressively add unit tests for the rest of minbasic
+  (lexer, parser, value/format, tab, env, …) and any future example,
+  refactoring for testability where it helps.
 
 - **Canary CI against the latest release.** Add a CI job that builds
   every `*/cmd/*` with `BUILDER_VERSION=latest`, separate from the pinned
