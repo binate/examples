@@ -1,0 +1,144 @@
+package "pkg/basic"
+
+import "pkg/buf"
+import "pkg/builtins/testing"
+import "pkg/std/math"
+
+// fmtCheck returns "" when formatNumber(n) equals want, else a message that
+// includes the actual bytes, so a wrong expectation shows up in the failure.
+func fmtCheck(n float64, want *[]readonly char) testing.TestResult {
+	var got @[]char = formatNumber(n)
+	if charsEq(got, want) {
+		return ""
+	}
+	return buf.Concat("formatNumber wrong; got: ", got)
+}
+
+// Every rendering carries a leading sign char (space for >= 0, '-' for < 0) and
+// a single trailing space (ECMA-55 clause 14, significance-width d = 6).
+
+func TestFormatIntegers() testing.TestResult {
+	var r testing.TestResult
+	r = fmtCheck(0.0, " 0 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(1.0, " 1 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(42.0, " 42 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(100.0, " 100 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(-5.0, "-5 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(-100.0, "-100 ")
+	if len(r) > 0 {
+		return r
+	}
+	return ""
+}
+
+// TestFormatDecimals covers the plain-decimal form, including the magnitude < 1
+// case that prints like ".5" with no digit left of the point.
+func TestFormatDecimals() testing.TestResult {
+	var r testing.TestResult
+	r = fmtCheck(0.5, " .5 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(-0.5, "-.5 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(1.5, " 1.5 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(3.25, " 3.25 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(0.25, " .25 ")
+	if len(r) > 0 {
+		return r
+	}
+	return ""
+}
+
+// TestFormatScaled covers the E-notation form chosen when the exponent leaves
+// the [-d, d) window; a significand of exactly 1 prints as "1.".
+func TestFormatScaled() testing.TestResult {
+	var r testing.TestResult
+	r = fmtCheck(10000000.0, " 1.E+7 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(15000000000.0, " 1.5E+10 ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(0.0000001, " 1.E-7 ")
+	if len(r) > 0 {
+		return r
+	}
+	return ""
+}
+
+// TestFormatInfNaN covers the overflow-recovery values: machine infinity prints
+// as "INF" (with the sign char) and an undefined result as " NAN ".
+func TestFormatInfNaN() testing.TestResult {
+	var r testing.TestResult
+	r = fmtCheck(math.Inf(1), " INF ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(math.Inf(-1), "-INF ")
+	if len(r) > 0 {
+		return r
+	}
+	r = fmtCheck(math.NaN(), " NAN ")
+	if len(r) > 0 {
+		return r
+	}
+	return ""
+}
+
+func TestIsInfinite() testing.TestResult {
+	if !isInfinite(math.Inf(1)) {
+		return "isInfinite(+Inf) should be true"
+	}
+	if isInfinite(0.0) {
+		return "isInfinite(0) should be false"
+	}
+	if isInfinite(1.0) {
+		return "isInfinite(1) should be false"
+	}
+	if isInfinite(math.NaN()) {
+		return "isInfinite(NaN) should be false"
+	}
+	return ""
+}
+
+func TestIsNaN() testing.TestResult {
+	if !isNaN(math.NaN()) {
+		return "isNaN(NaN) should be true"
+	}
+	if isNaN(0.0) {
+		return "isNaN(0) should be false"
+	}
+	if isNaN(1.0) {
+		return "isNaN(1) should be false"
+	}
+	if isNaN(math.Inf(1)) {
+		return "isNaN(+Inf) should be false"
+	}
+	return ""
+}
