@@ -1,0 +1,180 @@
+package "pkg/basic"
+
+import "pkg/buf"
+import "pkg/builtins/testing"
+
+// These tests run whole programs through parseProgram + runProgramInto and assert
+// the resulting variable store and/or the captured output. Programs with no PRINT
+// produce no output, so an empty capture also confirms no diagnostic was emitted.
+
+func TestExecLetArithmetic() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 LET A = 2 + 3 * 4\n20 END\n")
+	if len(out) != 0 {
+		return "a program with no PRINT should produce no output"
+	}
+	if e.getNum("A") != 14.0 {
+		return "A should be 2 + 3*4 = 14"
+	}
+	return ""
+}
+
+func TestExecGotoSkips() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 GOTO 40\n20 LET B = 9\n40 LET A = 1\n50 END\n")
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("A") != 1.0 {
+		return "line 40 should run -> A = 1"
+	}
+	if e.getNum("B") != 0.0 {
+		return "line 20 should be skipped -> B = 0"
+	}
+	return ""
+}
+
+func TestExecIf() testing.TestResult {
+	var taken @[]char = buf.Concat("10 LET A = 5\n20 IF A > 3 THEN 50\n30 LET R = 2\n",
+		"40 GOTO 60\n50 LET R = 1\n60 END\n")
+	var skipped @[]char = buf.Concat("10 LET A = 1\n20 IF A > 3 THEN 50\n30 LET R = 2\n",
+		"40 GOTO 60\n50 LET R = 1\n60 END\n")
+	var out @[]char
+	var e @env
+	out, e = runProg(taken)
+	if e.getNum("R") != 1.0 {
+		return "A > 3 true -> jump -> R = 1"
+	}
+	out, e = runProg(skipped)
+	if e.getNum("R") != 2.0 {
+		return "A > 3 false -> fall through -> R = 2"
+	}
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	return ""
+}
+
+func TestExecForNext() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 LET S = 0\n20 FOR I = 1 TO 5\n30 LET S = S + I\n40 NEXT I\n50 END\n")
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("S") != 15.0 {
+		return "sum 1..5 should be 15"
+	}
+	return ""
+}
+
+func TestExecForStep() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 LET S = 0\n20 FOR I = 0 TO 10 STEP 2\n30 LET S = S + I\n40 NEXT I\n50 END\n")
+	if e.getNum("S") != 30.0 {
+		return "sum of 0,2,4,6,8,10 should be 30"
+	}
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	return ""
+}
+
+func TestExecGosubReturn() testing.TestResult {
+	var src @[]char = buf.Concat("10 LET A = 1\n20 GOSUB 100\n30 LET C = 3\n40 GOTO 200\n",
+		"100 LET B = 2\n110 RETURN\n200 END\n")
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("A") != 1.0 || e.getNum("B") != 2.0 || e.getNum("C") != 3.0 {
+		return "GOSUB should run the subroutine and RETURN to line 30"
+	}
+	return ""
+}
+
+func TestExecOnGoto() testing.TestResult {
+	var src @[]char = buf.Concat(buf.Concat(
+		"10 LET N = 2\n20 ON N GOTO 100,200,300\n",
+		"100 LET R = 1\n110 GOTO 900\n200 LET R = 2\n"),
+		"210 GOTO 900\n300 LET R = 3\n900 END\n")
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("R") != 2.0 {
+		return "ON 2 GOTO should select the 2nd target -> R = 2"
+	}
+	return ""
+}
+
+func TestExecArrayElement() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 LET A(2) = 7\n20 LET X = A(2)\n30 END\n")
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("X") != 7.0 {
+		return "A(2) should store and read back 7"
+	}
+	return ""
+}
+
+// TestExecPrintNumber pins PRINT's numeric layout: the formatted number (sign
+// space + digits + trailing space) followed by an end-of-line.
+func TestExecPrintNumber() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 PRINT 5\n20 END\n")
+	if !charsEq(out, " 5 \n") {
+		return "PRINT 5 should emit \" 5 \\n\""
+	}
+	if e.getNum("Z") != 0.0 {
+		return "PRINT must not disturb storage"
+	}
+	return ""
+}
+
+func TestExecPrintString() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 PRINT \"HELLO\"\n20 END\n")
+	if !charsEq(out, "HELLO\n") {
+		return "PRINT of a string should emit it verbatim then a newline"
+	}
+	return ""
+}
+
+// TestExecPrintSemicolon pins that ';' abuts items (each number keeps its own
+// surrounding spaces) and a trailing ';' suppresses the end-of-line.
+func TestExecPrintSemicolon() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 PRINT 1;2;3\n20 END\n")
+	if !charsEq(out, " 1  2  3 \n") {
+		return "PRINT 1;2;3 should abut the formatted numbers"
+	}
+	out, e = runProg("10 PRINT 5;\n20 END\n")
+	if !charsEq(out, " 5 ") {
+		return "a trailing ';' should suppress the end-of-line"
+	}
+	return ""
+}
+
+func TestExecPrintEmpty() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 PRINT\n20 END\n")
+	if !charsEq(out, "\n") {
+		return "an empty PRINT should emit a blank line"
+	}
+	return ""
+}

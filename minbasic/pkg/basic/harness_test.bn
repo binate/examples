@@ -68,3 +68,23 @@ func newEvalRT() @runtime {
 	cap.b = buf.New()
 	return buildRT(cap)
 }
+
+// runProg parses and runs the full program src, returning the captured output
+// (program PRINT output plus any diagnostics) and the resulting variable store —
+// the harness for executor tests.
+func runProg(src @[]char) (@[]char, @env) {
+	var cap @captureOut = make(captureOut)
+	cap.b = buf.New()
+	var out @io.ConsoleOut = cap
+	var inp @io.ConsoleIn = newNullIn()
+	var prog @[]@Line
+	var perr @[]char
+	var ok bool
+	prog, perr, ok = parseProgram(src)
+	if !ok {
+		emitDiag(out, perr)
+		return cap.text(), newEnv(0)
+	}
+	var e @env = runProgramInto(prog, out, out, inp)
+	return cap.text(), e
+}
