@@ -1,8 +1,9 @@
 # Sourced by the build/run scripts (not run directly). The sourcing
 # script must set SCRIPT_DIR (its own scripts/ directory) first.
 #
-# Provides REPO_DIR and two helpers:
+# Provides REPO_DIR and three helpers:
 #   parse_cmd_path <example>/cmd/<sub>  -> EXAMPLE SUB CMDDIR OUT
+#   parse_pkg_path <example>/<pkg-path> -> EXAMPLE PKG PKGDIR
 #   set_paths      <example> <lib>      -> I L RT  (search paths rooted at the example)
 
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -18,6 +19,23 @@ parse_cmd_path() {
     CMDDIR="$REPO_DIR/$_cmd"
     OUT="$REPO_DIR/out/$EXAMPLE/$SUB"
     [ -d "$CMDDIR" ] || { echo "no such example directory: $_cmd" >&2; exit 2; }
+}
+
+# Split a test-package path (e.g. minbasic/pkg/buf) into the example root and the
+# import path that `bnc --test` / `bni --test` resolve. The example directory is
+# the package search root (prepended by set_paths), so EXAMPLE is the first path
+# component and PKG is the remainder — the import path as written in source
+# (`import "pkg/buf"`). A `cmd/<sub>` package works too (PKG = cmd/<sub>).
+parse_pkg_path() {
+    _pkg="${1%/}"
+    case "$_pkg" in
+        */*) ;;
+        *) echo "expected an <example>/<pkg-path> path, got: $1" >&2; exit 2 ;;
+    esac
+    EXAMPLE="${_pkg%%/*}"
+    PKG="${_pkg#*/}"
+    PKGDIR="$REPO_DIR/$_pkg"
+    [ -d "$PKGDIR" ] || { echo "no such package directory: $_pkg" >&2; exit 2; }
 }
 
 # Each example is its own package search root, prepended ahead of the
