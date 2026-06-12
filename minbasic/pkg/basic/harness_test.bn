@@ -147,3 +147,41 @@ func runProgInput(src @[]char, replies @[]@[]char) (@[]char, @env) {
 	var inp @io.ConsoleIn = s
 	return runWithIn(src, inp)
 }
+
+// noopWrite is a ReplIO channel that discards framing output (a non-capturing
+// function value, like cmd/basic's frameOut).
+func noopWrite(s *[]readonly char) int {
+	return len(s)
+}
+
+// newSession builds a REPL session whose framing (banner/prompts/LIST/diagnostics)
+// is discarded and whose BASIC program output is captured, with no INPUT replies.
+// Returns the session and the program-output capture.
+func newSession() (@ReplSession, @captureOut) {
+	var rio ReplIO
+	rio.WriteOut = noopWrite
+	rio.WriteErr = noopWrite
+	var cap @captureOut = make(captureOut)
+	cap.b = buf.New()
+	var out @io.ConsoleOut = cap
+	var inp @io.ConsoleIn = newNullIn()
+	var sess @ReplSession
+	var errs @[]ReplError
+	sess, errs = NewSession(rio, out, inp)
+	return sess, cap
+}
+
+// u8 copies a char slice into a uint8 slice (the same bytes) for Step's raw input
+// view.
+func u8(line @[]char) @[]uint8 {
+	var out @[]uint8 = make_slice(uint8, len(line))
+	for i := 0; i < len(line); i++ {
+		out[i] = cast(uint8, line[i])
+	}
+	return out
+}
+
+// feed runs one input line through the session.
+func feed(sess @ReplSession, line @[]char) {
+	sess.Step(u8(line), false)
+}

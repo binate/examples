@@ -1,0 +1,145 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+func TestImmediateAllowed() testing.TestResult {
+	if !immediateAllowed(ST_LET) || !immediateAllowed(ST_PRINT) {
+		return "LET and PRINT are allowed in immediate mode"
+	}
+	if !immediateAllowed(ST_INPUT) || !immediateAllowed(ST_REM) {
+		return "INPUT and REM are allowed in immediate mode"
+	}
+	if immediateAllowed(ST_GOTO) || immediateAllowed(ST_FOR) || immediateAllowed(ST_DIM) {
+		return "control/declaration statements are not allowed in immediate mode"
+	}
+	return ""
+}
+
+func TestSkipBlank() testing.TestResult {
+	if skipBlank("  X", 0) != 2 {
+		return "skipBlank should skip leading spaces"
+	}
+	if skipBlank("X", 0) != 0 {
+		return "skipBlank with no leading blank should be 0"
+	}
+	if skipBlank("   ", 0) != 3 {
+		return "an all-blank string should skip to the end"
+	}
+	return ""
+}
+
+func TestTrimSpaces() testing.TestResult {
+	if !charsEq(trimSpaces("  hi  "), "hi") {
+		return "trimSpaces should remove surrounding blanks"
+	}
+	if !charsEq(trimSpaces("RUN"), "RUN") {
+		return "trimSpaces of a bare word is unchanged"
+	}
+	if len(trimSpaces("   ")) != 0 {
+		return "trimSpaces of all blanks is empty"
+	}
+	return ""
+}
+
+func TestCharsEqFold() testing.TestResult {
+	if !charsEqFold("run", "RUN") {
+		return "run should fold-match RUN"
+	}
+	if !charsEqFold("Run", "RUN") {
+		return "Run should fold-match RUN"
+	}
+	if charsEqFold("list", "RUN") {
+		return "list should not match RUN"
+	}
+	if charsEqFold("ru", "RUN") {
+		return "different lengths should not match"
+	}
+	return ""
+}
+
+func TestSessionImmediatePrint() testing.TestResult {
+	var sess @ReplSession
+	var cap @captureOut
+	sess, cap = newSession()
+	feed(sess, "PRINT 5")
+	if !charsEq(cap.text(), " 5 \n") {
+		return "an immediate PRINT should emit through the program output sink"
+	}
+	return ""
+}
+
+// TestSessionImmediateLetPersists checks the persistent session state: an
+// immediate LET is visible to a later immediate PRINT.
+func TestSessionImmediateLetPersists() testing.TestResult {
+	var sess @ReplSession
+	var cap @captureOut
+	sess, cap = newSession()
+	feed(sess, "LET A = 5")
+	feed(sess, "PRINT A")
+	if !charsEq(cap.text(), " 5 \n") {
+		return "an immediate LET should persist for a later PRINT"
+	}
+	return ""
+}
+
+// TestSessionProgramEditAndRun checks numbered lines are stored and RUN executes
+// them.
+func TestSessionProgramEditAndRun() testing.TestResult {
+	var sess @ReplSession
+	var cap @captureOut
+	sess, cap = newSession()
+	feed(sess, "10 PRINT 42")
+	feed(sess, "20 END")
+	feed(sess, "RUN")
+	if !charsEq(cap.text(), " 42 \n") {
+		return "RUN should execute the stored program"
+	}
+	return ""
+}
+
+// TestSessionEditDelete checks a bare line number deletes that stored line.
+func TestSessionEditDelete() testing.TestResult {
+	var sess @ReplSession
+	var cap @captureOut
+	sess, cap = newSession()
+	feed(sess, "10 PRINT 1")
+	feed(sess, "15 PRINT 2")
+	feed(sess, "20 END")
+	feed(sess, "15")
+	feed(sess, "RUN")
+	if !charsEq(cap.text(), " 1 \n") {
+		return "deleting line 15 should leave only PRINT 1 to run"
+	}
+	return ""
+}
+
+// TestSessionNewClears checks NEW empties the stored program.
+func TestSessionNewClears() testing.TestResult {
+	var sess @ReplSession
+	var cap @captureOut
+	sess, cap = newSession()
+	feed(sess, "10 PRINT 1")
+	feed(sess, "20 END")
+	feed(sess, "NEW")
+	feed(sess, "RUN")
+	if len(cap.text()) != 0 {
+		return "NEW should clear the program so RUN produces nothing"
+	}
+	return ""
+}
+
+// TestSessionRunRetainsState checks RUN's final variable state is retained for a
+// later immediate PRINT.
+func TestSessionRunRetainsState() testing.TestResult {
+	var sess @ReplSession
+	var cap @captureOut
+	sess, cap = newSession()
+	feed(sess, "10 LET A = 7")
+	feed(sess, "20 END")
+	feed(sess, "RUN")
+	feed(sess, "PRINT A")
+	if !charsEq(cap.text(), " 7 \n") {
+		return "RUN should retain its final variable state for a later PRINT"
+	}
+	return ""
+}
