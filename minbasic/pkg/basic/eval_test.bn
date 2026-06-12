@@ -1,0 +1,174 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// evalSrc parses src as a numeric expression and evaluates it in r.
+func evalSrc(r @runtime, src @[]char) float64 {
+	var p @parser = newParser(src)
+	return r.evalNum(p.parseExpr())
+}
+
+// relOf parses src as a relational expression (an IF test).
+func relOf(src @[]char) @Rel {
+	var p @parser = newParser(src)
+	return p.parseRelational()
+}
+
+func TestEvalArithmetic() testing.TestResult {
+	var r @runtime = newEvalRT()
+	if evalSrc(r, "1+2*3") != 7.0 {
+		return "1+2*3 should be 7"
+	}
+	if evalSrc(r, "(1+2)*3") != 9.0 {
+		return "(1+2)*3 should be 9"
+	}
+	if evalSrc(r, "10-2-3") != 5.0 {
+		return "10-2-3 should be 5 (left associative)"
+	}
+	if evalSrc(r, "12/4/3") != 1.0 {
+		return "12/4/3 should be 1"
+	}
+	if evalSrc(r, "-2^2") != -4.0 {
+		return "-2^2 should be -4 (= -(2^2))"
+	}
+	return ""
+}
+
+// TestEvalPower pins the `^` operator, including ECMA-55's left-associativity
+// and 0^0 == 1.
+func TestEvalPower() testing.TestResult {
+	var r @runtime = newEvalRT()
+	if evalSrc(r, "2^3") != 8.0 {
+		return "2^3 should be 8"
+	}
+	if evalSrc(r, "2^3^2") != 64.0 {
+		return "2^3^2 = (2^3)^2 = 64 (left associative)"
+	}
+	if evalSrc(r, "2^0") != 1.0 {
+		return "2^0 should be 1"
+	}
+	if evalSrc(r, "0^0") != 1.0 {
+		return "0^0 should be 1 (ECMA-55)"
+	}
+	if evalSrc(r, "2^(-1)") != 0.5 {
+		return "2^(-1) should be 0.5"
+	}
+	return ""
+}
+
+func TestEvalVariables() testing.TestResult {
+	var r @runtime = newEvalRT()
+	r.env.setNum("A", 5.0)
+	r.env.setNum("B", 3.0)
+	if evalSrc(r, "A+B") != 8.0 {
+		return "A+B should be 8"
+	}
+	if evalSrc(r, "A*B-1") != 14.0 {
+		return "A*B-1 should be 14"
+	}
+	if evalSrc(r, "C") != 0.0 {
+		return "an unset variable should read 0"
+	}
+	return ""
+}
+
+// TestEvalDivisionByZero pins the ECMA-55 nonfatal recovery: the result is signed
+// machine infinity (the numerator's sign) and the run is NOT fatal.
+func TestEvalDivisionByZero() testing.TestResult {
+	var r @runtime = newEvalRT()
+	var v float64 = evalSrc(r, "1/0")
+	if !isInfinite(absf(v)) || v < 0.0 {
+		return "1/0 should recover to +INF"
+	}
+	if r.fatal {
+		return "division by zero is nonfatal, not fatal"
+	}
+	var w float64 = evalSrc(r, "-1/0")
+	if !isInfinite(absf(w)) || w > 0.0 {
+		return "-1/0 should recover to -INF"
+	}
+	return ""
+}
+
+// TestEvalNegativeBaseNonIntegerPower pins the ECMA-55 fatal case (clause 8): a
+// negative base to a non-integer power is not real.
+func TestEvalNegativeBaseNonIntegerPower() testing.TestResult {
+	var r @runtime = newEvalRT()
+	evalSrc(r, "(-2)^(1/2)")
+	if !r.fatal {
+		return "a negative base to a non-integer power should be fatal"
+	}
+	return ""
+}
+
+func TestEvalString() testing.TestResult {
+	var r @runtime = newEvalRT()
+	r.env.setStr("A$", "hi")
+	var p @parser = newParser("A$")
+	if !charsEq(r.evalStr(p.parseStringExpr()), "hi") {
+		return "evalStr(A$) should read the variable"
+	}
+	var q @parser = newParser("\"X\"")
+	if !charsEq(r.evalStr(q.parseStringExpr()), "X") {
+		return "evalStr should read a string constant"
+	}
+	return ""
+}
+
+func TestEvalNumericRelation() testing.TestResult {
+	var r @runtime = newEvalRT()
+	r.env.setNum("A", 2.0)
+	r.env.setNum("B", 5.0)
+	if !r.evalRel(relOf("A < B")) {
+		return "2 < 5 should be true"
+	}
+	if r.evalRel(relOf("A > B")) {
+		return "2 > 5 should be false"
+	}
+	if !r.evalRel(relOf("A <> B")) {
+		return "2 <> 5 should be true"
+	}
+	if !r.evalRel(relOf("A + 3 = B")) {
+		return "2+3 = 5 should be true"
+	}
+	if !r.evalRel(relOf("A <= A")) {
+		return "2 <= 2 should be true"
+	}
+	if !r.evalRel(relOf("B >= A")) {
+		return "5 >= 2 should be true"
+	}
+	return ""
+}
+
+func TestEvalStringRelation() testing.TestResult {
+	var r @runtime = newEvalRT()
+	r.env.setStr("A$", "hi")
+	r.env.setStr("B$", "hi")
+	if !r.evalRel(relOf("A$ = B$")) {
+		return "\"hi\" = \"hi\" should be true"
+	}
+	r.env.setStr("B$", "ho")
+	if r.evalRel(relOf("A$ = B$")) {
+		return "\"hi\" = \"ho\" should be false"
+	}
+	if !r.evalRel(relOf("A$ <> B$")) {
+		return "\"hi\" <> \"ho\" should be true"
+	}
+	return ""
+}
+
+func TestCharsEqual() testing.TestResult {
+	if !charsEqual("abc", "abc") {
+		return "abc should equal abc"
+	}
+	if charsEqual("abc", "abd") {
+		return "abc should not equal abd"
+	}
+	if charsEqual("ab", "abc") {
+		return "different-length strings are not equal"
+	}
+	if !charsEqual("", "") {
+		return "empty should equal empty"
+	}
+	return ""
+}

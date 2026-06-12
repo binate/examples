@@ -1,0 +1,70 @@
+package "pkg/basic"
+
+import "pkg/basic/io"
+import "pkg/buf"
+
+// captureOut is a test io.ConsoleOut that accumulates everything written, so a
+// test can assert what a runtime emitted (program output and diagnostics).
+type captureOut struct {
+	b buf.CharBuf
+}
+
+func (c @captureOut) Write(s *[]readonly char) int {
+	c.b = c.b.WriteStr(s)
+	return len(s)
+}
+
+impl @captureOut : io.ConsoleOut
+
+// text returns everything written to c so far as a fresh slice.
+func (c @captureOut) text() @[]char {
+	return c.b.Freeze()
+}
+
+// nullIn is a test io.ConsoleIn that always reports end-of-input; evaluator and
+// non-INPUT executor tests never read a reply.
+type nullIn struct {
+	dummy int
+}
+
+func (n @nullIn) ReadLine() io.InLine {
+	var res io.InLine
+	res.Text = make_slice(char, 0)
+	res.Eof = true
+	return res
+}
+
+impl @nullIn : io.ConsoleIn
+
+// newNullIn returns a null INPUT source.
+func newNullIn() @io.ConsoleIn {
+	var n @nullIn = make(nullIn)
+	n.dummy = 0
+	var cin @io.ConsoleIn = n
+	return cin
+}
+
+// buildRT builds a runtime that writes to cap (used for both program output and
+// diagnostics) and reads from a null INPUT source, over a one-line dummy program
+// so the executing-line lookups in nonfatal reporting are valid.
+func buildRT(cap @captureOut) @runtime {
+	var line @Line = make(Line)
+	line.Num = 10
+	line.Stmt = simpleStmt(ST_REM)
+	var prog @[]@Line = make_slice(@Line, 1)
+	prog[0] = line
+	var lm @lineMap = buildLineMap(prog)
+	var data @[]@datum = make_slice(@datum, 0)
+	var defs @defStore = make(defStore)
+	var out @io.ConsoleOut = cap
+	var inp @io.ConsoleIn = newNullIn()
+	return newRuntime(out, out, inp, prog, lm, data, 0, defs)
+}
+
+// newEvalRT is the harness for evaluator tests, which inspect returned values and
+// the fatal flag rather than emitted text.
+func newEvalRT() @runtime {
+	var cap @captureOut = make(captureOut)
+	cap.b = buf.New()
+	return buildRT(cap)
+}
