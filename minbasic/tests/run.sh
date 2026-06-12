@@ -17,10 +17,29 @@ cd "$REPO_DIR"
 
 BIN="$(scripts/build-compiled.sh minbasic/cmd/run)"
 
+# Programs listed in tests/SKIP are not run (see that file and tests/README.md
+# for why). skip_reason echoes a program's skip reason, or nothing if it runs.
+SKIP_FILE="$SCRIPT_DIR/SKIP"
+skip_reason() {
+    [ -f "$SKIP_FILE" ] || return 0
+    awk -v n="$1" '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        $1 == n { $1 = ""; sub(/^[[:space:]]+/, ""); print; exit }
+    ' "$SKIP_FILE"
+}
+
 pass=0
 fail=0
+skip=0
 for bas in "$SCRIPT_DIR"/nbs/*.BAS; do
     name="$(basename "${bas%.BAS}")"
+    reason="$(skip_reason "$name")"
+    if [ -n "$reason" ]; then
+        echo "SKIP: $name ($reason)"
+        skip=$((skip + 1))
+        continue
+    fi
     want="$SCRIPT_DIR/expected/$name.out"
     # A program that reads INPUT draws its replies from stdin; a matching
     # input/<name>.in file supplies a canned, deterministic reply stream. Programs
@@ -52,5 +71,5 @@ for bas in "$SCRIPT_DIR"/nbs/*.BAS; do
     fi
 done
 
-echo "tests/run.sh: $pass passed, $fail failed (of $((pass + fail)))"
+echo "tests/run.sh: $pass passed, $fail failed, $skip skipped (of $((pass + fail + skip)))"
 [ "$fail" -eq 0 ]
