@@ -1,0 +1,215 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+func TestFuncCode() testing.TestResult {
+	if funcCode("ABS") != FN_ABS {
+		return "funcCode(ABS)"
+	}
+	if funcCode("ATN") != FN_ATN {
+		return "funcCode(ATN)"
+	}
+	if funcCode("COS") != FN_COS {
+		return "funcCode(COS)"
+	}
+	if funcCode("EXP") != FN_EXP {
+		return "funcCode(EXP)"
+	}
+	if funcCode("INT") != FN_INT {
+		return "funcCode(INT)"
+	}
+	if funcCode("LOG") != FN_LOG {
+		return "funcCode(LOG)"
+	}
+	if funcCode("RND") != FN_RND {
+		return "funcCode(RND)"
+	}
+	if funcCode("SGN") != FN_SGN {
+		return "funcCode(SGN)"
+	}
+	if funcCode("SIN") != FN_SIN {
+		return "funcCode(SIN)"
+	}
+	if funcCode("SQR") != FN_SQR {
+		return "funcCode(SQR)"
+	}
+	if funcCode("TAN") != FN_TAN {
+		return "funcCode(TAN)"
+	}
+	if funcCode("FOO") != -1 {
+		return "funcCode(FOO) should be -1"
+	}
+	return ""
+}
+
+func TestFuncTakesArg() testing.TestResult {
+	if !funcTakesArg(FN_ABS) {
+		return "ABS takes an argument"
+	}
+	if !funcTakesArg(FN_SIN) {
+		return "SIN takes an argument"
+	}
+	if funcTakesArg(FN_RND) {
+		return "RND takes no argument"
+	}
+	return ""
+}
+
+func TestAbsf() testing.TestResult {
+	if absf(-5.0) != 5.0 {
+		return "absf(-5) should be 5"
+	}
+	if absf(5.0) != 5.0 {
+		return "absf(5) should be 5"
+	}
+	if absf(0.0) != 0.0 {
+		return "absf(0) should be 0"
+	}
+	return ""
+}
+
+func TestSgn() testing.TestResult {
+	if sgn(-3.0) != -1.0 {
+		return "sgn(-3) should be -1"
+	}
+	if sgn(0.0) != 0.0 {
+		return "sgn(0) should be 0"
+	}
+	if sgn(7.0) != 1.0 {
+		return "sgn(7) should be 1"
+	}
+	return ""
+}
+
+func TestEvalAbsSgnInt() testing.TestResult {
+	var r @runtime = newEvalRT()
+	if evalSrc(r, "ABS(-5)") != 5.0 {
+		return "ABS(-5) should be 5"
+	}
+	if evalSrc(r, "SGN(-2)") != -1.0 {
+		return "SGN(-2) should be -1"
+	}
+	if evalSrc(r, "INT(2.7)") != 2.0 {
+		return "INT(2.7) should be 2"
+	}
+	if evalSrc(r, "INT(-2.3)") != -3.0 {
+		return "INT(-2.3) should floor to -3"
+	}
+	return ""
+}
+
+// TestEvalSqrtLogExp uses arguments whose results are exact in IEEE double.
+func TestEvalSqrtLogExp() testing.TestResult {
+	var r @runtime = newEvalRT()
+	if evalSrc(r, "SQR(9)") != 3.0 {
+		return "SQR(9) should be 3"
+	}
+	if evalSrc(r, "SQR(0)") != 0.0 {
+		return "SQR(0) should be 0"
+	}
+	if evalSrc(r, "EXP(0)") != 1.0 {
+		return "EXP(0) should be 1"
+	}
+	if evalSrc(r, "LOG(1)") != 0.0 {
+		return "LOG(1) should be 0"
+	}
+	return ""
+}
+
+func TestEvalTrigAtZero() testing.TestResult {
+	var r @runtime = newEvalRT()
+	if evalSrc(r, "SIN(0)") != 0.0 {
+		return "SIN(0) should be 0"
+	}
+	if evalSrc(r, "COS(0)") != 1.0 {
+		return "COS(0) should be 1"
+	}
+	if evalSrc(r, "TAN(0)") != 0.0 {
+		return "TAN(0) should be 0"
+	}
+	if evalSrc(r, "ATN(0)") != 0.0 {
+		return "ATN(0) should be 0"
+	}
+	return ""
+}
+
+func TestEvalSqrtNegativeFatal() testing.TestResult {
+	var r @runtime = newEvalRT()
+	evalSrc(r, "SQR(-1)")
+	if !r.fatal {
+		return "SQR of a negative number should be fatal"
+	}
+	return ""
+}
+
+func TestEvalLogNonPositiveFatal() testing.TestResult {
+	var r @runtime = newEvalRT()
+	evalSrc(r, "LOG(0)")
+	if !r.fatal {
+		return "LOG(0) should be fatal"
+	}
+	var r2 @runtime = newEvalRT()
+	evalSrc(r2, "LOG(-2)")
+	if !r2.fatal {
+		return "LOG of a negative number should be fatal"
+	}
+	return ""
+}
+
+// TestEvalRnd checks RND's range, that it advances, and that the fixed seed makes
+// it reproducible (without asserting the specific xorshift value).
+func TestEvalRnd() testing.TestResult {
+	var r @runtime = newEvalRT()
+	var a float64 = evalSrc(r, "RND")
+	if a < 0.0 || a >= 1.0 {
+		return "RND should be in [0, 1)"
+	}
+	var b float64 = evalSrc(r, "RND")
+	if a == b {
+		return "consecutive RND values should differ"
+	}
+	var r2 @runtime = newEvalRT()
+	if evalSrc(r2, "RND") != a {
+		return "RND should be reproducible from the fixed seed"
+	}
+	return ""
+}
+
+func TestExecDefFnWithParam() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 DEF FNS(X) = X * X\n20 LET A = FNS(3)\n30 END\n")
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("A") != 9.0 {
+		return "FNS(3) = 3*3 should be 9"
+	}
+	return ""
+}
+
+// TestExecDefFnParamIsLocal pins that a DEF parameter shadows the global of the
+// same name only during the call, restoring it afterward.
+func TestExecDefFnParamIsLocal() testing.TestResult {
+	var src @[]char = "10 LET X = 10\n20 DEF FNA(X) = X * X\n30 LET A = FNA(2)\n40 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if e.getNum("A") != 4.0 {
+		return "FNA(2) should be 4"
+	}
+	if e.getNum("X") != 10.0 {
+		return "the call must not clobber the global X"
+	}
+	return ""
+}
+
+func TestExecDefFnNoParam() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 DEF FNC = 42\n20 LET A = FNC\n30 END\n")
+	if e.getNum("A") != 42.0 {
+		return "FNC (no parameter) should be 42"
+	}
+	return ""
+}
