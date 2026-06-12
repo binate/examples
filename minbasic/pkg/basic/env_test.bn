@@ -1,0 +1,93 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// TestNumIndex pins the flat numeric-scalar layout: slot 0 is the bare letter,
+// slots 1..10 are letter+digit '0'..'9', 11 slots per letter.
+func TestNumIndex() testing.TestResult {
+	if numIndex("A") != 0 {
+		return "numIndex(A) should be 0"
+	}
+	if numIndex("A0") != 1 {
+		return "numIndex(A0) should be 1"
+	}
+	if numIndex("A9") != 10 {
+		return "numIndex(A9) should be 10"
+	}
+	if numIndex("B") != 11 {
+		return "numIndex(B) should be 11"
+	}
+	if numIndex("Z") != 275 {
+		return "numIndex(Z) should be 275"
+	}
+	if numIndex("Z9") != 285 {
+		return "numIndex(Z9) should be 285"
+	}
+	return ""
+}
+
+func TestSvarIndex() testing.TestResult {
+	if svarIndex("A$") != 0 {
+		return "svarIndex(A$) should be 0"
+	}
+	if svarIndex("Q$") != 16 {
+		return "svarIndex(Q$) should be 16"
+	}
+	if svarIndex("Z$") != 25 {
+		return "svarIndex(Z$) should be 25"
+	}
+	return ""
+}
+
+func TestEnvNumericDefaultsZero() testing.TestResult {
+	var e @env = newEnv(0)
+	if e.getNum("A") != 0.0 {
+		return "A should default to 0"
+	}
+	if e.getNum("Z9") != 0.0 {
+		return "Z9 should default to 0"
+	}
+	return ""
+}
+
+func TestEnvSetGetNum() testing.TestResult {
+	var e @env = newEnv(0)
+	e.setNum("A", 3.5)
+	if e.getNum("A") != 3.5 {
+		return "getNum(A) should read back setNum(A, 3.5)"
+	}
+	e.setNum("Q7", -2.0)
+	if e.getNum("Q7") != -2.0 {
+		return "getNum(Q7) should read back setNum(Q7, -2.0)"
+	}
+	if e.getNum("B") != 0.0 {
+		return "setNum(A) must not disturb B"
+	}
+	if e.getNum("A") != 3.5 {
+		return "setNum(Q7) must not disturb A"
+	}
+	return ""
+}
+
+func TestEnvStringDefaultsEmpty() testing.TestResult {
+	var e @env = newEnv(0)
+	if len(e.getStr("A$")) != 0 {
+		return "A$ should default to the empty string"
+	}
+	if len(e.getStr("Z$")) != 0 {
+		return "Z$ should default to the empty string"
+	}
+	return ""
+}
+
+func TestEnvSetGetStr() testing.TestResult {
+	var e @env = newEnv(0)
+	e.setStr("A$", "hi")
+	if !charsEq(e.getStr("A$"), "hi") {
+		return "getStr(A$) should read back setStr(A$, \"hi\")"
+	}
+	if len(e.getStr("B$")) != 0 {
+		return "setStr(A$) must not disturb B$"
+	}
+	return ""
+}
