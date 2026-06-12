@@ -93,6 +93,11 @@ output.
   `cmd/basic`, a REPL) over example-local packages (`pkg/basic`, `pkg/buf`,
   `pkg/host`) with `.bni` interface files and dependency-injected I/O. It carries
   its own program/REPL test suites (`minbasic/tests/`, `minbasic/sessions/`).
+- [`mandelbrot`](mandelbrot/) — renders the **Mandelbrot set** as ASCII art,
+  split into an abstract escape-time calculator (`pkg/mandel`) and a separate
+  ASCII renderer (`pkg/ascii`). The calculator streams each sample's escape count
+  to a caller-supplied plot closure; the renderer's closure captures its grid.
+  Carries unit tests for both packages and a pinned end-to-end picture fixture.
 
 See [`TODO.md`](TODO.md) for planned work (a canary CI run against the latest
 release, the unit-test coverage sweep).
