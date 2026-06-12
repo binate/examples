@@ -1,0 +1,75 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// Results are integer-valued floats, so exact == comparison is well-defined.
+
+func TestFloorfPositive() testing.TestResult {
+	if floorf(2.7) != 2.0 {
+		return "floorf(2.7) should be 2"
+	}
+	if floorf(2.0) != 2.0 {
+		return "floorf(2.0) should be 2"
+	}
+	if floorf(0.0) != 0.0 {
+		return "floorf(0.0) should be 0"
+	}
+	return ""
+}
+
+// TestFloorfNegative pins the toward-−∞ behavior: a negative value with a
+// fractional part floors to one below its truncation.
+func TestFloorfNegative() testing.TestResult {
+	if floorf(-2.7) != -3.0 {
+		return "floorf(-2.7) should be -3"
+	}
+	if floorf(-2.0) != -2.0 {
+		return "floorf(-2.0) should be -2"
+	}
+	if floorf(-0.5) != -1.0 {
+		return "floorf(-0.5) should be -1"
+	}
+	return ""
+}
+
+// TestRoundfHalfUp pins ties rounding up (toward +∞).
+func TestRoundfHalfUp() testing.TestResult {
+	if roundf(0.5) != 1.0 {
+		return "roundf(0.5) should be 1"
+	}
+	if roundf(1.5) != 2.0 {
+		return "roundf(1.5) should be 2"
+	}
+	if roundf(2.5) != 3.0 {
+		return "roundf(2.5) should be 3"
+	}
+	return ""
+}
+
+// TestRoundfNegativeTies pins that ties round toward +∞ for negatives too:
+// -1.5 → -1, not -2.
+func TestRoundfNegativeTies() testing.TestResult {
+	if roundf(-1.5) != -1.0 {
+		return "roundf(-1.5) should be -1"
+	}
+	if roundf(-2.5) != -2.0 {
+		return "roundf(-2.5) should be -2"
+	}
+	return ""
+}
+
+func TestRoundfNearest() testing.TestResult {
+	if roundf(2.4) != 2.0 {
+		return "roundf(2.4) should be 2"
+	}
+	if roundf(2.6) != 3.0 {
+		return "roundf(2.6) should be 3"
+	}
+	if roundf(-2.4) != -2.0 {
+		return "roundf(-2.4) should be -2"
+	}
+	if roundf(-2.6) != -3.0 {
+		return "roundf(-2.6) should be -3"
+	}
+	return ""
+}

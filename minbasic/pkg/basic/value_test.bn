@@ -1,0 +1,36 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+func TestNumValue() testing.TestResult {
+	var v Value = numValue(3.5)
+	if v.Kind != VAL_NUM {
+		return "numValue should tag VAL_NUM"
+	}
+	if v.Num != 3.5 {
+		return "numValue should carry the number"
+	}
+	return ""
+}
+
+func TestStrValue() testing.TestResult {
+	var v Value = strValue("hi")
+	if v.Kind != VAL_STR {
+		return "strValue should tag VAL_STR"
+	}
+	if !charsEq(v.Str, "hi") {
+		return "strValue should carry the string"
+	}
+	return ""
+}
+
+func TestStrValueEmpty() testing.TestResult {
+	var v Value = strValue("")
+	if v.Kind != VAL_STR {
+		return "strValue(\"\") should tag VAL_STR"
+	}
+	if len(v.Str) != 0 {
+		return "strValue(\"\") should carry an empty string"
+	}
+	return ""
+}
