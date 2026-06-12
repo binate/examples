@@ -1,0 +1,162 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// ECMA-55 is uppercase: a plain-string-character is an UPPERCASE letter, a digit,
+// '+', '-', or '.'.
+func TestIsPlainStringChar() testing.TestResult {
+	if !isPlainStringChar('A') {
+		return "A is a plain string char"
+	}
+	if !isPlainStringChar('5') {
+		return "5 is a plain string char"
+	}
+	if !isPlainStringChar('+') || !isPlainStringChar('-') || !isPlainStringChar('.') {
+		return "+ - . are plain string chars"
+	}
+	if isPlainStringChar(' ') {
+		return "a space is not a plain string char"
+	}
+	if isPlainStringChar(';') || isPlainStringChar('"') {
+		return "; and \" are not plain string chars"
+	}
+	return ""
+}
+
+func TestIsUnquotedString() testing.TestResult {
+	if !isUnquotedString("ABC") {
+		return "ABC is a valid unquoted string"
+	}
+	if !isUnquotedString("A B") {
+		return "interior spaces are allowed"
+	}
+	if !isUnquotedString("1.5") {
+		return "1.5 is a valid unquoted string"
+	}
+	if isUnquotedString("") {
+		return "an empty datum is not a valid unquoted string"
+	}
+	if isUnquotedString("A;B") {
+		return "; is excluded from an unquoted string"
+	}
+	if isUnquotedString("X?") {
+		return "? is excluded from an unquoted string"
+	}
+	return ""
+}
+
+// TestValidReply checks the atomic reply validation: each unquoted datum must be
+// a well-formed unquoted-string; a quoted datum is exempt.
+func TestValidReply() testing.TestResult {
+	var good @[]@datum = make_slice(@datum, 1)
+	good[0] = newDatum("AB", false)
+	if !validReply(good) {
+		return "an unquoted plain datum is a valid reply"
+	}
+	var empty @[]@datum = make_slice(@datum, 1)
+	empty[0] = newDatum("", false)
+	if validReply(empty) {
+		return "an empty unquoted datum is invalid"
+	}
+	var quoted @[]@datum = make_slice(@datum, 1)
+	quoted[0] = newDatum("A;Y", true)
+	if !validReply(quoted) {
+		return "a quoted datum is exempt from the plain-string rule"
+	}
+	var bad @[]@datum = make_slice(@datum, 1)
+	bad[0] = newDatum("A;B", false)
+	if validReply(bad) {
+		return "an unquoted datum holding ';' is invalid"
+	}
+	return ""
+}
+
+func TestDatumFitsTarget() testing.TestResult {
+	var p @parser = newParser("A")
+	var numTarget @Expr = p.parseExpr()
+	var q @parser = newParser("A$")
+	var strTarget @Expr = q.parseStringExpr()
+	if !datumFitsTarget(numTarget, newDatum("5", false)) {
+		return "a numeric target accepts a numeric datum"
+	}
+	if datumFitsTarget(numTarget, newDatum("X", false)) {
+		return "a numeric target rejects a non-numeric datum"
+	}
+	if !datumFitsTarget(strTarget, newDatum("HELLO", false)) {
+		return "a string target accepts a short datum"
+	}
+	if datumFitsTarget(strTarget, newDatum("1234567890123456789", false)) {
+		return "a string target rejects a datum over 18 chars"
+	}
+	return ""
+}
+
+func TestExecInputNumeric() testing.TestResult {
+	var replies @[]@[]char = make_slice(@[]char, 1)
+	replies[0] = "42"
+	var out @[]char
+	var e @env
+	out, e = runProgInput("10 INPUT A\n20 END\n", replies)
+	if e.getNum("A") != 42.0 {
+		return "INPUT should read 42 into A"
+	}
+	if !charsEq(out, "? ") {
+		return "INPUT should emit the \"? \" prompt"
+	}
+	return ""
+}
+
+func TestExecInputMultiple() testing.TestResult {
+	var replies @[]@[]char = make_slice(@[]char, 1)
+	replies[0] = "3,4"
+	var out @[]char
+	var e @env
+	out, e = runProgInput("10 INPUT A,B\n20 END\n", replies)
+	if e.getNum("A") != 3.0 || e.getNum("B") != 4.0 {
+		return "INPUT A,B should read 3 and 4 from one reply"
+	}
+	return ""
+}
+
+func TestExecInputString() testing.TestResult {
+	var replies @[]@[]char = make_slice(@[]char, 1)
+	replies[0] = "HELLO"
+	var out @[]char
+	var e @env
+	out, e = runProgInput("10 INPUT A$\n20 END\n", replies)
+	if !charsEqual(e.getStr("A$"), "HELLO") {
+		return "INPUT should read the string into A$"
+	}
+	return ""
+}
+
+// TestExecInputRedo checks the nonfatal re-request: a non-numeric reply for a
+// numeric target is discarded with ?REDO FROM START and the read repeats.
+func TestExecInputRedo() testing.TestResult {
+	var replies @[]@[]char = make_slice(@[]char, 2)
+	replies[0] = "X"
+	replies[1] = "5"
+	var out @[]char
+	var e @env
+	out, e = runProgInput("10 INPUT A\n20 END\n", replies)
+	if e.getNum("A") != 5.0 {
+		return "INPUT should retry and read 5"
+	}
+	if !contains(out, "?REDO FROM START") {
+		return "a bad reply should be re-requested"
+	}
+	return ""
+}
+
+// TestExecInputEof checks that end-of-input while awaiting a reply stops the run
+// cleanly (the line after the INPUT does not execute).
+func TestExecInputEof() testing.TestResult {
+	var replies @[]@[]char = make_slice(@[]char, 0)
+	var out @[]char
+	var e @env
+	out, e = runProgInput("10 INPUT A\n20 LET B = 9\n30 END\n", replies)
+	if e.getNum("B") != 0.0 {
+		return "EOF awaiting INPUT should stop before line 20"
+	}
+	return ""
+}

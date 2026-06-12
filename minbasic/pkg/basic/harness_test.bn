@@ -91,14 +91,13 @@ func newEvalRT() @runtime {
 	return buildRT(cap)
 }
 
-// runProg parses and runs the full program src, returning the captured output
-// (program PRINT output plus any diagnostics) and the resulting variable store —
-// the harness for executor tests.
-func runProg(src @[]char) (@[]char, @env) {
+// runWithIn parses and runs the full program src reading INPUT replies from inp,
+// returning the captured output (program PRINT output plus any diagnostics) and
+// the resulting variable store.
+func runWithIn(src @[]char, inp @io.ConsoleIn) (@[]char, @env) {
 	var cap @captureOut = make(captureOut)
 	cap.b = buf.New()
 	var out @io.ConsoleOut = cap
-	var inp @io.ConsoleIn = newNullIn()
 	var prog @[]@Line
 	var perr @[]char
 	var ok bool
@@ -109,4 +108,42 @@ func runProg(src @[]char) (@[]char, @env) {
 	}
 	var e @env = runProgramInto(prog, out, out, inp)
 	return cap.text(), e
+}
+
+// runProg runs src with no INPUT replies available — the harness for executor
+// tests that do not read INPUT.
+func runProg(src @[]char) (@[]char, @env) {
+	return runWithIn(src, newNullIn())
+}
+
+// scriptIn is a test io.ConsoleIn that replays a fixed list of reply lines, then
+// reports end-of-input.
+type scriptIn struct {
+	lines @[]@[]char
+	pos   int
+}
+
+func (s @scriptIn) ReadLine() io.InLine {
+	var res io.InLine
+	if s.pos >= len(s.lines) {
+		res.Text = make_slice(char, 0)
+		res.Eof = true
+		return res
+	}
+	res.Text = s.lines[s.pos]
+	res.Eof = false
+	s.pos = s.pos + 1
+	return res
+}
+
+impl @scriptIn : io.ConsoleIn
+
+// runProgInput runs src with the given INPUT reply lines (consumed in order; a
+// further read past them reports end-of-input).
+func runProgInput(src @[]char, replies @[]@[]char) (@[]char, @env) {
+	var s @scriptIn = make(scriptIn)
+	s.lines = replies
+	s.pos = 0
+	var inp @io.ConsoleIn = s
+	return runWithIn(src, inp)
 }
