@@ -1,0 +1,316 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// expect consumes the next token from l and checks its kind; when text is
+// non-empty it also checks the token text. Returns false on any mismatch.
+func expect(l @lexer, kind int, text *[]readonly char) bool {
+	var t Token = l.next()
+	if t.Kind != kind {
+		return false
+	}
+	if len(text) > 0 && !charsEq(t.Text, text) {
+		return false
+	}
+	return true
+}
+
+func TestIsDigit() testing.TestResult {
+	if !isDigit('0') || !isDigit('9') || !isDigit('5') {
+		return "isDigit should accept 0-9"
+	}
+	if isDigit('A') || isDigit('.') || isDigit(' ') {
+		return "isDigit should reject non-digits"
+	}
+	return ""
+}
+
+func TestIsAlpha() testing.TestResult {
+	if !isAlpha('A') || !isAlpha('Z') || !isAlpha('M') {
+		return "isAlpha should accept A-Z"
+	}
+	if isAlpha('a') || isAlpha('0') || isAlpha('$') {
+		return "isAlpha should reject anything but A-Z"
+	}
+	return ""
+}
+
+func TestKeywordKind() testing.TestResult {
+	if keywordKind("LET") != TOK_LET {
+		return "keywordKind(LET)"
+	}
+	if keywordKind("PRINT") != TOK_PRINT {
+		return "keywordKind(PRINT)"
+	}
+	if keywordKind("GOTO") != TOK_GOTO {
+		return "keywordKind(GOTO)"
+	}
+	if keywordKind("FOR") != TOK_FOR {
+		return "keywordKind(FOR)"
+	}
+	if keywordKind("INPUT") != TOK_INPUT {
+		return "keywordKind(INPUT)"
+	}
+	if keywordKind("RANDOMIZE") != TOK_RANDOMIZE {
+		return "keywordKind(RANDOMIZE)"
+	}
+	if keywordKind("FOO") != -1 {
+		return "keywordKind(FOO) should be -1 (not a keyword)"
+	}
+	if keywordKind("A") != -1 {
+		return "keywordKind(A) should be -1 (a variable, not a keyword)"
+	}
+	return ""
+}
+
+func TestIsFnName() testing.TestResult {
+	if !isFnName("FNA") || !isFnName("FNZ") {
+		return "FNA / FNZ should be FN names"
+	}
+	if isFnName("FN") {
+		return "FN (length 2) is not an FN name"
+	}
+	if isFnName("ABC") {
+		return "ABC (no FN prefix) is not an FN name"
+	}
+	if isFnName("FNAB") {
+		return "FNAB (length 4) is not an FN name"
+	}
+	return ""
+}
+
+func TestLexLetStatement() testing.TestResult {
+	var l @lexer = newLexer("LET A = 1")
+	if !expect(l, TOK_LET, "") {
+		return "expected LET"
+	}
+	if !expect(l, TOK_VAR, "A") {
+		return "expected VAR A"
+	}
+	if !expect(l, TOK_EQ, "") {
+		return "expected ="
+	}
+	if !expect(l, TOK_NUMBER, "1") {
+		return "expected NUMBER 1"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexVariables() testing.TestResult {
+	var l @lexer = newLexer("A A1 B$")
+	if !expect(l, TOK_VAR, "A") {
+		return "expected VAR A"
+	}
+	if !expect(l, TOK_VAR, "A1") {
+		return "expected VAR A1"
+	}
+	if !expect(l, TOK_SVAR, "B$") {
+		return "expected SVAR B$"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexNumbers() testing.TestResult {
+	var l @lexer = newLexer("123 1.5 .5 1E10 2.5E-3")
+	if !expect(l, TOK_NUMBER, "123") {
+		return "expected NUMBER 123"
+	}
+	if !expect(l, TOK_NUMBER, "1.5") {
+		return "expected NUMBER 1.5"
+	}
+	if !expect(l, TOK_NUMBER, ".5") {
+		return "expected NUMBER .5"
+	}
+	if !expect(l, TOK_NUMBER, "1E10") {
+		return "expected NUMBER 1E10"
+	}
+	if !expect(l, TOK_NUMBER, "2.5E-3") {
+		return "expected NUMBER 2.5E-3"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexString() testing.TestResult {
+	var l @lexer = newLexer("\"HELLO\"")
+	if !expect(l, TOK_STRING, "HELLO") {
+		return "expected STRING HELLO"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexStringEmpty() testing.TestResult {
+	var l @lexer = newLexer("\"\"")
+	var t Token = l.next()
+	if t.Kind != TOK_STRING || len(t.Text) != 0 {
+		return "empty quotes should be an empty STRING"
+	}
+	return ""
+}
+
+func TestLexStringUnterminated() testing.TestResult {
+	var l @lexer = newLexer("\"HI")
+	var t Token = l.next()
+	if t.Kind != TOK_ERROR {
+		return "an unterminated string should be TOK_ERROR"
+	}
+	return ""
+}
+
+func TestLexOperators() testing.TestResult {
+	var l @lexer = newLexer("+ - * / ^ ( ) = , ;")
+	if !expect(l, TOK_PLUS, "") {
+		return "expected +"
+	}
+	if !expect(l, TOK_MINUS, "") {
+		return "expected -"
+	}
+	if !expect(l, TOK_STAR, "") {
+		return "expected *"
+	}
+	if !expect(l, TOK_SLASH, "") {
+		return "expected /"
+	}
+	if !expect(l, TOK_CARET, "") {
+		return "expected ^"
+	}
+	if !expect(l, TOK_LPAREN, "") {
+		return "expected ("
+	}
+	if !expect(l, TOK_RPAREN, "") {
+		return "expected )"
+	}
+	if !expect(l, TOK_EQ, "") {
+		return "expected ="
+	}
+	if !expect(l, TOK_COMMA, "") {
+		return "expected ,"
+	}
+	if !expect(l, TOK_SEMI, "") {
+		return "expected ;"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexRelational() testing.TestResult {
+	var l @lexer = newLexer("< > <= >= <>")
+	if !expect(l, TOK_LT, "") {
+		return "expected <"
+	}
+	if !expect(l, TOK_GT, "") {
+		return "expected >"
+	}
+	if !expect(l, TOK_LE, "") {
+		return "expected <="
+	}
+	if !expect(l, TOK_GE, "") {
+		return "expected >="
+	}
+	if !expect(l, TOK_NE, "") {
+		return "expected <>"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexFuncCall() testing.TestResult {
+	var l @lexer = newLexer("SIN ( X )")
+	if !expect(l, TOK_FUNC, "SIN") {
+		return "expected FUNC SIN"
+	}
+	if !expect(l, TOK_LPAREN, "") {
+		return "expected ("
+	}
+	if !expect(l, TOK_VAR, "X") {
+		return "expected VAR X"
+	}
+	if !expect(l, TOK_RPAREN, "") {
+		return "expected )"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+// TestLexFnCall checks that FN<letter> lexes to TOK_FN carrying just the
+// function letter (the FN prefix stripped).
+func TestLexFnCall() testing.TestResult {
+	var l @lexer = newLexer("FNB ( X )")
+	if !expect(l, TOK_FN, "B") {
+		return "expected FN B"
+	}
+	if !expect(l, TOK_LPAREN, "") {
+		return "expected ("
+	}
+	if !expect(l, TOK_VAR, "X") {
+		return "expected VAR X"
+	}
+	if !expect(l, TOK_RPAREN, "") {
+		return "expected )"
+	}
+	return ""
+}
+
+// TestLexGoToTwoWords checks the two-word GO TO spells two tokens (TOK_GO then
+// TOK_TO), distinct from the single-word GOTO.
+func TestLexGoToTwoWords() testing.TestResult {
+	var l @lexer = newLexer("GO TO")
+	if !expect(l, TOK_GO, "") {
+		return "expected GO"
+	}
+	if !expect(l, TOK_TO, "") {
+		return "expected TO"
+	}
+	if !expect(l, TOK_EOF, "") {
+		return "expected EOF"
+	}
+	return ""
+}
+
+func TestLexUnknownKeyword() testing.TestResult {
+	var l @lexer = newLexer("FOOBAR")
+	var t Token = l.next()
+	if t.Kind != TOK_ERROR {
+		return "a multi-letter run that is not a keyword should be TOK_ERROR"
+	}
+	return ""
+}
+
+func TestLexUnexpectedChar() testing.TestResult {
+	var l @lexer = newLexer("@")
+	var t Token = l.next()
+	if t.Kind != TOK_ERROR {
+		return "an unexpected character should be TOK_ERROR"
+	}
+	return ""
+}
+
+// TestRestOfLine checks restOfLine returns the line tail from the cursor
+// verbatim (the REM remark path), leading space included.
+func TestRestOfLine() testing.TestResult {
+	var l @lexer = newLexer("REM the rest")
+	if !expect(l, TOK_REM, "") {
+		return "expected REM"
+	}
+	if !charsEq(l.restOfLine(), " the rest") {
+		return "restOfLine should return the remainder verbatim"
+	}
+	return ""
+}
