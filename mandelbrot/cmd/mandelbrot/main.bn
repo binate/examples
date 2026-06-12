@@ -1,0 +1,35 @@
+// Command mandelbrot renders the Mandelbrot set as ASCII art to standard output.
+// It fixes a default view of the complex plane and a sample resolution, runs the
+// pkg/mandel escape-time calculator into a pkg/ascii renderer, and writes the
+// finished picture. The view and resolution are constants (no arguments), so the
+// output is identical every run and across execution modes — see mandelbrot/tests
+// for the pinned fixture.
+package "main"
+
+import "pkg/ascii"
+import "pkg/bootstrap"
+import "pkg/mandel"
+
+// COLS and ROWS are the picture's sample resolution. Terminal character cells are
+// about twice as tall as wide, so ROWS is near half of COLS to keep the rendered
+// set close to its true aspect rather than vertically stretched.
+const (
+	COLS int = 78
+	ROWS int = 28
+)
+
+// MAX_ITERS bounds the escape iteration: a sample still within the escape radius
+// after this many steps is taken to be inside the set.
+const MAX_ITERS int = 100
+
+// main renders the default view and writes the picture to standard output.
+func main() {
+	var win mandel.Window
+	win.MinRe = -2.2
+	win.MaxRe = 0.8
+	win.MinIm = -1.2
+	win.MaxIm = 1.2
+	var r @ascii.Renderer = ascii.New(COLS, ROWS, MAX_ITERS)
+	mandel.Compute(win, COLS, ROWS, MAX_ITERS, r.Sink())
+	bootstrap.Write(bootstrap.STDOUT, r.Picture())
+}

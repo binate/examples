@@ -1,0 +1,57 @@
+package "pkg/ascii"
+
+// New: see the interface file.
+func New(cols int, rows int, maxIters int) @Renderer {
+	var r @Renderer = make(Renderer)
+	r.cols = cols
+	r.rows = rows
+	r.maxIters = maxIters
+	r.cells = make_slice(char, cols * rows)
+	for i := 0; i < cols * rows; i++ {
+		r.cells[i] = ' '
+	}
+	return r
+}
+
+// Sink: see the interface file. The returned closure captures r, so each plotted
+// sample writes into this Renderer's grid.
+func (r @Renderer) Sink() @func(int, int, int) {
+	return func(px int, py int, iters int) {
+		r.cells[py * r.cols + px] = glyphFor(iters, r.maxIters)
+	}
+}
+
+// Picture: see the interface file.
+func (r @Renderer) Picture() @[]char {
+	// Each row contributes cols glyphs plus a trailing newline.
+	var out @[]char = make_slice(char, r.rows * (r.cols + 1))
+	var k int = 0
+	for py := 0; py < r.rows; py++ {
+		for px := 0; px < r.cols; px++ {
+			out[k] = r.cells[py * r.cols + px]
+			k = k + 1
+		}
+		out[k] = '\n'
+		k = k + 1
+	}
+	return out
+}
+
+// glyphFor maps one escape count to a shading glyph. A count of -1 (the sample
+// never escaped) is the set interior and returns the densest glyph, kept distinct
+// from the ramp so the body reads as a solid shape. Otherwise the count is scaled
+// across the lightest-to-densest ramp, so a faster escape is lighter.
+func glyphFor(iters int, maxIters int) char {
+	if iters < 0 {
+		return '@'
+	}
+	// Ramp glyphs, lightest first. An escaped count is in [0, maxIters), so the
+	// index iters*len/maxIters lands in [0, len); the clamp is defensive.
+	var ramp *[]readonly char = " .:-=+*#%"
+	var n int = len(ramp)
+	var idx int = iters * n / maxIters
+	if idx >= n {
+		idx = n - 1
+	}
+	return ramp[idx]
+}

@@ -1,0 +1,31 @@
+// Package ascii renders Mandelbrot escape counts as a text picture, local to the
+// `mandelbrot` example. A Renderer is a pkg/mandel plot target: it owns a
+// cols×rows glyph grid, and Sink hands back the plot function to pass to
+// mandel.Compute. Each escape count maps to a shading glyph — faster escape (a
+// smaller count) is lighter; the set interior (-1) is the densest glyph — so the
+// finished grid is a coarse greyscale picture of the set.
+package "pkg/ascii"
+
+// Renderer accumulates plotted escape counts into a fixed cols×rows glyph grid.
+// Build one with New, pass Sink() to mandel.Compute, then read the result with
+// Picture.
+type Renderer struct {
+	cols     int
+	rows     int
+	maxIters int
+	cells    @[]char
+}
+
+// New returns a Renderer for a cols×rows grid whose escape counts run 0..maxIters
+// (maxIters is needed to scale a count onto the shading ramp). Every cell starts
+// at the lightest glyph.
+func New(cols int, rows int, maxIters int) @Renderer
+
+// Sink returns the plot function to hand to mandel.Compute: each call stores the
+// glyph for one sample's escape count at (px, py). The returned closure captures
+// this Renderer, so plotted samples land in its grid.
+func (r @Renderer) Sink() @func(int, int, int)
+
+// Picture returns the rendered grid as a single string: rows top-to-bottom, each
+// followed by a newline (so the result ends with a trailing newline).
+func (r @Renderer) Picture() @[]char

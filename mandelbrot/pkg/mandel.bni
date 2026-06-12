@@ -1,0 +1,35 @@
+// Package mandel is an abstract Mandelbrot-set escape-time calculator, local to
+// the `mandelbrot` example. It is pure computation with no I/O: given a window of
+// the complex plane and a sample resolution, it computes each sample's escape
+// iteration count and hands it to a caller-supplied plot function. What to DO
+// with the counts — render them, tally them, write an image — is the caller's
+// concern; pkg/ascii is one such consumer.
+package "pkg/mandel"
+
+// Window is the axis-aligned rectangle of the complex plane to sample: the real
+// axis spans [MinRe, MaxRe] and the imaginary axis [MinIm, MaxIm]. Re increases
+// left-to-right across columns; Im increases bottom-to-top, so Compute maps row 0
+// (the top of the image) to MaxIm and the last row to MinIm — a rendered picture
+// is then right-side up.
+type Window struct {
+	MinRe float64
+	MaxRe float64
+	MinIm float64
+	MaxIm float64
+}
+
+// Compute samples win on a cols×rows grid and calls plot once per sample, in
+// row-major order (row 0 first, each row left to right). plot receives the pixel
+// column px (0..cols-1), row py (0..rows-1), and the sample's escape count: the
+// number of z := z² + c iterations from z = 0 at which |z| first exceeds 2, or -1
+// if |z| stays within the escape radius through maxIters iterations (taken to be
+// inside the set). Samples are taken at cell centers, so they sit symmetrically
+// within the window rather than biased to an edge.
+func Compute(win Window, cols int, rows int, maxIters int, plot @func(int, int, int))
+
+// Escape returns the escape-iteration count for the complex point (cRe, cIm): the
+// number of z := z² + c iterations from z = 0 at which |z| first exceeds 2, or -1
+// if |z| stays within the escape radius through maxIters iterations. It is the
+// per-sample kernel Compute applies, exposed so the iteration can be exercised
+// without building a grid.
+func Escape(cRe float64, cIm float64, maxIters int) int
