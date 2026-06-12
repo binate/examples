@@ -1,0 +1,249 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// stmtOf parses line as a full statement, returning the Stmt and ok (false when
+// parsing failed). exNum/exVar from parse_expr_test.bn are reused here.
+func stmtOf(line @[]char) (@Stmt, bool) {
+	var p @parser = newParser(line)
+	var s @Stmt = p.parseStmt()
+	return s, !p.hasErr
+}
+
+// stmtFails reports whether line fails to parse as a statement.
+func stmtFails(line @[]char) bool {
+	var p @parser = newParser(line)
+	p.parseStmt()
+	return p.hasErr
+}
+
+func TestRelCode() testing.TestResult {
+	if relCode(TOK_EQ) != REL_EQ {
+		return "relCode(=)"
+	}
+	if relCode(TOK_NE) != REL_NE {
+		return "relCode(<>)"
+	}
+	if relCode(TOK_LT) != REL_LT {
+		return "relCode(<)"
+	}
+	if relCode(TOK_GT) != REL_GT {
+		return "relCode(>)"
+	}
+	if relCode(TOK_LE) != REL_LE {
+		return "relCode(<=)"
+	}
+	if relCode(TOK_GE) != REL_GE {
+		return "relCode(>=)"
+	}
+	if relCode(TOK_PLUS) != -1 {
+		return "relCode(+) should be -1 (not a relation)"
+	}
+	return ""
+}
+
+func TestParseLetScalar() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("LET A = 1")
+	if !ok {
+		return "LET A = 1 should parse"
+	}
+	if s.Kind != ST_LET || !charsEq(s.Name, "A") {
+		return "should be a LET to A"
+	}
+	if !exNum(s.Value, 1.0) {
+		return "RHS should be 1"
+	}
+	return ""
+}
+
+func TestParseLetArrayElement() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("LET A(1) = 2")
+	if !ok {
+		return "LET A(1) = 2 should parse"
+	}
+	if s.Kind != ST_LET {
+		return "kind should be ST_LET"
+	}
+	if !present(s.LHS) || s.LHS.Kind != EX_AINDEX {
+		return "LHS should be an array element"
+	}
+	if !exNum(s.Value, 2.0) {
+		return "RHS should be 2"
+	}
+	return ""
+}
+
+func TestParseLetString() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("LET A$ = \"HI\"")
+	if !ok {
+		return "LET A$ = \"HI\" should parse"
+	}
+	if s.Kind != ST_LET || !charsEq(s.Name, "A$") {
+		return "should be a LET to A$"
+	}
+	if !present(s.Value) || s.Value.Kind != EX_STR || !charsEq(s.Value.Str, "HI") {
+		return "RHS should be the string HI"
+	}
+	return ""
+}
+
+func TestParseGoto() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("GOTO 100")
+	if !ok || s.Kind != ST_GOTO || s.Target != 100 {
+		return "GOTO 100"
+	}
+	s, ok = stmtOf("GO TO 100")
+	if !ok || s.Kind != ST_GOTO || s.Target != 100 {
+		return "GO TO 100 (two words) should equal GOTO"
+	}
+	return ""
+}
+
+func TestParseGosub() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("GOSUB 50")
+	if !ok || s.Kind != ST_GOSUB || s.Target != 50 {
+		return "GOSUB 50"
+	}
+	s, ok = stmtOf("GO SUB 50")
+	if !ok || s.Kind != ST_GOSUB || s.Target != 50 {
+		return "GO SUB 50 (two words) should equal GOSUB"
+	}
+	return ""
+}
+
+func TestParseIfNumeric() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("IF A < 1 THEN 100")
+	if !ok {
+		return "IF A < 1 THEN 100 should parse"
+	}
+	if s.Kind != ST_IF || s.Target != 100 {
+		return "should be ST_IF with target 100"
+	}
+	if !present(s.Cond) || s.Cond.IsStr || s.Cond.Op != REL_LT {
+		return "condition should be a numeric < relation"
+	}
+	return ""
+}
+
+// TestParseIfStringEqualityOnly pins that strings compare only with = / <>;
+// an ordering relation on strings is a parse error.
+func TestParseIfStringEqualityOnly() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("IF A$ = B$ THEN 10")
+	if !ok {
+		return "IF A$ = B$ THEN 10 should parse"
+	}
+	if !present(s.Cond) || !s.Cond.IsStr || s.Cond.Op != REL_EQ {
+		return "condition should be a string equality relation"
+	}
+	if !stmtFails("IF A$ < B$ THEN 10") {
+		return "string ordering should be a parse error"
+	}
+	return ""
+}
+
+func TestParseForSimple() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("FOR I = 1 TO 10")
+	if !ok {
+		return "FOR I = 1 TO 10 should parse"
+	}
+	if s.Kind != ST_FOR || !charsEq(s.Name, "I") {
+		return "should be a FOR over I"
+	}
+	if !exNum(s.Value, 1.0) || !exNum(s.Limit, 10.0) {
+		return "init should be 1 and limit 10"
+	}
+	if s.HasStep {
+		return "no STEP clause -> HasStep should be false"
+	}
+	return ""
+}
+
+func TestParseForStep() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("FOR I = 1 TO 10 STEP 2")
+	if !ok {
+		return "FOR ... STEP 2 should parse"
+	}
+	if !s.HasStep {
+		return "a STEP clause -> HasStep should be true"
+	}
+	if !exNum(s.Step, 2.0) {
+		return "step should be 2"
+	}
+	return ""
+}
+
+func TestParseNext() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("NEXT I")
+	if !ok || s.Kind != ST_NEXT || !charsEq(s.Name, "I") {
+		return "NEXT I"
+	}
+	return ""
+}
+
+func TestParseSimpleKeywords() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("END")
+	if !ok || s.Kind != ST_END {
+		return "END"
+	}
+	s, ok = stmtOf("STOP")
+	if !ok || s.Kind != ST_STOP {
+		return "STOP"
+	}
+	s, ok = stmtOf("RETURN")
+	if !ok || s.Kind != ST_RETURN {
+		return "RETURN"
+	}
+	s, ok = stmtOf("RESTORE")
+	if !ok || s.Kind != ST_RESTORE {
+		return "RESTORE"
+	}
+	return ""
+}
+
+func TestParseLineRefBounds() testing.TestResult {
+	var s @Stmt
+	var ok bool
+	s, ok = stmtOf("GOTO 9999")
+	if !ok || s.Target != 9999 {
+		return "GOTO 9999 should be valid"
+	}
+	if !stmtFails("GOTO 0") {
+		return "GOTO 0 should fail (line < 1)"
+	}
+	if !stmtFails("GOTO 10000") {
+		return "GOTO 10000 should fail (line > 9999)"
+	}
+	return ""
+}
+
+func TestParseTrailingAndUnknown() testing.TestResult {
+	if !stmtFails("END X") {
+		return "trailing tokens after a statement should fail"
+	}
+	if !stmtFails("PIZZA") {
+		return "an unknown leading word should fail"
+	}
+	return ""
+}
