@@ -1,11 +1,11 @@
-name: Build examples
+name: CI
 
 on:
   push:
   pull_request:
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -21,3 +21,9 @@ jobs:
 
       - name: Build all examples
         run: ./scripts/build-all.sh
+
+      - name: Run unit tests
+        run: ./scripts/test-all.sh
+
+      - name: Run example end-to-end suites
+        run: ./scripts/e2e-all.sh
