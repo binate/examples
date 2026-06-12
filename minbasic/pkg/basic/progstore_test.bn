@@ -1,0 +1,98 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// stLine stores line num (verbatim text, a REM statement) in p.
+func stLine(p @progStore, num int, text @[]char) {
+	p.put(num, text, simpleStmt(ST_REM))
+}
+
+func TestProgStoreEmpty() testing.TestResult {
+	var p @progStore = newProgStore()
+	if !p.isEmpty() {
+		return "a new store should be empty"
+	}
+	if p.findIndex(10) != -1 {
+		return "findIndex on an empty store should be -1"
+	}
+	return ""
+}
+
+// TestProgStorePutSorted checks lines entered out of order are kept ascending.
+func TestProgStorePutSorted() testing.TestResult {
+	var p @progStore = newProgStore()
+	stLine(p, 30, "C")
+	stLine(p, 10, "A")
+	stLine(p, 20, "B")
+	if len(p.lines) != 3 {
+		return "should hold 3 lines"
+	}
+	if p.lines[0].Num != 10 || p.lines[1].Num != 20 || p.lines[2].Num != 30 {
+		return "lines should be kept in ascending order"
+	}
+	if p.findIndex(20) != 1 {
+		return "findIndex(20) should be 1"
+	}
+	return ""
+}
+
+// TestProgStoreReplace checks re-entering a line number overwrites in place.
+func TestProgStoreReplace() testing.TestResult {
+	var p @progStore = newProgStore()
+	stLine(p, 10, "FIRST")
+	stLine(p, 10, "SECOND")
+	if len(p.lines) != 1 {
+		return "re-entering a line number should replace, not add"
+	}
+	if !charsEq(p.lines[0].Text, "SECOND") {
+		return "the line text should be the latest"
+	}
+	return ""
+}
+
+func TestProgStoreRemove() testing.TestResult {
+	var p @progStore = newProgStore()
+	stLine(p, 10, "A")
+	stLine(p, 20, "B")
+	stLine(p, 30, "C")
+	if !p.remove(20) {
+		return "remove of an existing line should return true"
+	}
+	if len(p.lines) != 2 || p.lines[0].Num != 10 || p.lines[1].Num != 30 {
+		return "remove should drop line 20 and keep order"
+	}
+	if p.remove(99) {
+		return "remove of an absent line should return false"
+	}
+	return ""
+}
+
+func TestProgStoreClear() testing.TestResult {
+	var p @progStore = newProgStore()
+	stLine(p, 10, "A")
+	stLine(p, 20, "B")
+	p.clear()
+	if !p.isEmpty() {
+		return "clear should empty the store"
+	}
+	return ""
+}
+
+// TestProgStoreSnapshot checks snapshot yields an ascending @[]@Line carrying each
+// line's parsed statement.
+func TestProgStoreSnapshot() testing.TestResult {
+	var p @progStore = newProgStore()
+	p.put(20, "B", simpleStmt(ST_END))
+	p.put(10, "A", simpleStmt(ST_REM))
+	var prog @[]@Line = p.snapshot()
+	if len(prog) != 2 {
+		return "snapshot should have 2 lines"
+	}
+	if prog[0].Num != 10 || prog[1].Num != 20 {
+		return "snapshot should be ascending"
+	}
+	if prog[0].Stmt.Kind != ST_REM || prog[1].Stmt.Kind != ST_END {
+		return "snapshot should carry each line's parsed statement"
+	}
+	return ""
+}
