@@ -1,0 +1,174 @@
+package "pkg/buf"
+
+import "pkg/builtins/testing"
+
+// eq reports whether managed-slice got holds exactly the bytes of want.
+func eq(got @[]char, want *[]readonly char) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := 0; i < len(got); i++ {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestNewIsEmpty() testing.TestResult {
+	var b CharBuf = New()
+	if b.Len != 0 {
+		return "New().Len should be 0"
+	}
+	if !eq(b.Freeze(), "") {
+		return "New().Freeze() should be empty"
+	}
+	return ""
+}
+
+func TestWriteByte() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteByte('h')
+	b = b.WriteByte('i')
+	if b.Len != 2 {
+		return "WriteByte should leave Len == 2"
+	}
+	if !eq(b.Freeze(), "hi") {
+		return "WriteByte should build \"hi\""
+	}
+	return ""
+}
+
+func TestWriteStr() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteStr("hello, ")
+	b = b.WriteStr("world")
+	if !eq(b.Freeze(), "hello, world") {
+		return "WriteStr should append both fragments in order"
+	}
+	return ""
+}
+
+func TestWriteStrEmpty() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteStr("")
+	b = b.WriteStr("x")
+	b = b.WriteStr("")
+	if !eq(b.Freeze(), "x") {
+		return "empty WriteStr should be a no-op"
+	}
+	return ""
+}
+
+func TestWriteIntZero() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteInt(0)
+	if !eq(b.Freeze(), "0") {
+		return "WriteInt(0) should be \"0\""
+	}
+	return ""
+}
+
+func TestWriteIntPositive() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteInt(12345)
+	if !eq(b.Freeze(), "12345") {
+		return "WriteInt(12345) should be \"12345\""
+	}
+	return ""
+}
+
+func TestWriteIntNegative() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteInt(-42)
+	if !eq(b.Freeze(), "-42") {
+		return "WriteInt(-42) should be \"-42\""
+	}
+	return ""
+}
+
+func TestWriteIntInterleaved() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteStr("n=")
+	b = b.WriteInt(7)
+	b = b.WriteByte('.')
+	if !eq(b.Freeze(), "n=7.") {
+		return "WriteInt should compose with other writes"
+	}
+	return ""
+}
+
+// TestWriteByteGrows pushes well past INITIAL_CAP (64) to exercise grow(),
+// checking each byte survives the backing reallocation.
+func TestWriteByteGrows() testing.TestResult {
+	var b CharBuf = New()
+	var n int = 200
+	for i := 0; i < n; i++ {
+		b = b.WriteByte(cast(char, cast(int, 'a') + (i % 26)))
+	}
+	var got @[]char = b.Freeze()
+	if len(got) != n {
+		return "grow should preserve length"
+	}
+	for i := 0; i < n; i++ {
+		if got[i] != cast(char, cast(int, 'a') + (i % 26)) {
+			return "grow should preserve every byte"
+		}
+	}
+	return ""
+}
+
+// TestBytesSharesBacking checks the documented refcount behavior: a Bytes()
+// view stays valid (reads the old bytes) even after a later write grows the
+// backing into a fresh allocation.
+func TestBytesSharesBacking() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteStr("abc")
+	var view @[]char = b.Bytes()
+	for i := 0; i < 100; i++ {
+		b = b.WriteByte('z')
+	}
+	if !eq(view, "abc") {
+		return "Bytes() view should survive a later grow"
+	}
+	return ""
+}
+
+// TestFreezeIndependent checks that Freeze() copies: mutating the buffer
+// afterward must not change the frozen slice.
+func TestFreezeIndependent() testing.TestResult {
+	var b CharBuf = New()
+	b = b.WriteStr("abc")
+	var frozen @[]char = b.Freeze()
+	b = b.WriteByte('d')
+	if !eq(frozen, "abc") {
+		return "Freeze() result should be independent of later writes"
+	}
+	return ""
+}
+
+func TestCopyStr() testing.TestResult {
+	if !eq(CopyStr("hello"), "hello") {
+		return "CopyStr should copy the bytes verbatim"
+	}
+	if !eq(CopyStr(""), "") {
+		return "CopyStr(\"\") should be empty"
+	}
+	return ""
+}
+
+func TestConcat() testing.TestResult {
+	if !eq(Concat("ab", "cd"), "abcd") {
+		return "Concat(\"ab\", \"cd\") should be \"abcd\""
+	}
+	if !eq(Concat("", "x"), "x") {
+		return "Concat with empty prefix should be the suffix"
+	}
+	if !eq(Concat("x", ""), "x") {
+		return "Concat with empty suffix should be the prefix"
+	}
+	if !eq(Concat("", ""), "") {
+		return "Concat of two empties should be empty"
+	}
+	return ""
+}
