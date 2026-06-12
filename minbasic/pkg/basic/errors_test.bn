@@ -1,0 +1,144 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// TestForExits pins the ECMA-55 loop-exit test (v - limit) * SGN(step) > 0.
+func TestForExits() testing.TestResult {
+	if forExits(5.0, 10.0, 1.0) {
+		return "ascending: 5 vs 10 should not exit"
+	}
+	if !forExits(11.0, 10.0, 1.0) {
+		return "ascending: 11 past 10 should exit"
+	}
+	if forExits(10.0, 10.0, 1.0) {
+		return "ascending: v == limit should not exit"
+	}
+	if !forExits(0.0, 1.0, -1.0) {
+		return "descending: 0 past 1 should exit"
+	}
+	if forExits(5.0, 1.0, -1.0) {
+		return "descending: 5 vs 1 should not exit"
+	}
+	if forExits(100.0, 10.0, 0.0) {
+		return "step 0 never exits on its own"
+	}
+	return ""
+}
+
+func TestErrNextWithoutFor() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 NEXT I\n20 END\n")
+	if !contains(out, "NEXT without FOR") {
+		return "a NEXT with no open FOR should be reported"
+	}
+	return ""
+}
+
+func TestErrForNextMismatch() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 FOR I = 1 TO 2\n20 NEXT J\n30 END\n")
+	if !contains(out, "does not match") {
+		return "a NEXT naming the wrong variable should be reported"
+	}
+	return ""
+}
+
+func TestErrNoSuchLine() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 GOTO 99\n20 END\n")
+	if !contains(out, "no such line") {
+		return "GOTO to a missing line should be reported"
+	}
+	return ""
+}
+
+func TestErrReturnWithoutGosub() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 RETURN\n20 END\n")
+	if !contains(out, "RETURN without GOSUB") {
+		return "a RETURN with no pending GOSUB should be reported"
+	}
+	return ""
+}
+
+func TestErrOnIndexOutOfRange() testing.TestResult {
+	var src @[]char = "10 ON 5 GOTO 100,200\n100 LET R = 1\n200 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if !contains(out, "ON index out of range") {
+		return "an ON selector past the target count should be reported"
+	}
+	return ""
+}
+
+func TestErrSubscriptOutOfRange() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 DIM A(2)\n20 LET A(5) = 1\n30 END\n")
+	if !contains(out, "subscript out of range") {
+		return "an out-of-range subscript should be reported"
+	}
+	return ""
+}
+
+func TestErrStringTooLong() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 LET A$ = \"1234567890123456789\"\n20 END\n")
+	if !contains(out, "string too long") {
+		return "a string over 18 chars should be rejected"
+	}
+	return ""
+}
+
+func TestErrFnNotDefined() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 LET A = FNX(1)\n20 END\n")
+	if !contains(out, "is not defined") {
+		return "a reference to an undefined FN should be reported"
+	}
+	return ""
+}
+
+func TestErrFnReferencedBeforeDef() testing.TestResult {
+	var src @[]char = "10 LET A = FNX(1)\n20 DEF FNX(Y) = Y\n30 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if !contains(out, "referenced before its DEF") {
+		return "a forward FN reference should be reported"
+	}
+	return ""
+}
+
+func TestErrFnArityMismatch() testing.TestResult {
+	var src @[]char = "10 DEF FNX = 5\n20 LET A = FNX(2)\n30 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if !contains(out, "takes no argument") {
+		return "an argument to a no-parameter FN should be reported"
+	}
+	return ""
+}
+
+// TestExecOptionBase1 checks OPTION BASE 1 shifts the subscript range to 1..upper.
+func TestExecOptionBase1() testing.TestResult {
+	var src @[]char = "10 OPTION BASE 1\n20 DIM A(3)\n30 LET A(1) = 7\n40 LET X = A(1)\n50 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("X") != 7.0 {
+		return "OPTION BASE 1 array should store and read A(1)"
+	}
+	return ""
+}
