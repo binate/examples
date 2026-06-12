@@ -1,0 +1,124 @@
+package "pkg/mandel"
+
+import "pkg/builtins/testing"
+
+// recorder accumulates what a Compute plot closure observed, so a test can assert
+// over the whole sweep. The plot functions below capture a recorder and write
+// into it — the same closure-as-sink shape a real renderer uses.
+type recorder struct {
+	cols    int
+	n       int
+	ordered bool
+	inside  int
+	outside int
+}
+
+// newRecorder returns a fresh recorder for a sweep of the given column count.
+func newRecorder(cols int) @recorder {
+	var r @recorder = make(recorder)
+	r.cols = cols
+	r.n = 0
+	r.ordered = true
+	r.inside = 0
+	r.outside = 0
+	return r
+}
+
+// TestEscapeInsidePoints pins points known to lie in the set: the orbit stays
+// bounded, so Escape reports -1 through the iteration limit.
+func TestEscapeInsidePoints() testing.TestResult {
+	if Escape(0.0, 0.0, 100) != -1 {
+		return "the origin is in the set -> -1"
+	}
+	if Escape(-1.0, 0.0, 100) != -1 {
+		return "-1 (the period-2 bulb) is in the set -> -1"
+	}
+	if Escape(-0.1, 0.25, 100) != -1 {
+		return "a point inside the main cardioid -> -1"
+	}
+	return ""
+}
+
+// TestEscapeOutsidePoints pins points outside the set: any |c| > 2 escapes after
+// a single step (z becomes c, whose magnitude already exceeds the radius).
+func TestEscapeOutsidePoints() testing.TestResult {
+	if Escape(5.0, 5.0, 100) != 1 {
+		return "|c| well over 2 escapes at iteration 1"
+	}
+	var k int = Escape(2.0, 0.0, 100)
+	if k < 0 {
+		return "c = 2 is outside the set -> must escape"
+	}
+	return ""
+}
+
+// TestEscapeRespectsLimit checks maxIters bounds the work: with a single allowed
+// iteration an in-set point cannot be distinguished from the interior, so it is
+// reported as -1 rather than looping.
+func TestEscapeRespectsLimit() testing.TestResult {
+	if Escape(0.0, 0.0, 1) != -1 {
+		return "one iteration on an in-set point still reports -1"
+	}
+	return ""
+}
+
+// TestEscapeConjugateSymmetry checks the set's symmetry about the real axis: a
+// point and its complex conjugate escape at the same iteration.
+func TestEscapeConjugateSymmetry() testing.TestResult {
+	if Escape(0.3, 0.5, 100) != Escape(0.3, -0.5, 100) {
+		return "c and its conjugate must share an escape count"
+	}
+	if Escape(-0.75, 0.13, 100) != Escape(-0.75, -0.13, 100) {
+		return "conjugate symmetry must hold near the boundary too"
+	}
+	return ""
+}
+
+// TestComputeVisitsAllSamplesRowMajor checks Compute calls plot exactly cols*rows
+// times, in row-major order (the call index equals py*cols + px).
+func TestComputeVisitsAllSamplesRowMajor() testing.TestResult {
+	var rec @recorder = newRecorder(4)
+	var win Window
+	win.MinRe = -2.0
+	win.MaxRe = 1.0
+	win.MinIm = -1.0
+	win.MaxIm = 1.0
+	Compute(win, 4, 3, 20, func(px int, py int, iters int) {
+		if py * rec.cols + px != rec.n {
+			rec.ordered = false
+		}
+		rec.n = rec.n + 1
+	})
+	if rec.n != 12 {
+		return "Compute should call plot cols*rows = 12 times"
+	}
+	if !rec.ordered {
+		return "Compute should visit samples in row-major order"
+	}
+	return ""
+}
+
+// TestComputeReportsInsideAndOutside checks Compute wires Escape through: a window
+// straddling the set boundary yields both in-set (-1) and escaped samples.
+func TestComputeReportsInsideAndOutside() testing.TestResult {
+	var rec @recorder = newRecorder(20)
+	var win Window
+	win.MinRe = -2.0
+	win.MaxRe = 1.0
+	win.MinIm = -1.0
+	win.MaxIm = 1.0
+	Compute(win, 20, 16, 100, func(px int, py int, iters int) {
+		if iters < 0 {
+			rec.inside = rec.inside + 1
+		} else {
+			rec.outside = rec.outside + 1
+		}
+	})
+	if rec.inside == 0 {
+		return "a window over the set should have in-set samples"
+	}
+	if rec.outside == 0 {
+		return "a window over the set should have escaped samples"
+	}
+	return ""
+}

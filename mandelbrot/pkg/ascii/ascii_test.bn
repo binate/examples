@@ -1,0 +1,76 @@
+package "pkg/ascii"
+
+import "pkg/builtins/testing"
+
+// sameText reports whether got holds exactly the characters of want.
+func sameText(got @[]char, want *[]readonly char) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := 0; i < len(got); i++ {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestGlyphForInside checks the set interior (-1) maps to the densest glyph,
+// distinct from any ramp glyph.
+func TestGlyphForInside() testing.TestResult {
+	if glyphFor(-1, 100) != '@' {
+		return "an unescaped sample (-1) should render as '@'"
+	}
+	return ""
+}
+
+// TestGlyphForRamp checks an escaped count scales across the ramp: count 0 (the
+// fastest escape) is the lightest glyph, and a count near the limit is a dense
+// ramp glyph that is still not the reserved set glyph.
+func TestGlyphForRamp() testing.TestResult {
+	if glyphFor(0, 100) != ' ' {
+		return "the fastest escape (0) should render as a space"
+	}
+	if glyphFor(99, 100) != '%' {
+		return "a near-limit escape should render as the densest ramp glyph"
+	}
+	if glyphFor(99, 100) == '@' {
+		return "an escaped sample must not borrow the set glyph"
+	}
+	return ""
+}
+
+// TestRenderSmallGrid drives the whole renderer path: New, the Sink closure, and
+// Picture. The closure returned by Sink captures the Renderer, so the four
+// plotted samples land in its grid and Picture reads them back row-major with a
+// trailing newline per row.
+func TestRenderSmallGrid() testing.TestResult {
+	var r @Renderer = New(2, 2, 10)
+	var plot @func(int, int, int) = r.Sink()
+	plot(0, 0, -1)
+	plot(1, 0, 0)
+	plot(0, 1, 9)
+	plot(1, 1, -1)
+	var pic @[]char = r.Picture()
+	if !sameText(pic, "@ \n%@\n") {
+		return "the rendered 2x2 grid should be \"@ \\n%@\\n\""
+	}
+	return ""
+}
+
+// TestPictureDimensions checks an unplotted grid renders as all-space cells, sized
+// rows*(cols+1) with a newline ending each row.
+func TestPictureDimensions() testing.TestResult {
+	var r @Renderer = New(3, 2, 10)
+	var pic @[]char = r.Picture()
+	if len(pic) != 2 * (3 + 1) {
+		return "a 3x2 picture is rows*(cols+1) characters"
+	}
+	if pic[3] != '\n' || pic[7] != '\n' {
+		return "each row should end with a newline"
+	}
+	if !sameText(pic, "   \n   \n") {
+		return "an unplotted grid should render as spaces"
+	}
+	return ""
+}
