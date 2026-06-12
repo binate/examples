@@ -12,12 +12,16 @@
   fixed for free or it adds a deterministic saturating helper at the index
   sites — then un-skip the three programs (re-freezing fixtures if needed).
 
-- **Unit-test coverage sweep.** The `*_test.bn` runner is in place
-  (`run-tests-compiled.sh` / `run-tests-interpreted.sh` / `test-all.sh`,
-  both `bnc --test` and `bni --test`, wired into CI) and `minbasic/pkg/buf`
-  is covered. Progressively add unit tests for the rest of minbasic
-  (lexer, parser, value/format, tab, env, …) and any future example,
-  refactoring for testability where it helps.
+- **Unit-test coverage sweep (largely complete).** minbasic's `pkg/buf` and
+  the whole `pkg/basic` core are unit-tested (~166 tests, green under both
+  `bnc --test` and `bni --test`, run in CI): lexer/token, parser
+  (expression/statement/relational), evaluator and executor (via a
+  `captureOut`/`scriptIn` runtime harness in `harness_test.bn`), the ECMA-55
+  number formatter, variable/array storage, the supplied functions + DEF FN,
+  READ/DATA, INPUT, the program store + line map, the embeddable REPL session,
+  and the runtime/load error paths. What remains is marginal and largely
+  covered indirectly (the `setup`/`usesarray` load helpers, the DIM/DEF parser
+  internals). Add unit tests for any new example as it lands.
 
 - **Canary CI against the latest release.** Add a CI job that builds
   every `*/cmd/*` with `BUILDER_VERSION=latest`, separate from the pinned
