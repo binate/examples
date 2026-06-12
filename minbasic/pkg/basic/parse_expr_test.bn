@@ -1,0 +1,233 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// exprOf parses src as a numeric expression, returning the root node and ok
+// (false when parsing failed).
+func exprOf(src @[]char) (@Expr, bool) {
+	var p @parser = newParser(src)
+	var e @Expr = p.parseExpr()
+	return e, !p.hasErr
+}
+
+// parseFails reports whether src fails to parse as a numeric expression.
+func parseFails(src @[]char) bool {
+	var p @parser = newParser(src)
+	p.parseExpr()
+	return p.hasErr
+}
+
+// exNum / exVar / exBin are nil-safe AST shape predicates for the tests.
+
+func exNum(e @Expr, val float64) bool {
+	return present(e) && e.Kind == EX_NUM && e.Num == val
+}
+
+func exVar(e @Expr, name *[]readonly char) bool {
+	return present(e) && e.Kind == EX_VAR && charsEq(e.Name, name)
+}
+
+func exBin(e @Expr, op int) bool {
+	return present(e) && e.Kind == EX_BINARY && e.Op == op
+}
+
+// TestParsePrecedence pins that * binds tighter than +: 1+2*3 = 1+(2*3).
+func TestParsePrecedence() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("1+2*3")
+	if !ok {
+		return "1+2*3 should parse"
+	}
+	if !exBin(e, TOK_PLUS) {
+		return "root should be +"
+	}
+	if !exNum(e.X, 1.0) {
+		return "left of + should be 1"
+	}
+	if !exBin(e.Y, TOK_STAR) {
+		return "right of + should be *"
+	}
+	if !exNum(e.Y.X, 2.0) || !exNum(e.Y.Y, 3.0) {
+		return "* operands should be 2 and 3"
+	}
+	return ""
+}
+
+// TestParseAddSubLeftAssoc pins left-associativity: 1-2-3 = (1-2)-3.
+func TestParseAddSubLeftAssoc() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("1-2-3")
+	if !ok {
+		return "1-2-3 should parse"
+	}
+	if !exBin(e, TOK_MINUS) {
+		return "root should be -"
+	}
+	if !exBin(e.X, TOK_MINUS) {
+		return "left of root should be (1-2)"
+	}
+	if !exNum(e.X.X, 1.0) || !exNum(e.X.Y, 2.0) {
+		return "inner should be 1-2"
+	}
+	if !exNum(e.Y, 3.0) {
+		return "right of root should be 3"
+	}
+	return ""
+}
+
+// TestParseCaretLeftAssoc pins ECMA-55's unusual LEFT-associative ^:
+// 2^3^2 = (2^3)^2.
+func TestParseCaretLeftAssoc() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("2^3^2")
+	if !ok {
+		return "2^3^2 should parse"
+	}
+	if !exBin(e, TOK_CARET) {
+		return "root should be ^"
+	}
+	if !exBin(e.X, TOK_CARET) {
+		return "^ is left-associative: (2^3)^2"
+	}
+	if !exNum(e.X.X, 2.0) || !exNum(e.X.Y, 3.0) {
+		return "inner should be 2^3"
+	}
+	if !exNum(e.Y, 2.0) {
+		return "right should be 2"
+	}
+	return ""
+}
+
+// TestParseUnaryBindsLooserThanCaret pins -A^B = -(A^B): the unary sign wraps
+// the whole factor.
+func TestParseUnaryBindsLooserThanCaret() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("-A^B")
+	if !ok {
+		return "-A^B should parse"
+	}
+	if !present(e) || e.Kind != EX_UNARY || e.Op != TOK_MINUS {
+		return "root should be a unary minus"
+	}
+	if !exBin(e.X, TOK_CARET) {
+		return "-A^B should be -(A^B)"
+	}
+	if !exVar(e.X.X, "A") || !exVar(e.X.Y, "B") {
+		return "^ operands should be A and B"
+	}
+	return ""
+}
+
+// TestParseParensOverridePrecedence pins that parens regroup: (1+2)*3.
+func TestParseParensOverridePrecedence() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("(1+2)*3")
+	if !ok {
+		return "(1+2)*3 should parse"
+	}
+	if !exBin(e, TOK_STAR) {
+		return "root should be *"
+	}
+	if !exBin(e.X, TOK_PLUS) {
+		return "parens should force (1+2) on the left"
+	}
+	if !exNum(e.Y, 3.0) {
+		return "right of * should be 3"
+	}
+	return ""
+}
+
+func TestParseArrayRef() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("A(1)")
+	if !ok {
+		return "A(1) should parse"
+	}
+	if !present(e) || e.Kind != EX_AINDEX || !charsEq(e.Name, "A") || e.Op != 1 {
+		return "A(1) should be a 1-D array index of A"
+	}
+	if !exNum(e.X, 1.0) {
+		return "subscript should be 1"
+	}
+	e, ok = exprOf("B(1,2)")
+	if !ok {
+		return "B(1,2) should parse"
+	}
+	if e.Kind != EX_AINDEX || e.Op != 2 {
+		return "B(1,2) should be a 2-D index"
+	}
+	if !exNum(e.X, 1.0) || !exNum(e.Y, 2.0) {
+		return "subscripts should be 1 and 2"
+	}
+	return ""
+}
+
+// TestParseSimpleVarNotSubscriptable pins that a digit-suffixed name is a simple
+// variable (and cannot be subscripted).
+func TestParseSimpleVar() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("A1")
+	if !ok {
+		return "A1 should parse"
+	}
+	if !exVar(e, "A1") {
+		return "A1 should be a simple variable"
+	}
+	if !parseFails("A1(2)") {
+		return "subscripting a digit-suffixed name should fail"
+	}
+	return ""
+}
+
+func TestParseFuncCall() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("SIN(0)")
+	if !ok {
+		return "SIN(0) should parse"
+	}
+	if !present(e) || e.Kind != EX_CALL || e.Op != funcCode("SIN") {
+		return "SIN(0) should be a call to SIN"
+	}
+	if !exNum(e.X, 0.0) {
+		return "the argument should be 0"
+	}
+	return ""
+}
+
+// TestParseRndNoArg pins that RND takes no argument (its argument is nil).
+func TestParseRndNoArg() testing.TestResult {
+	var e @Expr
+	var ok bool
+	e, ok = exprOf("RND")
+	if !ok {
+		return "RND should parse"
+	}
+	if !present(e) || e.Kind != EX_CALL || e.Op != funcCode("RND") {
+		return "RND should be a no-argument call"
+	}
+	if present(e.X) {
+		return "RND should carry no argument"
+	}
+	return ""
+}
+
+func TestParseErrors() testing.TestResult {
+	if !parseFails("1 +") {
+		return "a trailing operator should be a parse error"
+	}
+	if !parseFails("(1+2") {
+		return "a missing ')' should be a parse error"
+	}
+	if !parseFails("*3") {
+		return "a leading binary operator should be a parse error"
+	}
+	return ""
+}
