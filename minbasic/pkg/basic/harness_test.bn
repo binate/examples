@@ -44,6 +44,28 @@ func newNullIn() @io.ConsoleIn {
 	return cin
 }
 
+// contains reports whether hay holds needle as a substring (a naive scan, used to
+// assert that a diagnostic appears in captured output).
+func contains(hay @[]char, needle *[]readonly char) bool {
+	var n int = len(needle)
+	if n == 0 {
+		return true
+	}
+	for i := 0; i + n <= len(hay); i++ {
+		var match bool = true
+		for j := 0; j < n; j++ {
+			if hay[i + j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
 // buildRT builds a runtime that writes to cap (used for both program output and
 // diagnostics) and reads from a null INPUT source, over a one-line dummy program
 // so the executing-line lookups in nonfatal reporting are valid.

@@ -1,0 +1,166 @@
+package "pkg/basic"
+
+import "pkg/builtins/testing"
+
+// TestIsNumericConstant pins ECMA-55's numeric-constant grammar (clause 6.2),
+// which is intentionally stricter than strconv.ParseFloat.
+func TestIsNumericConstant() testing.TestResult {
+	if !isNumericConstant("123") {
+		return "123 is numeric"
+	}
+	if !isNumericConstant("-1.5") {
+		return "-1.5 is numeric"
+	}
+	if !isNumericConstant("+7") {
+		return "+7 is numeric"
+	}
+	if !isNumericConstant(".5") {
+		return ".5 is numeric"
+	}
+	if !isNumericConstant("1.") {
+		return "1. is numeric"
+	}
+	if !isNumericConstant("1E10") {
+		return "1E10 is numeric"
+	}
+	if !isNumericConstant("1.5E-3") {
+		return "1.5E-3 is numeric"
+	}
+	if isNumericConstant("") {
+		return "empty is not numeric"
+	}
+	if isNumericConstant("E5") {
+		return "E5 (no significand) is not numeric"
+	}
+	if isNumericConstant("1E") {
+		return "1E (no exponent digits) is not numeric"
+	}
+	if isNumericConstant("abc") {
+		return "abc is not numeric"
+	}
+	if isNumericConstant("+") {
+		return "a lone sign is not numeric"
+	}
+	if isNumericConstant("1.2.3") {
+		return "1.2.3 is not numeric"
+	}
+	if isNumericConstant("12X") {
+		return "trailing junk is not numeric"
+	}
+	return ""
+}
+
+func TestNumericDatum() testing.TestResult {
+	if !numericDatum(newDatum("42", false)) {
+		return "an unquoted numeric-looking datum is numeric"
+	}
+	if numericDatum(newDatum("42", true)) {
+		return "a quoted datum is never numeric"
+	}
+	if numericDatum(newDatum("hi", false)) {
+		return "an unquoted non-numeric datum is not numeric"
+	}
+	return ""
+}
+
+func TestDatumValue() testing.TestResult {
+	if datumValue(newDatum("3.5", false)) != 3.5 {
+		return "datumValue(3.5)"
+	}
+	if datumValue(newDatum("-2", false)) != -2.0 {
+		return "datumValue(-2)"
+	}
+	if datumValue(newDatum("0", false)) != 0.0 {
+		return "datumValue(0)"
+	}
+	return ""
+}
+
+// TestScanDataLine checks the DATA scanner: unquoted data are trimmed of
+// surrounding spaces, quoted data keep their interior verbatim.
+func TestScanDataLine() testing.TestResult {
+	var l @lexer = newLexer("1, 2 , \"hi\"")
+	var data @[]@datum
+	var derr @[]char
+	var ok bool
+	data, derr, ok = l.scanDataLine()
+	if !ok {
+		return "scanDataLine should succeed"
+	}
+	if len(data) != 3 {
+		return "should scan 3 data"
+	}
+	if !charsEq(data[0].Text, "1") || data[0].Quoted {
+		return "datum 0 should be the unquoted 1"
+	}
+	if !charsEq(data[1].Text, "2") || data[1].Quoted {
+		return "datum 1 should be the unquoted 2 (trimmed)"
+	}
+	if !charsEq(data[2].Text, "hi") || !data[2].Quoted {
+		return "datum 2 should be the quoted hi"
+	}
+	return ""
+}
+
+func TestScanDataUnterminatedQuote() testing.TestResult {
+	var l @lexer = newLexer("\"oops")
+	var data @[]@datum
+	var derr @[]char
+	var ok bool
+	data, derr, ok = l.scanDataLine()
+	if ok {
+		return "an unterminated quoted datum should fail"
+	}
+	return ""
+}
+
+func TestExecReadData() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 DATA 1,2,3\n20 READ A,B,C\n30 END\n")
+	if len(out) != 0 {
+		return "no output expected"
+	}
+	if e.getNum("A") != 1.0 || e.getNum("B") != 2.0 || e.getNum("C") != 3.0 {
+		return "READ should assign 1, 2, 3 to A, B, C"
+	}
+	return ""
+}
+
+func TestExecReadString() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 DATA \"HELLO\"\n20 READ A$\n30 END\n")
+	if !charsEqual(e.getStr("A$"), "HELLO") {
+		return "READ should assign the string datum to A$"
+	}
+	return ""
+}
+
+// TestExecRestore checks RESTORE rewinds the data pointer so READ re-reads.
+func TestExecRestore() testing.TestResult {
+	var src @[]char = "10 DATA 5,6\n20 READ A\n30 RESTORE\n40 READ B\n50 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if e.getNum("A") != 5.0 {
+		return "the first READ should get 5"
+	}
+	if e.getNum("B") != 5.0 {
+		return "RESTORE then READ should re-read 5"
+	}
+	return ""
+}
+
+func TestExecReadOutOfData() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 DATA 1\n20 READ A,B\n30 END\n")
+	if e.getNum("A") != 1.0 {
+		return "the first READ should succeed"
+	}
+	if !contains(out, "out of data") {
+		return "reading past the data should report out of data"
+	}
+	return ""
+}
