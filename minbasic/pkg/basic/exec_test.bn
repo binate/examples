@@ -178,3 +178,27 @@ func TestExecPrintEmpty() testing.TestResult {
 	}
 	return ""
 }
+
+// TestExecPrintTab checks TAB(n) positions the next item at column n (1-based):
+// TAB(5);"X" pads four spaces, then X.
+func TestExecPrintTab() testing.TestResult {
+	var out @[]char
+	var e @env
+	out, e = runProg("10 PRINT TAB(5);\"X\"\n20 END\n")
+	if !charsEq(out, "    X\n") {
+		return "TAB(5) should place X at column 5"
+	}
+	return ""
+}
+
+// TestExec2DArray checks a two-dimensional array element stores and reads back.
+func TestExec2DArray() testing.TestResult {
+	var src @[]char = "10 DIM A(2,3)\n20 LET A(1,2) = 9\n30 LET X = A(1,2)\n40 END\n"
+	var out @[]char
+	var e @env
+	out, e = runProg(src)
+	if e.getNum("X") != 9.0 {
+		return "a 2-D array element should round-trip"
+	}
+	return ""
+}
