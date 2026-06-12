@@ -67,6 +67,11 @@ output.
 - [`hello`](hello/) — minimal "hello world".
 - [`numbers`](numbers/) — an example-local package (`pkg/seq`) shared by two
   runnables; shows the search-root + multi-runnable layout.
+- [`minbasic`](minbasic/) — a "serious" example: an embeddable **ECMA-55 Minimal
+  BASIC** interpreter. Two runnables (`cmd/run`, a batch program runner;
+  `cmd/basic`, a REPL) over example-local packages (`pkg/basic`, `pkg/buf`,
+  `pkg/host`) with `.bni` interface files and dependency-injected I/O. It carries
+  its own program/REPL test suites (`minbasic/tests/`, `minbasic/sessions/`).
 
 See [`TODO.md`](TODO.md) for planned work (test scripts, a canary CI run against
 the latest release).
