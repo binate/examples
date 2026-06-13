@@ -6,11 +6,19 @@
   `ON…GOTO` index, and a `TAB` column. Casting a non-finite / out-of-range
   float to int is platform-dependent (arm64 saturates to `INT64_MAX`; x86-64
   yields `INT64_MIN`), so output differs by host ISA and the three programs are
-  skipped in `minbasic/tests/SKIP`. The real fix depends on the toolchain
-  decision tracked in the binate repo's `explorations/claude-todo.md` ("make
-  `cast(int,float)` well-defined"): once `cast` is defined, either minbasic is
-  fixed for free or it adds a deterministic saturating helper at the index
-  sites — then un-skip the three programs (re-freezing fixtures if needed).
+  skipped in `minbasic/tests/SKIP`. The real fix is the toolchain making
+  `cast(int,float)` well-defined (tracked in the binate repo's
+  `explorations/claude-todo.md`) — a deterministic, host-independent result for
+  non-finite / out-of-range inputs, which either fixes minbasic for free or lets
+  it add a saturating helper at the index sites.
+
+  Unskip path: that fix reaches examples only through a new BUILDER `bnc`
+  release, since builds use the prebuilt BUILDER (`BUILDER_VERSION`, currently
+  `bnc-0.0.8`) — not a binate checkout. So once the fix ships in a BUILDER
+  release and `BUILDER_VERSION` is bumped past `bnc-0.0.8` here, re-run P168 /
+  P174 / P180, confirm compiled == interpreted across hosts, drop them from
+  `minbasic/tests/SKIP`, and re-freeze the fixtures if the now-defined behavior
+  changed the output.
 
 - **Unit-test coverage sweep (largely complete).** minbasic's `pkg/buf` and
   the whole `pkg/basic` core are unit-tested (~166 tests, green under both
