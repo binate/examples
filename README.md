@@ -98,6 +98,11 @@ output.
   ASCII renderer (`pkg/ascii`). The calculator streams each sample's escape count
   to a caller-supplied plot closure; the renderer's closure captures its grid.
   Carries unit tests for both packages and a pinned end-to-end picture fixture.
+- [`generics`](generics/) — Binate **generics**: a type-parameterized `sort` over
+  the `lang.Orderable` constraint, with both primitives and a user type
+  satisfying it (constraint-method dispatch, monomorphized, bodies-in-`.bni`). A
+  generic `Vec`/`Map` are planned here once two generic-instantiation toolchain
+  bugs are fixed — see [`TODO.md`](TODO.md).
 
 See [`TODO.md`](TODO.md) for planned work (a canary CI run against the latest
 release, the unit-test coverage sweep).
