@@ -1,0 +1,22 @@
+unsorted ints:
+5
+3
+8
+1
+9
+2
+7
+sorted ints:
+1
+2
+3
+5
+7
+8
+9
+record ids, sorted by ascending score:
+4
+2
+5
+3
+1
