@@ -1,0 +1,89 @@
+package "pkg/sort"
+
+import "pkg/builtins/lang"
+import "pkg/builtins/testing"
+
+// keyed is a user type that opts into Orderable (ordering by k), to check Sort
+// works on any Orderable element — not only the primitives that ship with one.
+// id carries the pre-sort position so a test can read back the resulting order.
+type keyed struct {
+	k  int
+	id int
+}
+
+func (x keyed) Compare(other keyed) int {
+	return x.k - other.k
+}
+
+impl keyed : lang.Orderable
+
+// mk builds a keyed element.
+func mk(k int, id int) keyed {
+	var x keyed
+	x.k = k
+	x.id = id
+	return x
+}
+
+// TestSortInts sorts a slice of ints (int satisfies Orderable out of the box).
+func TestSortInts() testing.TestResult {
+	var s @[]int = @[]int{5, 3, 8, 1, 9, 2, 7}
+	Sort[int](s)
+	var want @[]int = @[]int{1, 2, 3, 5, 7, 8, 9}
+	if len(s) != len(want) {
+		return "Sort must not change the length"
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] != want[i] {
+			return "ints should end up ascending"
+		}
+	}
+	return ""
+}
+
+// TestIsSorted checks the order predicate before and after sorting.
+func TestIsSorted() testing.TestResult {
+	var s @[]int = @[]int{3, 1, 2}
+	if IsSorted[int](s) {
+		return "an unsorted slice should report false"
+	}
+	Sort[int](s)
+	if !IsSorted[int](s) {
+		return "a sorted slice should report true"
+	}
+	return ""
+}
+
+// TestSortEdgeCases checks the empty and single-element slices.
+func TestSortEdgeCases() testing.TestResult {
+	var empty @[]int = make_slice(int, 0)
+	Sort[int](empty)
+	if !IsSorted[int](empty) {
+		return "the empty slice is trivially sorted"
+	}
+	var one @[]int = @[]int{42}
+	Sort[int](one)
+	if one[0] != 42 {
+		return "a single element is unchanged"
+	}
+	return ""
+}
+
+// TestSortUserType sorts a slice of a user Orderable type and reads back the
+// resulting order via the carried ids.
+func TestSortUserType() testing.TestResult {
+	var items @[]keyed = make_slice(keyed, 4)
+	items[0] = mk(30, 0)
+	items[1] = mk(10, 1)
+	items[2] = mk(20, 2)
+	items[3] = mk(5, 3)
+	Sort[keyed](items)
+	// Ascending by k (5, 10, 20, 30) -> original ids 3, 1, 2, 0.
+	if items[0].id != 3 || items[1].id != 1 {
+		return "user Orderable type should sort by k"
+	}
+	if items[2].id != 2 || items[3].id != 0 {
+		return "user Orderable type should sort by k"
+	}
+	return ""
+}

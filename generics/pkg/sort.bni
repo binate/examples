@@ -1,0 +1,41 @@
+// Package sort provides a generic in-place sort over any Orderable element type
+// — a teaching example for generic functions and interface-constraint dispatch.
+// A production sort belongs in the standard library.
+//
+// The operations are generic, so (per plan-generics.md) their bodies live here
+// in the interface file: a consumer monomorphizes Sort[T] at its own call site.
+package "pkg/sort"
+
+import "pkg/builtins/lang"
+
+// Sort orders s ascending, in place, using T's Orderable contract — a sorts
+// before b exactly when a.Compare(b) < 0. Primitive types (int, uint, uint8, …)
+// satisfy Orderable out of the box; a user type opts in with
+// `impl T : lang.Orderable`.
+//
+// It is a single-function insertion sort. A factored generic quicksort
+// (Sort -> partition -> swap) would be the natural shape, but a constrained
+// generic cannot yet forward its type parameter to another constrained generic
+// (see examples/TODO.md); insertion sort keeps everything in one function. It is
+// O(n²) — fine for a teaching example.
+func Sort[T lang.Orderable](s @[]T) {
+	for i := 1; i < len(s); i++ {
+		var key T = s[i]
+		var j int = i - 1
+		for j >= 0 && s[j].Compare(key) > 0 {
+			s[j + 1] = s[j]
+			j = j - 1
+		}
+		s[j + 1] = key
+	}
+}
+
+// IsSorted reports whether s is in ascending Orderable order.
+func IsSorted[T lang.Orderable](s @[]T) bool {
+	for i := 0; i + 1 < len(s); i++ {
+		if s[i].Compare(s[i + 1]) > 0 {
+			return false
+		}
+	}
+	return true
+}
