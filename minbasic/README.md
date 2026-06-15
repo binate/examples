@@ -6,9 +6,13 @@ example that demonstrates an embeddable REPL (same contract shape as
 low-level I/O directly), and idiomatic Binate (tagged-union ASTs, managed/raw
 slices, refcounting, errors-as-values).
 
-**Status: work in progress** (M0 skeleton). See [`docs/plan.md`](docs/plan.md)
-for the architecture, milestones, and open decisions, and
-[`docs/ecma55-notes.md`](docs/ecma55-notes.md) for the language digest.
+It implements the whole standard — `LET`/`PRINT`/`GOTO`/`IF`/`FOR`/`GOSUB`/
+`ON…GOTO`/`READ`/`DATA`/`DIM` arrays/`DEF FN`/`INPUT`, the supplied numeric
+functions, and ECMA-55 PRINT formatting — across two runnables: `cmd/run` (a
+batch runner, `run prog.bas`) and `cmd/basic` (an interactive REPL). The
+interpreter core (`pkg/basic`) depends only on the `pkg/basic/io` interfaces;
+`pkg/host` is the one package that reaches the OS (via `pkg/std/os`). See
+[`docs/ecma55-notes.md`](ecma55-notes.md) for the language digest.
 
 ## Run
 
@@ -27,11 +31,6 @@ out/minbasic/run minbasic/programs/integers.bas
 ```
 
 It also runs interpreted (`./scripts/run-interpreted.sh minbasic/cmd/run`), and
-`minbasic/tests/run.sh` checks every program in `programs/` against an expected
-fixture (compiled == interpreted == fixture).
-
-> **Toolchain note.** The interface-vtable fix that minbasic's
-> dependency-injected `io.ConsoleOut` relies on (an interface method taking a
-> 2-word slice argument was miscompiled in `bnc-0.0.7`) shipped in `bnc-0.0.8`,
-> so the example now runs correctly against the pinned release — no `main`-built
-> `BINATE_BUNDLE` required.
+the example carries its own end-to-end suites: `tests/run.sh` runs a vendored
+**NBS conformance** set and `sessions/run.sh` the REPL sessions, each asserting
+compiled == interpreted == committed fixture in both modes.
