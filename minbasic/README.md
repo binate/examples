@@ -34,3 +34,6 @@ It also runs interpreted (`./scripts/run-interpreted.sh minbasic/cmd/run`), and
 the example carries its own end-to-end suites: `tests/run.sh` runs a vendored
 **NBS conformance** set and `sessions/run.sh` the REPL sessions, each asserting
 compiled == interpreted == committed fixture in both modes.
+
+See [`examples/`](examples/) for sample BASIC programs to run — `hello.bas` and,
+meta as it is, an ASCII `mandelbrot.bas` written in Minimal BASIC.
