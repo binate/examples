@@ -1,25 +1,5 @@
 # examples — TODO
 
-- **minbasic: non-portable numeric→index conversion (NBS P168/P174/P180
-  skipped).** minbasic turns an overflowed BASIC number (machine `+Inf`) into
-  an integer index via `cast(int, roundf(...))` for an array subscript, an
-  `ON…GOTO` index, and a `TAB` column. Casting a non-finite / out-of-range
-  float to int is platform-dependent (arm64 saturates to `INT64_MAX`; x86-64
-  yields `INT64_MIN`), so output differs by host ISA and the three programs are
-  skipped in `minbasic/tests/SKIP`. The real fix is the toolchain making
-  `cast(int,float)` well-defined (tracked in the binate repo's
-  `explorations/claude-todo.md`) — a deterministic, host-independent result for
-  non-finite / out-of-range inputs, which either fixes minbasic for free or lets
-  it add a saturating helper at the index sites.
-
-  Unskip path: that fix reaches examples only through a new BUILDER `bnc`
-  release, since builds use the prebuilt BUILDER (`BUILDER_VERSION`, currently
-  `bnc-0.0.8`) — not a binate checkout. So once the fix ships in a BUILDER
-  release and `BUILDER_VERSION` is bumped past `bnc-0.0.8` here, re-run P168 /
-  P174 / P180, confirm compiled == interpreted across hosts, drop them from
-  `minbasic/tests/SKIP`, and re-freeze the fixtures if the now-defined behavior
-  changed the output.
-
 - **Unit-test coverage sweep (largely complete).** minbasic's `pkg/buf` and
   the whole `pkg/basic` core are unit-tested (~166 tests, green under both
   `bnc --test` and `bni --test`, run in CI): lexer/token, parser

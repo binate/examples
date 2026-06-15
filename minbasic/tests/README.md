@@ -30,16 +30,15 @@ nonzero on any failure.
 
 Programs listed in [`SKIP`](SKIP) (one `<name>  <reason>` per line) are reported
 `SKIP` and not run; the summary counts them separately and they do not fail the
-suite. This is for programs minbasic cannot run *portably* yet — see "Skipped"
-below.
+suite. The mechanism is for any program minbasic cannot yet run portably; **no
+programs are currently skipped**.
 
 ## The runnable-now subset (which programs are here, and why)
 
-Of the **208** NBS programs (P001..P208), **207** are vendored. The other **1**
-is excluded because minbasic cannot run it deterministically *today*. Of the
-207 vendored, **3** are currently skipped (non-portable across host ISAs — see
-"Skipped" below); the remaining **204** run in CI. Runnability was determined
-empirically (running each program through minbasic), not guessed. The breakdown:
+Of the **208** NBS programs (P001..P208), **207** are vendored and all run in
+CI. The other **1** is excluded because minbasic cannot run it deterministically
+*today*. Runnability was determined empirically (running each program through
+minbasic), not guessed. The breakdown:
 
 ### Excluded — deferred feature (1)
 
@@ -50,20 +49,15 @@ library, so compiled and interpreted agree). One program remains excluded:
 - **P131** — `RANDOMIZE`: needs an entropy source we have deferred (it would need
   Binate library support beyond `pkg/std/math`).
 
-### Skipped — non-portable across host ISAs (3)
+### Overflow → integer-index programs (3)
 
-Listed in [`SKIP`](SKIP); run on arm64 but not on x86-64, so skipped everywhere
-to keep CI green on both. Each converts an **overflowed** numeric (machine
-`+Inf`, from an overflow or division by zero) to an **integer index** —
-`P168` an array subscript (`Z(A^A)`, `A=9999`), `P180` an `ON…GOTO` index
-(`ON 1E-33/0 GOTO …`), `P174` a `TAB` column (`TAB(9^(9^9))`). The conversion is
-`cast(int, …)`, and casting a non-finite / out-of-range float to int is
-platform-dependent: arm64 saturates (`+Inf → INT64_MAX = 9223372036854775807`,
-the value these fixtures were frozen with) while x86-64 yields `INT64_MIN`. So
-the output differs by ISA through no fault of the program. Tracked in the
-examples repo's `TODO.md` (the minbasic side) and the binate repo's
-`explorations/claude-todo.md` (the underlying `cast(int,float)` gap); un-skip
-once `cast` is defined.
+`P168`, `P174`, `P180` each convert an **overflowed** numeric (machine `+Inf`,
+from an overflow or division by zero) to an **integer index** — `P168` an array
+subscript (`Z(A^A)`, `A=9999`), `P180` an `ON…GOTO` index (`ON 1E-33/0 GOTO …`),
+`P174` a `TAB` column (`TAB(9^(9^9))`). The conversion is `cast(int, …)`; its
+result for a non-finite / out-of-range float is **defined as saturating**
+(`+Inf → INT64_MAX = 9223372036854775807`) and host-independent, so all three
+run in CI byte-identically across modes and ISAs.
 
 ### INPUT programs (all 8 kept)
 

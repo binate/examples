@@ -2,16 +2,5 @@
 # whitespace-delimited field is the program name; the rest is the reason).
 # Blank lines and lines starting with # are ignored.
 #
-# These three are non-portable across host ISAs. minbasic converts an
-# overflowed numeric (machine +Inf, from an overflow / division by zero) to an
-# integer index via cast(int, ...), and the result of casting a non-finite /
-# out-of-range float to int is platform-dependent: arm64 saturates (+Inf ->
-# INT64_MAX), x86-64 yields INT64_MIN. The macOS/arm64-frozen fixtures encode
-# the arm64 value, so the programs fail on an x86-64 runner. Tracked in the
-# examples repo's TODO.md (the minbasic side) and the binate repo's
-# explorations/claude-todo.md (the toolchain cast(int,float) gap). Re-enable
-# once the cast semantics are defined.
-
-P168  array subscript from an overflowed expression: Z(A^A), A=9999
-P174  TAB column from an overflowed expression: TAB(9^(9^9))
-P180  ON-GOTO index from a division-by-zero result: ON 1E-33/0 GOTO ...
+# No programs are currently skipped. The mechanism is kept for any future
+# program minbasic cannot yet run portably.
