@@ -7,8 +7,8 @@
 package "main"
 
 import "pkg/ascii"
-import "pkg/bootstrap"
 import "pkg/mandel"
+import "pkg/std/os"
 
 // COLS and ROWS are the picture's sample resolution. Terminal character cells are
 // about twice as tall as wide, so ROWS is near half of COLS to keep the rendered
@@ -31,5 +31,5 @@ func main() {
 	win.MaxIm = 1.2
 	var r @ascii.Renderer = ascii.New(COLS, ROWS, MAX_ITERS)
 	mandel.Compute(win, COLS, ROWS, MAX_ITERS, r.Sink())
-	bootstrap.Write(bootstrap.STDOUT, r.Picture())
+	_, _ = os.Stdout.Write(r.Picture())
 }

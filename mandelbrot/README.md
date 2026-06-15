@@ -38,7 +38,7 @@ output:
 ```
 var r @ascii.Renderer = ascii.New(COLS, ROWS, MAX_ITERS)
 mandel.Compute(win, COLS, ROWS, MAX_ITERS, r.Sink())   // r.Sink() captures r
-bootstrap.Write(bootstrap.STDOUT, r.Picture())
+os.Stdout.Write(r.Picture())
 ```
 
 A different consumer — a pixel image, a histogram of escape counts — just
