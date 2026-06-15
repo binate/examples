@@ -6,20 +6,13 @@ import "pkg/buf"
 import "pkg/std/errors"
 import "pkg/std/os"
 
-// writeChars copies the BASIC text s (char) into a uint8 buffer holding the same
-// bytes and writes it to f, returning the number of bytes written. os.File.Write
-// takes uint8 and the interpreter core produces char (the same byte but distinct
-// types), so the bytes are copied across at this boundary; a write error is
-// discarded, the framing/ConsoleOut contract being a plain count (as the old
-// descriptor write was). A zero-copy reinterpret would be the natural shape but
-// `bit_cast` of a slice currently mis-lowers in the native backend.
+// writeChars writes the BASIC text s to f, returning the number of bytes written.
+// char is uint8, so the char slice passes straight to os.File.Write (which takes
+// uint8) with no conversion; the write error is discarded, the framing/ConsoleOut
+// contract being a plain count (as the old descriptor write was).
 func writeChars(f @os.File, s *[]readonly char) int {
-	var u @[]uint8 = make_slice(uint8, len(s))
-	for i := 0; i < len(s); i++ {
-		u[i] = cast(uint8, s[i])
-	}
 	var n int
-	n, _ = f.Write(u)
+	n, _ = f.Write(s)
 	return n
 }
 
@@ -78,8 +71,7 @@ func NewStdinReader() @LineReader {
 // '\n' (excluded from the result) or end-of-input. Eof is true only when the
 // input was already exhausted at a line boundary (an empty line returned); a
 // final unterminated line is returned with Eof false, and the next call reports
-// Eof. char and uint8 are the same byte, so the read byte stores directly via
-// cast.
+// Eof. char is uint8, so the read byte stores directly.
 //
 // The result is a single LineResult struct rather than a (line, eof) tuple
 // because returning a multi-value tuple from a vtable-dispatched interface method
@@ -109,13 +101,13 @@ func (r @stdinReader) ReadLine() LineResult {
 			return res
 		}
 		got = true
-		if one[0] == cast(uint8, '\n') {
+		if one[0] == '\n' {
 			res.Line = b.Freeze()
 			res.Eof = false
 			return res
 		}
-		if one[0] != cast(uint8, '\r') {
-			b = b.WriteByte(cast(char, one[0]))
+		if one[0] != '\r' {
+			b = b.WriteByte(one[0])
 		}
 	}
 }
@@ -175,13 +167,13 @@ func ReadFile(path *[]readonly char) (@[]char, bool) {
 	}
 	var size int64
 	var serr @errors.Error
-	size, serr = f.Seek(cast(int64, 0), os.SeekEnd)
+	size, serr = f.Seek(0, os.SeekEnd)
 	if present(serr) {
 		_ = f.Close()
 		return make_slice(char, 0), false
 	}
 	var rwerr @errors.Error
-	_, rwerr = f.Seek(cast(int64, 0), os.SeekStart)
+	_, rwerr = f.Seek(0, os.SeekStart)
 	if present(rwerr) {
 		_ = f.Close()
 		return make_slice(char, 0), false
@@ -199,7 +191,7 @@ func ReadFile(path *[]readonly char) (@[]char, bool) {
 			return make_slice(char, 0), false
 		}
 		for i := 0; i < n; i++ {
-			b = b.WriteByte(cast(char, chunk[i]))
+			b = b.WriteByte(chunk[i])
 		}
 		got = got + n
 	}
