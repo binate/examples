@@ -1,7 +1,8 @@
-// Package host is minbasic's I/O delegate — the ONE place that reaches
-// pkg/bootstrap. It implements the pkg/basic/io interfaces over the process's
-// standard streams, so the interpreter core never touches an fd. When
-// pkg/bootstrap is eventually removed/renamed, only this package changes.
+// Package host is minbasic's I/O delegate — the ONE place that reaches the
+// operating system. It implements the pkg/basic/io interfaces over the process's
+// standard streams via pkg/std/os, so the interpreter core never touches a file
+// descriptor. pkg/bootstrap survives here only for Args (process arguments) —
+// pkg/std/os has no argument or exit call yet.
 package "pkg/host"
 
 import "pkg/basic/io"
@@ -10,9 +11,18 @@ import "pkg/basic/io"
 // process's standard output.
 func NewConsole() @io.ConsoleOut
 
+// WriteStdout writes s to standard output and returns the number of bytes
+// written. It is a REPL host's framing-output primitive (banner, prompts, LIST,
+// diagnostics); a BASIC program's own PRINT output goes through NewConsole.
+func WriteStdout(s *[]readonly char) int
+
+// WriteStderr writes s to standard error and returns the number of bytes
+// written — for a host's usage and fatal-setup messages.
+func WriteStderr(s *[]readonly char) int
+
 // NewStdinReader returns a LineReader that reads the process's standard input one
 // line at a time. It is the REPL host's input source, kept here because reading
-// from a file descriptor is the one job that touches pkg/bootstrap.
+// from a file descriptor is one of the jobs that reaches pkg/std/os.
 func NewStdinReader() @LineReader
 
 // NewConsoleIn returns a pkg/basic/io.ConsoleIn that reads a BASIC program's
@@ -21,13 +31,13 @@ func NewStdinReader() @LineReader
 // competing readers racing for the same descriptor).
 func NewConsoleIn(reader @LineReader) @io.ConsoleIn
 
-// LineResult is one ReadLine outcome: the line's characters (the terminating
-// newline stripped) and an Eof flag. Eof is true only when the input is exhausted
-// at a line boundary, in which case Line is empty; a final line with content but
-// no trailing newline is returned with Eof false, and the following call then
-// reports Eof. It is a single struct (rather than a multi-value return) because a
-// vtable-dispatched interface method returning a tuple is currently miscompiled —
-// see the note in pkg/host/host.bn.
+// LineResult is one ReadLine outcome: the line's characters (Line, the
+// terminating newline stripped) and an Eof flag. Eof is true only when the input
+// is exhausted at a line boundary, in which case Line is empty; a final line with
+// content but no trailing newline is returned with Eof false, and the following
+// call then reports Eof. It is a single struct (rather than a multi-value return)
+// because a vtable-dispatched interface method returning a tuple is currently
+// miscompiled — see the note in pkg/host/host.bn.
 type LineResult struct {
 	Line @[]char
 	Eof  bool
@@ -35,14 +45,14 @@ type LineResult struct {
 
 // LineReader reads its input one line at a time, yielding a LineResult per call.
 // This is the host's stdin seam — the only line-reading path that reaches
-// pkg/bootstrap.
+// pkg/std/os.
 interface LineReader {
 	ReadLine() LineResult
 }
 
-// ReadFile reads the entire contents of the file at path, returning the bytes
-// and an ok flag (false if the file cannot be opened or read). It opens,
-// reads to end, and closes via pkg/bootstrap.
+// ReadFile reads the entire contents of the file at path, returning the bytes and
+// an ok flag (false if the file cannot be opened or is read short). It opens,
+// reads to end, and closes via pkg/std/os.
 func ReadFile(path *[]readonly char) (@[]char, bool)
 
 // Args returns the process command-line arguments as managed slices (the first

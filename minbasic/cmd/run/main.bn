@@ -24,7 +24,7 @@ import "pkg/host"
 func main() {
 	var args @[]@[]char = host.Args()
 	if len(args) == 0 {
-		bootstrap.Write(bootstrap.STDERR, "usage: run <prog.bas>\n")
+		host.WriteStderr("usage: run <prog.bas>\n")
 		bootstrap.Exit(2)
 	}
 	var path @[]char = args[len(args) - 1]
@@ -32,7 +32,7 @@ func main() {
 	var ok bool
 	src, ok = host.ReadFile(path)
 	if !ok {
-		bootstrap.Write(bootstrap.STDERR, "run: cannot read file\n")
+		host.WriteStderr("run: cannot read file\n")
 		bootstrap.Exit(1)
 	}
 	// Program output and diagnostics both go to standard output: a single ordered

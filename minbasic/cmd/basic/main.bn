@@ -13,16 +13,16 @@ import "pkg/host"
 
 // frameOut writes engine framing text to standard output. It is the ReplIO
 // normal-output channel: the banner, the prompts, and LIST output flow through
-// here. It returns the number of bytes written (the bootstrap.Write result).
+// here. It returns the number of bytes written.
 func frameOut(s *[]readonly char) int {
-	return bootstrap.Write(bootstrap.STDOUT, s)
+	return host.WriteStdout(s)
 }
 
 // frameErr writes an engine diagnostic to standard output. Routing diagnostics
 // to stdout (rather than stderr) keeps a piped session's transcript a single
 // ordered stream, so compiled and interpreted runs diff byte-for-byte.
 func frameErr(s *[]readonly char) int {
-	return bootstrap.Write(bootstrap.STDOUT, s)
+	return host.WriteStdout(s)
 }
 
 // newIO builds the ReplIO framing sink, wiring both channels to standard output.
@@ -37,7 +37,7 @@ func newIO() basic.ReplIO {
 // bakes prompt strings (Depth drives the choice); a BASIC session is always at
 // Depth 0, so the host shows the single primary prompt "> " before each read.
 func prompt() {
-	bootstrap.Write(bootstrap.STDOUT, "> ")
+	host.WriteStdout("> ")
 }
 
 // main constructs the session (framing sink + program-output console + INPUT
@@ -74,8 +74,8 @@ func reportSetupErrors(errs @[]basic.ReplError) {
 		return
 	}
 	for i := 0; i < len(errs); i++ {
-		bootstrap.Write(bootstrap.STDERR, errs[i].Msg)
-		bootstrap.Write(bootstrap.STDERR, "\n")
+		host.WriteStderr(errs[i].Msg)
+		host.WriteStderr("\n")
 	}
 	bootstrap.Exit(1)
 }

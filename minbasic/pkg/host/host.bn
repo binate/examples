@@ -3,36 +3,65 @@ package "pkg/host"
 import "pkg/basic/io"
 import "pkg/bootstrap"
 import "pkg/buf"
+import "pkg/std/errors"
+import "pkg/std/os"
 
-// bootstrapConsole writes through bootstrap.Write to a fixed file descriptor.
-// This is the only type in minbasic that depends on pkg/bootstrap.
-type bootstrapConsole struct {
-	fd int
+// writeChars copies the BASIC text s (char) into a uint8 buffer holding the same
+// bytes and writes it to f, returning the number of bytes written. os.File.Write
+// takes uint8 and the interpreter core produces char (the same byte but distinct
+// types), so the bytes are copied across at this boundary; a write error is
+// discarded, the framing/ConsoleOut contract being a plain count (as the old
+// descriptor write was). A zero-copy reinterpret would be the natural shape but
+// `bit_cast` of a slice currently mis-lowers in the native backend.
+func writeChars(f @os.File, s *[]readonly char) int {
+	var u @[]uint8 = make_slice(uint8, len(s))
+	for i := 0; i < len(s); i++ {
+		u[i] = cast(uint8, s[i])
+	}
+	var n int
+	n, _ = f.Write(u)
+	return n
 }
 
-// Write sends the characters of s to the console's fd with no added newline, so
-// PRINT's trailing-';' suppression and inline prompts work. char and uint8 are
-// the same byte, so the readonly char slice is accepted directly.
-func (c *bootstrapConsole) Write(s *[]readonly char) int {
-	return bootstrap.Write(c.fd, s)
+// WriteStdout writes s to standard output and returns the bytes written. It is a
+// REPL host's framing-output primitive (banner, prompts, LIST, diagnostics); a
+// BASIC program's own PRINT output goes through NewConsole instead.
+func WriteStdout(s *[]readonly char) int {
+	return writeChars(os.Stdout, s)
 }
 
-impl *bootstrapConsole : io.ConsoleOut
+// WriteStderr writes s to standard error and returns the bytes written — for a
+// host's usage and fatal-setup messages.
+func WriteStderr(s *[]readonly char) int {
+	return writeChars(os.Stderr, s)
+}
+
+// fileConsole writes a BASIC program's PRINT output to an os.File with no added
+// newline, so PRINT's trailing-';' suppression and inline prompts work.
+type fileConsole struct {
+	f @os.File
+}
+
+// Write sends the characters of s to the console's file (see writeChars).
+func (c *fileConsole) Write(s *[]readonly char) int {
+	return writeChars(c.f, s)
+}
+
+impl *fileConsole : io.ConsoleOut
 
 // NewConsole returns a ConsoleOut bound to standard output.
 func NewConsole() @io.ConsoleOut {
-	var c @bootstrapConsole = make(bootstrapConsole)
-	c.fd = bootstrap.STDOUT
+	var c @fileConsole = make(fileConsole)
+	c.f = os.Stdout
 	var out @io.ConsoleOut = c
 	return out
 }
 
-// stdinReader reads lines from standard input. It reads one byte per read(2)
-// call (a line-oriented REPL needs no buffering, and leaving unconsumed bytes in
-// a shared buffer is the kind of statefulness this seam avoids) and assembles a
-// line up to the next '\n'. sawEof latches once read(2) reports end-of-input, so
-// a subsequent ReadLine returns the eof signal without another syscall. This is
-// the only line-reading type that depends on pkg/bootstrap.
+// stdinReader reads lines from standard input. It reads one byte per Read call (a
+// line-oriented REPL needs no buffering, and leaving unconsumed bytes in a shared
+// buffer is the kind of statefulness this seam avoids) and assembles a line up to
+// the next '\n'. sawEof latches once Read reports no more input, so a subsequent
+// ReadLine returns the eof signal without another read.
 type stdinReader struct {
 	sawEof bool
 }
@@ -49,7 +78,8 @@ func NewStdinReader() @LineReader {
 // '\n' (excluded from the result) or end-of-input. Eof is true only when the
 // input was already exhausted at a line boundary (an empty line returned); a
 // final unterminated line is returned with Eof false, and the next call reports
-// Eof. char and uint8 are the same byte, so the read byte stores directly.
+// Eof. char and uint8 are the same byte, so the read byte stores directly via
+// cast.
 //
 // The result is a single LineResult struct rather than a (line, eof) tuple
 // because returning a multi-value tuple from a vtable-dispatched interface method
@@ -67,8 +97,12 @@ func (r @stdinReader) ReadLine() LineResult {
 	var one @[]uint8 = make_slice(uint8, 1)
 	var got bool = false
 	for {
-		var n int = bootstrap.Read(bootstrap.STDIN, one)
+		var n int
+		n, _ = os.Stdin.Read(one)
 		if n <= 0 {
+			// End of input (Read returns 0 with io.EOF) or a read error: stop and
+			// return what was accumulated. The line-reader contract carries no
+			// error channel, so a read error ends input just as EOF does.
 			r.sawEof = true
 			res.Line = b.Freeze()
 			res.Eof = !got
@@ -89,8 +123,8 @@ func (r @stdinReader) ReadLine() LineResult {
 impl @stdinReader : LineReader
 
 // consoleIn adapts a LineReader into a pkg/basic/io.ConsoleIn: a BASIC INPUT
-// reply is just one line of input, so ReadLine forwards to the wrapped reader
-// and repackages its LineResult as the io.InLine the core expects. It holds the
+// reply is just one line of input, so ReadLine forwards to the wrapped reader and
+// repackages its LineResult as the io.InLine the core expects. It holds the
 // reader (not a fresh one) so a single stdin stream can be shared — the REPL host
 // gives the same LineReader its command loop reads from, and program INPUT then
 // pulls the next line from that one stream rather than a competing reader.
@@ -121,36 +155,60 @@ func (c @consoleIn) ReadLine() io.InLine {
 
 impl @consoleIn : io.ConsoleIn
 
-// READ_CHUNK is the buffer size used per read(2) call when slurping a file.
+// READ_CHUNK is the buffer size used per Read call when slurping a file.
 const READ_CHUNK int = 4096
 
-// ReadFile reads the whole file at path via bootstrap.Open/Read/Close. It
-// accumulates the bytes into a CharBuf, reading until end-of-file (a read of 0),
-// and returns the contents and an ok flag.
+// ReadFile reads the whole file at path via pkg/std/os and returns the contents
+// and an ok flag (false if the file cannot be opened or is read short).
+//
+// It sizes the file with a seek to the end, rewinds, then reads exactly that many
+// bytes — a short read is a failure. This sidesteps classifying os's end error
+// (io.EOF) with io.IsEOF, which would need pkg/std/io: pkg/host already imports
+// pkg/basic/io, and a package directly importing two packages whose final path
+// segment is the same ("io") currently collides on the `_Package` symbol.
 func ReadFile(path *[]readonly char) (@[]char, bool) {
-	var fd int = bootstrap.Open(path, bootstrap.O_RDONLY)
-	if fd < 0 {
+	var f @os.File
+	var oerr @errors.Error
+	f, oerr = os.Open(path)
+	if present(oerr) {
 		return make_slice(char, 0), false
 	}
+	var size int64
+	var serr @errors.Error
+	size, serr = f.Seek(cast(int64, 0), os.SeekEnd)
+	if present(serr) {
+		_ = f.Close()
+		return make_slice(char, 0), false
+	}
+	var rwerr @errors.Error
+	_, rwerr = f.Seek(cast(int64, 0), os.SeekStart)
+	if present(rwerr) {
+		_ = f.Close()
+		return make_slice(char, 0), false
+	}
+	var want int = cast(int, size)
 	var b buf.CharBuf = buf.New()
 	var chunk @[]uint8 = make_slice(uint8, READ_CHUNK)
-	for {
-		var n int = bootstrap.Read(fd, chunk)
-		if n < 0 {
-			bootstrap.Close(fd)
+	var got int = 0
+	for got < want {
+		var n int
+		n, _ = f.Read(chunk)
+		if n <= 0 {
+			// Reached the end early or hit a read error before the full size.
+			_ = f.Close()
 			return make_slice(char, 0), false
-		}
-		if n == 0 {
-			bootstrap.Close(fd)
-			return b.Freeze(), true
 		}
 		for i := 0; i < n; i++ {
 			b = b.WriteByte(cast(char, chunk[i]))
 		}
+		got = got + n
 	}
+	_ = f.Close()
+	return b.Freeze(), true
 }
 
-// Args returns the process command-line arguments (bootstrap.Args wrapped).
+// Args returns the process command-line arguments (bootstrap.Args wrapped). This
+// is the one I/O job still on pkg/bootstrap — pkg/std/os has no argument accessor.
 func Args() @[]@[]char {
 	return bootstrap.Args()
 }
