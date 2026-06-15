@@ -24,14 +24,15 @@
   binary, once we have an example that reads `Args()`. The run scripts
   currently forward extra args as-is.
 
-- **generics: add `vec` and `hashmap` (blocked on generic-instantiation
-  bugs).** The `generics/` example ships `sort` only. A generic growable
-  `Vec[T]` and a `Map[K, V]` are blocked by two toolchain limitations found
-  building them, both filed in the binate repo's `explorations/claude-todo.md`:
-  (1) a generic function can't take/return a generic struct instantiated with
-  its own type parameter (`func Push[T any](v @Vec[T], x T)` → "cannot assign
-  `Vec[T]` to `Vec[int]`"); (2) a constrained generic can't forward its type
-  parameter to another constrained generic. `sort` avoids both (generic only
-  over `@[]T`, single self-contained function). Add `vec` and `hashmap` once the
-  fixes ship in a BUILDER release and `BUILDER_VERSION` is bumped past
-  `bnc-0.0.8`.
+- **generics: add `vec` and `hashmap` (blocked on a generic `.bni`
+  resolution bug).** The `generics/` example ships `sort` only. The two
+  generic-instantiation bugs that first blocked a generic `Vec[T]` / `Map[K, V]`
+  were fixed in `bnc-0.0.9`, but building them on 0.0.9 surfaced a third (filed
+  in the binate repo's `explorations/claude-todo.md`): a generic function whose
+  body lives in a `.bni` can't resolve a generic struct declared in the same
+  `.bni` — `func Push[T any](v @Vec[T], x T)` in `vec.bni` reports
+  "undefined: Box" and records the parameter as `void`. Generic bodies must live
+  in the `.bni`, so a generic container package can't be written until this is
+  fixed; `sort` avoids it (generic only over `@[]T`, no user generic struct).
+  Add `vec` and `hashmap` once the fix ships in a BUILDER release and
+  `BUILDER_VERSION` is bumped.
