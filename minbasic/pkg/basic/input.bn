@@ -2,6 +2,8 @@ package "pkg/basic"
 
 import "pkg/basic/io"
 import "pkg/buf"
+import "pkg/std/errors"
+import "pkg/std/strconv"
 
 // execInput executes an INPUT statement (ECMA-55 clause 15). It repeatedly emits
 // the prompt, reads one reply line through the runtime's ConsoleIn, and tries to

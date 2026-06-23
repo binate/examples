@@ -1,6 +1,8 @@
 package "pkg/basic"
 
 import "pkg/basic/io"
+import "pkg/buf"
+import "pkg/std/math"
 
 // ZONE_WIDTH is the width of a print zone in character positions (ECMA-55's
 // implementation-defined value; we use the standard reference 15).
