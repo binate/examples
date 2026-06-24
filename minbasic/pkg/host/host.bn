@@ -5,6 +5,7 @@ import "pkg/bootstrap"
 import "pkg/buf"
 import "pkg/std/errors"
 import "pkg/std/os"
+import stdio "pkg/std/io"
 
 // writeChars writes the BASIC text s to f, returning the number of bytes written.
 // char is uint8, so the char slice passes straight to os.File.Write (which takes
@@ -150,14 +151,9 @@ impl @consoleIn : io.ConsoleIn
 // READ_CHUNK is the buffer size used per Read call when slurping a file.
 const READ_CHUNK int = 4096
 
-// ReadFile reads the whole file at path via pkg/std/os and returns the contents
-// and an ok flag (false if the file cannot be opened or is read short).
-//
-// It sizes the file with a seek to the end, rewinds, then reads exactly that many
-// bytes — a short read is a failure. This sidesteps classifying os's end error
-// (io.EOF) with io.IsEOF, which would need pkg/std/io: pkg/host already imports
-// pkg/basic/io, and a package directly importing two packages whose final path
-// segment is the same ("io") currently collides on the `_Package` symbol.
+// ReadFile reads the whole file at path via pkg/std/os. It accumulates the bytes
+// into a CharBuf, reading until end-of-file, and returns the contents and an ok
+// flag (false if the file cannot be opened, or a non-EOF read error occurs).
 func ReadFile(path *[]readonly char) (@[]char, bool) {
 	var f @os.File
 	var oerr @errors.Error
@@ -165,38 +161,26 @@ func ReadFile(path *[]readonly char) (@[]char, bool) {
 	if present(oerr) {
 		return make_slice(char, 0), false
 	}
-	var size int64
-	var serr @errors.Error
-	size, serr = f.Seek(0, os.SeekEnd)
-	if present(serr) {
-		_ = f.Close()
-		return make_slice(char, 0), false
-	}
-	var rwerr @errors.Error
-	_, rwerr = f.Seek(0, os.SeekStart)
-	if present(rwerr) {
-		_ = f.Close()
-		return make_slice(char, 0), false
-	}
-	var want int = cast(int, size)
 	var b buf.CharBuf = buf.New()
 	var chunk @[]uint8 = make_slice(uint8, READ_CHUNK)
-	var got int = 0
-	for got < want {
+	for {
 		var n int
-		n, _ = f.Read(chunk)
-		if n <= 0 {
-			// Reached the end early or hit a read error before the full size.
-			_ = f.Close()
-			return make_slice(char, 0), false
-		}
+		var rerr @errors.Error
+		n, rerr = f.Read(chunk)
 		for i := 0; i < n; i++ {
 			b = b.WriteByte(chunk[i])
 		}
-		got = got + n
+		if present(rerr) {
+			// io.EOF is the normal end; any other error fails the read. Close in
+			// either case — its own error is not actionable here.
+			var atEof bool = stdio.IsEOF(rerr)
+			_ = f.Close()
+			if atEof {
+				return b.Freeze(), true
+			}
+			return make_slice(char, 0), false
+		}
 	}
-	_ = f.Close()
-	return b.Freeze(), true
 }
 
 // Args returns the process command-line arguments (bootstrap.Args wrapped). This
