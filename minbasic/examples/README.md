@@ -11,6 +11,10 @@ out/minbasic/run minbasic/examples/hello.bas
 ./scripts/run-interpreted.sh minbasic/cmd/run minbasic/examples/mandelbrot.bas
 ```
 
+`run.sh` here runs both programs in both modes and diffs them against
+`expected/<name>.out`, so the programs (and the output below) can't silently
+drift; it's picked up by the repo's e2e runner.
+
 ## `hello.bas`
 
 The classic — a single `PRINT "HELLO, WORLD!"`.
