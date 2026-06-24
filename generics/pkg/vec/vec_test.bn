@@ -1,0 +1,81 @@
+package "pkg/vec"
+
+import "pkg/builtins/testing"
+
+// point is a value-struct element type, used to check Vec works for a
+// non-primitive T (not just int).
+type point struct {
+	x int
+	y int
+}
+
+// TestPushGrowGet pushes past the initial capacity to exercise growth, then
+// reads every element back in order.
+func TestPushGrowGet() testing.TestResult {
+	var v @Vec[int] = New[int]()
+	for i := 0; i < 10; i++ {
+		Push[int](v, i * i)
+	}
+	if Len[int](v) != 10 {
+		return "Len should be 10 after 10 pushes"
+	}
+	for i := 0; i < 10; i++ {
+		if Get[int](v, i) != i * i {
+			return "Get should return the pushed squares in order"
+		}
+	}
+	return ""
+}
+
+// TestSetAndItems checks Set updates in place and Items is a backing-sharing view
+// (mutating it mutates the Vec).
+func TestSetAndItems() testing.TestResult {
+	var v @Vec[int] = New[int]()
+	Push[int](v, 1)
+	Push[int](v, 2)
+	Push[int](v, 3)
+	Set[int](v, 1, 20)
+	var items @[]int = Items[int](v)
+	if len(items) != 3 {
+		return "Items length should equal Len"
+	}
+	if items[0] != 1 || items[1] != 20 || items[2] != 3 {
+		return "Set should update in place, visible through Items"
+	}
+	items[2] = 30
+	if Get[int](v, 2) != 30 {
+		return "Items should share the Vec's backing"
+	}
+	return ""
+}
+
+// TestEmpty checks a fresh Vec reports no elements.
+func TestEmpty() testing.TestResult {
+	var v @Vec[int] = New[int]()
+	if Len[int](v) != 0 {
+		return "a new Vec is empty"
+	}
+	if len(Items[int](v)) != 0 {
+		return "Items of an empty Vec is empty"
+	}
+	return ""
+}
+
+// TestVecOfStructs checks Vec carries a non-primitive element type by value.
+func TestVecOfStructs() testing.TestResult {
+	var v @Vec[point] = New[point]()
+	for i := 0; i < 5; i++ {
+		var p point
+		p.x = i
+		p.y = i * 2
+		Push[point](v, p)
+	}
+	if Len[point](v) != 5 {
+		return "five structs pushed"
+	}
+	var got point = Get[point](v, 3)
+	if got.x != 3 || got.y != 6 {
+		return "struct elements should round-trip by value"
+	}
+	return ""
+}

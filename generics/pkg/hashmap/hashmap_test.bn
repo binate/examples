@@ -1,0 +1,138 @@
+package "pkg/hashmap"
+
+import "pkg/builtins/lang"
+import "pkg/builtins/testing"
+
+// coord is a user key type that opts into lang.Hashable, to check Map works for
+// a non-primitive key (not just int). Hashable extends Comparable, so it supplies
+// both Hash and Compare; the two must agree (equal coords hash equal).
+type coord struct {
+	x int
+	y int
+}
+
+func (c coord) Hash() uint {
+	return cast(uint, c.x * 31 + c.y)
+}
+
+func (c coord) Compare(other coord) int {
+	if c.x != other.x {
+		return c.x - other.x
+	}
+	return c.y - other.y
+}
+
+impl coord : lang.Hashable
+
+// TestPutGetLen checks basic insert, retrieve, and the live-entry count.
+func TestPutGetLen() testing.TestResult {
+	var m @Map[int, int] = New[int, int]()
+	Put[int, int](m, 10, 100)
+	Put[int, int](m, 20, 200)
+	if Len[int, int](m) != 2 {
+		return "two entries"
+	}
+	var v int
+	var ok bool
+	v, ok = Get[int, int](m, 10)
+	if !ok || v != 100 {
+		return "Get 10 -> 100"
+	}
+	v, ok = Get[int, int](m, 20)
+	if !ok || v != 200 {
+		return "Get 20 -> 200"
+	}
+	return ""
+}
+
+// TestOverwrite checks a repeated key replaces the value without adding an entry.
+func TestOverwrite() testing.TestResult {
+	var m @Map[int, int] = New[int, int]()
+	Put[int, int](m, 5, 1)
+	Put[int, int](m, 5, 2)
+	if Len[int, int](m) != 1 {
+		return "overwrite keeps a single entry"
+	}
+	var v int
+	var ok bool
+	v, ok = Get[int, int](m, 5)
+	if !ok || v != 2 {
+		return "value overwritten to 2"
+	}
+	return ""
+}
+
+// TestMissing checks absence: Get returns (zero, false) and Has is false.
+func TestMissing() testing.TestResult {
+	var m @Map[int, int] = New[int, int]()
+	Put[int, int](m, 1, 7)
+	var v int
+	var ok bool
+	v, ok = Get[int, int](m, 99)
+	if ok {
+		return "an absent key reports not-present"
+	}
+	if v != 0 {
+		return "an absent key returns the zero value"
+	}
+	if !Has[int, int](m, 1) {
+		return "a present key Has -> true"
+	}
+	if Has[int, int](m, 99) {
+		return "an absent key Has -> false"
+	}
+	return ""
+}
+
+// TestGrow inserts enough keys to force several doublings and checks every entry
+// survives the rehash with its value.
+func TestGrow() testing.TestResult {
+	var m @Map[int, int] = New[int, int]()
+	for i := 0; i < 50; i++ {
+		Put[int, int](m, i, i * i)
+	}
+	if Len[int, int](m) != 50 {
+		return "50 distinct keys"
+	}
+	for i := 0; i < 50; i++ {
+		var v int
+		var ok bool
+		v, ok = Get[int, int](m, i)
+		if !ok || v != i * i {
+			return "every key survives growth with its value"
+		}
+	}
+	return ""
+}
+
+// TestUserKey checks a user Hashable key type, including that two distinct coord
+// values with equal fields address the same entry.
+func TestUserKey() testing.TestResult {
+	var m @Map[coord, int] = New[coord, int]()
+	var a coord
+	a.x = 1
+	a.y = 2
+	var b coord
+	b.x = 3
+	b.y = 4
+	Put[coord, int](m, a, 12)
+	Put[coord, int](m, b, 34)
+	var v int
+	var ok bool
+	v, ok = Get[coord, int](m, a)
+	if !ok || v != 12 {
+		return "user-key Get a -> 12"
+	}
+	v, ok = Get[coord, int](m, b)
+	if !ok || v != 34 {
+		return "user-key Get b -> 34"
+	}
+	var a2 coord
+	a2.x = 1
+	a2.y = 2
+	v, ok = Get[coord, int](m, a2)
+	if !ok || v != 12 {
+		return "equal coords address the same entry"
+	}
+	return ""
+}

@@ -1,0 +1,104 @@
+// Package hashmap provides Map, a generic hash map — the library answer to
+// Binate's deliberate lack of a built-in map. This is a teaching example; a
+// production map belongs in the standard library.
+//
+// Keys are constrained to lang.Hashable, which extends lang.Comparable: that one
+// bound supplies both the bucket hash (Hash) and key equality (Compare == 0), so
+// no separate equality constraint is needed. Values are unconstrained (any).
+// Binate has no methods on generic types, so every operation is a free function
+// taking the @Map[K, V]; the generic bodies live here in the interface file so a
+// consumer monomorphizes each instantiation from this source.
+package "pkg/hashmap"
+
+import "pkg/builtins/lang"
+
+// Map is a hash map from K to V using open addressing with linear probing. keys,
+// vals and used are parallel arrays of length cap (always a power of two); used[i]
+// marks a live slot; count is the number of live entries.
+type Map[K lang.Hashable, V any] struct {
+	keys  @[]K
+	vals  @[]V
+	used  @[]bool
+	count int
+	cap   int
+}
+
+// New returns an empty Map with a small power-of-two capacity.
+func New[K lang.Hashable, V any]() @Map[K, V] {
+	var m @Map[K, V] = make(Map[K, V])
+	m.cap = 8
+	m.keys = make_slice(K, m.cap)
+	m.vals = make_slice(V, m.cap)
+	m.used = make_slice(bool, m.cap)
+	m.count = 0
+	return m
+}
+
+// Put inserts key with val, or replaces the value if key is already present. It
+// grows (doubling) before the table passes a 75% load factor.
+func Put[K lang.Hashable, V any](m @Map[K, V], key K, val V) {
+	if (m.count + 1) * 4 > m.cap * 3 {
+		grow[K, V](m)
+	}
+	var i int = slotFor[K, V](m, key)
+	if !m.used[i] {
+		m.used[i] = true
+		m.keys[i] = key
+		m.count = m.count + 1
+	}
+	m.vals[i] = val
+}
+
+// Get returns the value stored for key and whether it was present; on absence it
+// returns the zero V and false.
+func Get[K lang.Hashable, V any](m @Map[K, V], key K) (V, bool) {
+	var i int = slotFor[K, V](m, key)
+	if m.used[i] {
+		return m.vals[i], true
+	}
+	var zero V
+	return zero, false
+}
+
+// Has reports whether key is present.
+func Has[K lang.Hashable, V any](m @Map[K, V], key K) bool {
+	return m.used[slotFor[K, V](m, key)]
+}
+
+// Len returns the number of live entries.
+func Len[K lang.Hashable, V any](m @Map[K, V]) int {
+	return m.count
+}
+
+// slotFor returns key's slot index: either the slot already holding an equal key,
+// or the first free slot on key's probe sequence. The table never fills (Put
+// keeps load < 75%), so the probe always terminates at a free slot.
+func slotFor[K lang.Hashable, V any](m @Map[K, V], key K) int {
+	var mask int = m.cap - 1
+	var i int = cast(int, key.Hash() & cast(uint, mask))
+	for m.used[i] {
+		if key.Compare(m.keys[i]) == 0 {
+			return i
+		}
+		i = (i + 1) & mask
+	}
+	return i
+}
+
+// grow doubles the capacity and reinserts every live entry into the new arrays.
+func grow[K lang.Hashable, V any](m @Map[K, V]) {
+	var oldKeys @[]K = m.keys
+	var oldVals @[]V = m.vals
+	var oldUsed @[]bool = m.used
+	var oldCap int = m.cap
+	m.cap = oldCap * 2
+	m.keys = make_slice(K, m.cap)
+	m.vals = make_slice(V, m.cap)
+	m.used = make_slice(bool, m.cap)
+	m.count = 0
+	for i := 0; i < oldCap; i++ {
+		if oldUsed[i] {
+			Put[K, V](m, oldKeys[i], oldVals[i])
+		}
+	}
+}
