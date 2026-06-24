@@ -1,34 +1,11 @@
-// Command demo exercises pkg/sort: it sorts a slice of ints — a primitive that
-// satisfies Orderable out of the box — and a slice of a user type that opts into
-// Orderable. The output is fixed, so it doubles as the example's end-to-end
-// fixture (mandelbrot-style).
+// Command demo composes the three generic packages: collect numbers in a Vec,
+// Sort the Vec in place, then tally occurrences in a Map. The output is fixed, so
+// it doubles as the example's end-to-end fixture.
 package "main"
 
-import "pkg/builtins/lang"
+import "pkg/hashmap"
 import "pkg/sort"
-
-// record is a user type ordered by score; id identifies it so the printed,
-// post-sort order shows the reordering. It demonstrates a user type opting into
-// lang.Orderable with a value-receiver Compare.
-type record struct {
-	score int
-	id    int
-}
-
-// Compare orders records by ascending score, satisfying lang.Orderable.
-func (r record) Compare(other record) int {
-	return r.score - other.score
-}
-
-impl record : lang.Orderable
-
-// mkRec builds a record.
-func mkRec(score int, id int) record {
-	var r record
-	r.score = score
-	r.id = id
-	return r
-}
+import "pkg/vec"
 
 // printInts prints each element of s on its own line.
 func printInts(s @[]int) {
@@ -37,24 +14,39 @@ func printInts(s @[]int) {
 	}
 }
 
-// main sorts an int slice and a record slice and prints both results.
+// main builds a Vec of numbers, sorts it in place, then counts occurrences in a
+// Map — exercising all three packages together over int (which satisfies both
+// lang.Orderable and lang.Hashable out of the box).
 func main() {
-	var nums @[]int = @[]int{5, 3, 8, 1, 9, 2, 7}
-	println("unsorted ints:")
-	printInts(nums)
-	sort.Sort[int](nums)
-	println("sorted ints:")
-	printInts(nums)
-
-	var recs @[]record = make_slice(record, 5)
-	recs[0] = mkRec(50, 1)
-	recs[1] = mkRec(20, 2)
-	recs[2] = mkRec(40, 3)
-	recs[3] = mkRec(10, 4)
-	recs[4] = mkRec(30, 5)
-	sort.Sort[record](recs)
-	println("record ids, sorted by ascending score:")
-	for i := 0; i < len(recs); i++ {
-		println(recs[i].id)
+	// Vec — a growable array (the library stand-in for a built-in append).
+	var v @vec.Vec[int] = vec.New[int]()
+	var data @[]int = @[]int{5, 3, 8, 3, 1, 8, 3}
+	for i := 0; i < len(data); i++ {
+		vec.Push[int](v, data[i])
 	}
+	println("collected:")
+	printInts(vec.Items[int](v))
+
+	// Sort — in place over the Vec's backing view.
+	sort.Sort[int](vec.Items[int](v))
+	println("sorted:")
+	printInts(vec.Items[int](v))
+
+	// Map — tally how many times each value occurs.
+	var counts @hashmap.Map[int, int] = hashmap.New[int, int]()
+	for i := 0; i < vec.Len[int](v); i++ {
+		var k int = vec.Get[int](v, i)
+		var c int
+		c, _ = hashmap.Get[int, int](counts, k)
+		hashmap.Put[int, int](counts, k, c + 1)
+	}
+	var n int
+	println("occurrences of 3:")
+	n, _ = hashmap.Get[int, int](counts, 3)
+	println(n)
+	println("occurrences of 8:")
+	n, _ = hashmap.Get[int, int](counts, 8)
+	println(n)
+	println("distinct values:")
+	println(hashmap.Len[int, int](counts))
 }

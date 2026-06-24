@@ -1,36 +1,37 @@
 # generics
 
 Demonstrates Binate's **generics** — type parameters with interface-constraint
-bounds, monomorphized — through a small generic `sort`. Containers and sorts
-like this ultimately belong in the standard library; this is a teaching example.
+bounds, monomorphized — through three small library pieces the language
+deliberately leaves out: a growable **`Vec`**, a **`Map`**, and a generic
+**`Sort`**. They ultimately belong in the standard library; this is a teaching
+example.
 
 ```
 generics/
-  pkg/sort.bni        Sort[T Orderable], IsSorted[T Orderable]
-  cmd/demo/main.bn    sorts ints and a user Orderable type
-  tests/run.sh        end-to-end fixture (both modes)
+  pkg/vec.bni        Vec[T any] — growable array (the missing `append`)
+  pkg/hashmap.bni    Map[K Hashable, V any] — open-addressing hash map
+  pkg/sort.bni       Sort[T Orderable], IsSorted[T Orderable]
+  cmd/demo/main.bn   collect in a Vec, Sort it, tally in a Map
+  tests/run.sh       end-to-end fixture (both modes)
 ```
 
 ## What it shows
 
-- **Generic functions with a constraint.** `Sort[T lang.Orderable](s @[]T)` works
-  for any element type satisfying `lang.Orderable` (a total order via `Compare`).
-  Type arguments are always explicit — `Sort[int](nums)` — Binate does no
-  inference.
-- **Constraint-method dispatch.** Inside the generic body `s[i].Compare(s[j])`
-  calls through the constraint interface; each instantiation resolves it to the
-  concrete type's method.
-- **Primitives satisfy the standard constraints.** `int`, `uint`, `uint8`, … ship
-  with `impl … : lang.Orderable` in `pkg/builtins/lang`, so `Sort[int]` just
-  works.
-- **User types opt in** with one declaration (`cmd/demo`'s `record`):
-  ```
-  func (r record) Compare(other record) int { return r.score - other.score }
-  impl record : lang.Orderable
-  ```
-- **Generic bodies live in the `.bni`.** A consumer monomorphizes `Sort[T]` at
-  its own call site, so the body is in `pkg/sort.bni` rather than a `.bn` — the
-  template-in-header model.
+- **Generic structs + free functions.** Binate has no methods on generic types,
+  so `Vec[T]` and `Map[K,V]` are structs operated on by free functions
+  (`vec.Push[int](v, x)`, `hashmap.Put[int,int](m, k, val)`). Type arguments are
+  always explicit — Binate does no inference.
+- **Constraint bounds + method dispatch.** `Sort[T lang.Orderable]` and
+  `Map[K lang.Hashable, V any]` bound their type parameters by stdlib interfaces;
+  inside the bodies `a.Compare(b)` / `key.Hash()` dispatch to the concrete type's
+  methods. Primitives satisfy these out of the box; a user type opts in with an
+  `impl` (see the tests' `coord` / `keyed`).
+- **`Hashable` gives hashing *and* equality.** `lang.Hashable` extends
+  `lang.Comparable`, so a map key needs just that one bound — `Hash()` for the
+  bucket, `Compare() == 0` for collision resolution.
+- **Generic bodies live in the `.bni`** (template-in-header): a consumer
+  monomorphizes each instantiation from the interface file, so the bodies — and
+  the private generic helpers `Map` uses (`slotFor` / `grow`) — are there too.
 
 ## Run it
 
@@ -40,51 +41,39 @@ generics/
 ```
 
 ```
-unsorted ints:
+collected:
 5
 3
 8
+3
 1
-9
-2
-7
-sorted ints:
+8
+3
+sorted:
 1
-2
+3
+3
 3
 5
-7
 8
-9
-record ids, sorted by ascending score:
+8
+occurrences of 3:
+3
+occurrences of 8:
+2
+distinct values:
 4
-2
-5
-3
-1
 ```
 
-(The records carried scores 50, 20, 40, 10, 30; ascending by score gives ids
-4, 2, 5, 3, 1.)
+The demo collects `5 3 8 3 1 8 3` in a `Vec`, sorts it in place through its
+backing view, then tallies occurrences in a `Map` (`3` → 3, `8` → 2; 4 distinct
+values) — all three packages composed.
 
 ## Tests
 
 ```sh
-./scripts/run-tests-compiled.sh generics/pkg/sort   # the generic sort
-generics/tests/run.sh                               # end-to-end, both modes
+./scripts/run-tests-compiled.sh generics/pkg/vec
+./scripts/run-tests-compiled.sh generics/pkg/hashmap
+./scripts/run-tests-compiled.sh generics/pkg/sort
+generics/tests/run.sh                             # end-to-end, both modes
 ```
-
-## Why only `sort`?
-
-This example was meant to also carry a generic growable `Vec[T]` and a
-`Map[K, V]`. Both are currently blocked by toolchain limitations in generic
-instantiation that `sort` happens to avoid — it is generic only over `@[]T`
-(never a user generic struct) and is a single self-contained function:
-
-- a generic function can't take or return a generic struct instantiated with its
-  own type parameter (so `func Push[T any](v @Vec[T], x T)` is rejected); and
-- a constrained generic can't forward its type parameter to another constrained
-  generic (so a factored `Sort → partition → swap` is rejected).
-
-Both are filed in the binate repo's `explorations/claude-todo.md`. `vec` and
-`hashmap` land here once they are fixed — see [`../TODO.md`](../TODO.md).

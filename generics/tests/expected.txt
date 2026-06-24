@@ -1,22 +1,22 @@
-unsorted ints:
+collected:
 5
 3
 8
+3
 1
-9
-2
-7
-sorted ints:
+8
+3
+sorted:
 1
-2
+3
+3
 3
 5
-7
 8
-9
-record ids, sorted by ascending score:
+8
+occurrences of 3:
+3
+occurrences of 8:
+2
+distinct values:
 4
-2
-5
-3
-1
