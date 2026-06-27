@@ -7,8 +7,8 @@
 package "main"
 
 import "pkg/basic"
-import "pkg/bootstrap"
 import "pkg/host"
+import "pkg/std/os"
 
 // main reads the program path from the command line, loads the source via the
 // host delegate, and runs it through pkg/basic. With no path argument it prints
@@ -25,7 +25,7 @@ func main() {
 	var args @[]@[]char = host.Args()
 	if len(args) == 0 {
 		host.WriteStderr("usage: run <prog.bas>\n")
-		bootstrap.Exit(2)
+		os.Exit(2)
 	}
 	var path @[]char = args[len(args) - 1]
 	var src @[]char
@@ -33,7 +33,7 @@ func main() {
 	src, ok = host.ReadFile(path)
 	if !ok {
 		host.WriteStderr("run: cannot read file\n")
-		bootstrap.Exit(1)
+		os.Exit(1)
 	}
 	// Program output and diagnostics both go to standard output: a single ordered
 	// stream keeps a piped transcript readable and makes compiled and interpreted

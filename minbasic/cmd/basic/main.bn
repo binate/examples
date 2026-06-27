@@ -8,8 +8,8 @@
 package "main"
 
 import "pkg/basic"
-import "pkg/bootstrap"
 import "pkg/host"
+import "pkg/std/os"
 
 // frameOut writes engine framing text to standard output. It is the ReplIO
 // normal-output channel: the banner, the prompts, and LIST output flow through
@@ -77,5 +77,5 @@ func reportSetupErrors(errs @[]basic.ReplError) {
 		host.WriteStderr(errs[i].Msg)
 		host.WriteStderr("\n")
 	}
-	bootstrap.Exit(1)
+	os.Exit(1)
 }
