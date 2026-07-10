@@ -1,0 +1,46 @@
+// callrng drives the demo C RNG library (cinterop/csrc/rng.c) entirely through
+// __c_call — the intrinsic that calls a C symbol by its VERBATIM name (no Binate
+// mangling) with the C ABI.  The C signature is supplied as Binate types at the
+// call site; the arguments are ordinary Binate values cast to the matching
+// widths.  Every call here resolves to the linked rng.o at link time.
+//
+// C `unsigned int` is 32-bit on all our targets, so it is spelled uint32 (not
+// Binate `int`, which is target-word-width and would be 64-bit on a 64-bit host).
+//
+// Compiled-mode only: the bytecode VM does no FFI, so this example ships no
+// interpreted path and no unit tests (a __c_call cannot run under the VM).
+package "main"
+
+// main seeds the generator, then draws two short deterministic sequences —
+// exercising the three call shapes __c_call supports: a void-return call, a
+// no-argument call, and a call with a value argument.
+func main() {
+	// rng_seed returns void: the "void" return spelling makes the call a bare
+	// statement with no throwaway result type.  A fixed seed makes everything
+	// below reproducible from run to run.
+	__c_call("rng_seed", "void", cast(uint32, 20260710))
+
+	// rng_next takes no arguments and returns the raw 32-bit state.  Mask each
+	// draw down to 10 bits so the printed line is small and host-independent.
+	print("next & 1023:")
+	var i int = 0
+	for i < 4 {
+		var v uint32 = __c_call("rng_next", uint32)
+		print(" ")
+		print(cast(int, v & cast(uint32, 1023)))
+		i = i + 1
+	}
+	println("")
+
+	// rng_below takes one argument (the exclusive bound) — a C call with a
+	// value argument.  Reseed first so this line stands alone.
+	__c_call("rng_seed", "void", cast(uint32, 20260710))
+	print("below 100:")
+	i = 0
+	for i < 6 {
+		print(" ")
+		print(cast(int, __c_call("rng_below", uint32, cast(uint32, 100))))
+		i = i + 1
+	}
+	println("")
+}

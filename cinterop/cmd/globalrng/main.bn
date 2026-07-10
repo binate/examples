@@ -1,0 +1,44 @@
+// globalrng reaches the demo C RNG library's global STATE directly, via
+// __c_global — the intrinsic that yields the ADDRESS of a C global variable by
+// its verbatim name.  __c_global("rng_state", uint32) is a raw *uint32 (never a
+// managed @-pointer: the storage belongs to the C side and has no Binate
+// refcount header).  Reading the state is *p; reseeding the generator is *p = v
+// — a write straight into the C library's own variable.
+//
+// One __c_call("rng_next", ...) drives the generator so the effect of each write
+// is observable.  Where callrng reseeds through the rng_seed FUNCTION, this does
+// the same job by writing the global directly — the two are equivalent because
+// __c_global addresses the very same storage rng_seed assigns.
+//
+// Compiled-mode only: the bytecode VM does no FFI (no interpreted path here).
+package "main"
+
+// main reads the library's default seed through the __c_global pointer, then
+// reseeds by writing through it and confirms the writes actually changed the
+// C-side state: the same seed reproduces a draw, and a different seed changes it.
+func main() {
+	var statep *uint32 = __c_global("rng_state", uint32)
+
+	// The library ships a nonzero default seed; read it back through the pointer.
+	print("default seed nonzero: ")
+	if *statep != cast(uint32, 0) { println("yes") } else { println("no") }
+
+	// Reseed by WRITING through the pointer, draw one value, then reseed to the
+	// SAME value and draw again.  Equal draws prove the write landed in the C
+	// library's own state, not a Binate-side copy.  (xorshift32 is a bijection
+	// on nonzero states, so equal seeds give equal draws deterministically.)
+	*statep = cast(uint32, 4242)
+	var a uint32 = __c_call("rng_next", uint32)
+	*statep = cast(uint32, 4242)
+	var b uint32 = __c_call("rng_next", uint32)
+	print("same seed reproduces draw: ")
+	if a == b { println("yes") } else { println("no") }
+
+	// A DIFFERENT seed must change the draw.  The bijection guarantees distinct
+	// seeds give distinct next-values, so this is deterministically true —
+	// confirming the second write took effect too.
+	*statep = cast(uint32, 99)
+	var c uint32 = __c_call("rng_next", uint32)
+	print("different seed changes draw: ")
+	if c != a { println("yes") } else { println("no") }
+}

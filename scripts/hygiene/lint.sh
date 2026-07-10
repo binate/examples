@@ -46,6 +46,16 @@ for ex_dir in "$REPO_DIR"/*/; do
     # Only directories that look like an example (have cmd/ and/or pkg/).
     [ -d "$ex_dir/cmd" ] || [ -d "$ex_dir/pkg" ] || continue
 
+    # An example that ships a C library (csrc/) is a C-interop example: it needs
+    # a C-interop-capable toolchain (the pinned bnlint may not yet parse
+    # __c_call/__c_global) and is exercised by its own harness (tests/run.sh),
+    # which type-checks it by compiling. Skip it in this generic sweep — same
+    # rationale as build-all.sh.
+    if [ -d "$ex_dir/csrc" ]; then
+        echo "lint: skipping $ex (ships csrc/, linted by its own harness)"
+        continue
+    fi
+
     root="$ex_dir"
     I="$root:$LIB:$LIB/ifaces/core:$LIB/ifaces/stdlib"
     L="$root:$LIB:$LIB/impls/core/common:$LIB/impls/core/libc:$LIB/impls/stdlib/common"

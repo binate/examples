@@ -1,0 +1,3 @@
+default seed nonzero: yes
+same seed reproduces draw: yes
+different seed changes draw: yes

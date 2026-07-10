@@ -14,6 +14,7 @@ search root:
 <example>/
   cmd/<subexample>/    one runnable program per directory (package "main")
   pkg/...              (optional) packages private to the example
+  csrc/                (optional) C sources the example links against (C interop)
 ```
 
 A runnable example is identified by its `cmd` path, e.g. `hello/cmd/hello`.
@@ -103,6 +104,12 @@ output.
   (`Orderable`/`Hashable`) — constraint-method dispatch, monomorphized,
   bodies-in-`.bni`, with both primitives and user types satisfying the bounds.
   `cmd/demo` composes the three (collect → sort → tally).
+- [`cinterop`](cinterop/) — calling **external C library code** from Binate via
+  the `__c_call` (call a C function) and `__c_global` (address a C global)
+  intrinsics, against a small demo C library (`csrc/rng.c`, a deterministic
+  PRNG) linked in with bnc's `--link-after-objs`. Compiled-mode only (the VM
+  does no FFI), and it needs a C compiler; its harness self-skips until the
+  pinned toolchain includes `__c_global` (see the example's README).
 
 See [`TODO.md`](TODO.md) for planned work (a canary CI run against the latest
 release, the unit-test coverage sweep).
