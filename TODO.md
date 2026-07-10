@@ -23,3 +23,16 @@
   under `bni` (whether a `--` separator is needed) vs. the compiled
   binary, once we have an example that reads `Args()`. The run scripts
   currently forward extra args as-is.
+
+- **Activate `cinterop` once a release ships `__c_global`.** The `cinterop/`
+  example (external C via `__c_call`/`__c_global`) is compiled-only and gated on
+  `__c_global`, which landed on binate `main` *after* `bnc-0.0.10` (the pinned
+  `BUILDER_VERSION`). For now it is withheld from the generic CI sweeps: it ships
+  `csrc/`, so `build-all.sh` and the `lint` hygiene check skip it, and its
+  `tests/run.sh` self-skips when the resolved `bnc` lacks `__c_global` or no C
+  compiler is present. When a release includes `__c_global` and `BUILDER_VERSION`
+  is bumped to it: (a) the e2e harness activates automatically — confirm it runs
+  green in CI; (b) decide whether `csrc/` examples should stay harness-only or
+  rejoin the generic `build-all`/`lint` sweeps; (c) ensure the CI runner provides
+  a C compiler (the harness needs `cc`/`$CC` — it currently *skips* rather than
+  fails when absent, which would silently drop coverage).
