@@ -36,3 +36,17 @@
   rejoin the generic `build-all`/`lint` sweeps; (c) ensure the CI runner provides
   a C compiler (the harness needs `cc`/`$CC` — it currently *skips* rather than
   fails when absent, which would silently drop coverage).
+
+- **Activate `variadics` once a release ships variadic functions.** The
+  `variadics/` example uses `func f(xs ...T)` / spread, which landed on binate
+  `main` *after* `bnc-0.0.10`. It is **builder-gated**: `scripts/builder-gate.sh`
+  compiles `variadics/.builder-probe` with the resolved `bnc`, and `build-all.sh`,
+  `test-all.sh`, the `lint` hygiene check, and `tests/run.sh` all skip the example
+  while that probe fails. This gate is **self-clearing** — once `BUILDER_VERSION`
+  names a release with variadics, the probe compiles and the example rejoins every
+  sweep automatically. At that point just verify it goes green in CI, then the
+  gate is dead weight: the `.builder-probe` file and the `builder-gate.sh` calls
+  can be removed (leaving the gate in place is harmless — it no-ops once the probe
+  compiles — but there is no reason to keep it). Unlike `cinterop`'s permanent
+  `csrc/` skip, nothing about `variadics` needs its own harness long-term; it is a
+  normal both-modes example that only needed the newer toolchain.

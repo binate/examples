@@ -56,6 +56,14 @@ for ex_dir in "$REPO_DIR"/*/; do
         continue
     fi
 
+    # An example gated on a language feature the resolved bnc predates (a
+    # temporary, self-clearing gate — e.g. variadics until the next release);
+    # the pinned bnlint would fail to parse it.
+    if "$SCRIPT_DIR/../builder-gate.sh" "${ex_dir%/}"; then
+        echo "lint: skipping $ex (needs a newer builder — builder-gated)"
+        continue
+    fi
+
     root="$ex_dir"
     I="$root:$LIB:$LIB/ifaces/core:$LIB/ifaces/stdlib"
     L="$root:$LIB:$LIB/impls/core/common:$LIB/impls/core/libc:$LIB/impls/stdlib/common"

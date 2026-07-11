@@ -1,0 +1,44 @@
+// Package agg is a small aggregation library built on VARIADIC functions. Each
+// aggregator takes a final `...T` parameter, so a caller passes a bare list of
+// values — `agg.Sum(1, 2, 3)` — or spreads an existing slice — `agg.Sum(xs...)`.
+//
+// Individual arguments are packed into a caller-side stack array (the callee
+// sees a raw slice `*[]T`), so a variadic call allocates NO heap: the `...T` is
+// a borrow, valid for the call. To keep the values past the call a callee must
+// copy them into owned storage; these aggregators only read, so they don't.
+//
+// A variadic parameter must be the LAST parameter (`Max`/`Fold` show a fixed
+// parameter before it). `Count`/`FirstOr` are GENERIC variadics: monomorphization
+// carries the variadic-ness onto each instantiation, so `Count[T]` works for any
+// element type.
+package "pkg/agg"
+
+// Sum returns the total of its arguments (0 when given none).
+func Sum(xs ...int) int
+
+// Max returns the largest of first and rest. first is a fixed parameter, so
+// there is always at least one value — no empty case to define away.
+func Max(first int, rest ...int) int
+
+// Min returns the smallest of first and rest.
+func Min(first int, rest ...int) int
+
+// Fold reduces xs left-to-right through combine, starting from init:
+// Fold(0, add, 1, 2, 3) computes ((0+1)+2)+3. combine is a function value, so
+// the caller supplies the operation.
+func Fold(init int, combine *func(int, int) int, xs ...int) int
+
+// Count returns how many arguments it was given. It is a generic variadic, so
+// it counts values of any element type: Count[int](1, 2) or Count[char]('a').
+func Count[T any](xs ...T) int {
+	return len(xs)
+}
+
+// FirstOr returns the first argument, or dflt when there are none. Generic and
+// variadic, with a fixed leading parameter (the default).
+func FirstOr[T any](dflt T, xs ...T) T {
+	if len(xs) > 0 {
+		return xs[0]
+	}
+	return dflt
+}

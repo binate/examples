@@ -1,0 +1,106 @@
+// Unit tests for the variadic aggregators, run in both modes (bnc --test and
+// bni --test) — variadics are an ordinary language feature, so they work under
+// the compiler and the bytecode VM alike.
+package "pkg/agg"
+
+import "pkg/builtins/testing"
+
+// addOp and mulOp are combiners for the Fold tests.
+func addOp(a int, b int) int { return a + b }
+func mulOp(a int, b int) int { return a * b }
+
+// TestSumPackAndEmpty covers individual-argument packing and the empty case.
+func TestSumPackAndEmpty() testing.TestResult {
+	if Sum(1, 2, 3, 4) != 10 {
+		return "Sum(1,2,3,4) != 10"
+	}
+	if Sum() != 0 {
+		return "Sum() != 0"
+	}
+	if Sum(42) != 42 {
+		return "Sum(42) != 42"
+	}
+	return ""
+}
+
+// TestSumSpread covers spreading a managed-slice and an array sub-slice.
+func TestSumSpread() testing.TestResult {
+	var m @[]int = @[]int{5, 10, 15, 20}
+	if Sum(m...) != 50 {
+		return "Sum(m...) != 50"
+	}
+	var arr [3]int
+	arr[0] = 2
+	arr[1] = 4
+	arr[2] = 6
+	if Sum(arr[:]...) != 12 {
+		return "Sum(arr[:]...) != 12"
+	}
+	var empty @[]int = make_slice(int, 0)
+	if Sum(empty...) != 0 {
+		return "Sum(empty...) != 0"
+	}
+	return ""
+}
+
+// TestMaxMin covers a fixed parameter preceding the variadic, including the
+// single-argument (empty variadic tail) case.
+func TestMaxMin() testing.TestResult {
+	if Max(3, 1, 4, 1, 5, 9, 2) != 9 {
+		return "Max != 9"
+	}
+	if Min(3, 1, 4, 1, 5, 9, 2) != 1 {
+		return "Min != 1"
+	}
+	if Max(7) != 7 {
+		return "Max(7) != 7 (empty variadic tail)"
+	}
+	return ""
+}
+
+// TestFold covers a variadic reduced through a function-value combiner.
+func TestFold() testing.TestResult {
+	if Fold(0, addOp, 1, 2, 3, 4) != 10 {
+		return "Fold(+) != 10"
+	}
+	if Fold(1, mulOp, 1, 2, 3, 4) != 24 {
+		return "Fold(*) != 24"
+	}
+	if Fold(100, addOp) != 100 {
+		return "Fold with no values != init"
+	}
+	return ""
+}
+
+// TestFuncValue covers a variadic function value (`*func(...int) int`).
+func TestFuncValue() testing.TestResult {
+	var f *func(...int) int = Sum
+	if f(10, 20, 30) != 60 {
+		return "variadic func value f(10,20,30) != 60"
+	}
+	if f() != 0 {
+		return "variadic func value f() != 0"
+	}
+	return ""
+}
+
+// TestGeneric covers generic variadics over two element types and the
+// fixed-parameter FirstOr default.
+func TestGeneric() testing.TestResult {
+	if Count[int](1, 2, 3, 4, 5) != 5 {
+		return "Count[int] != 5"
+	}
+	if Count[char]('x', 'y', 'z') != 3 {
+		return "Count[char] != 3"
+	}
+	if Count[int]() != 0 {
+		return "Count[int]() != 0"
+	}
+	if FirstOr[int](99, 7, 8) != 7 {
+		return "FirstOr with values != 7"
+	}
+	if FirstOr[int](99) != 99 {
+		return "FirstOr empty != default"
+	}
+	return ""
+}

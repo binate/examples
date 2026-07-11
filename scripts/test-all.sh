@@ -33,7 +33,16 @@ fi
 
 found=0
 failed=0
+skipped=0
 for pkg in $pkgs; do
+    # An example gated on a language feature the resolved bnc predates (a
+    # temporary, self-clearing gate — e.g. variadics until the next release).
+    example="${pkg%%/*}"
+    if "$SCRIPT_DIR/builder-gate.sh" "$example"; then
+        echo "=== $pkg (skipped: $example needs a newer builder) ==="
+        skipped=$((skipped + 1))
+        continue
+    fi
     found=$((found + 1))
     echo "=== $pkg ==="
     if [ "$mode" != interpreted ]; then
@@ -50,5 +59,5 @@ for pkg in $pkgs; do
     fi
 done
 
-echo "test-all: $found package(s) tested, $failed failure(s)"
+echo "test-all: $found package(s) tested, $failed failure(s), $skipped skipped (builder-gated)"
 [ "$failed" -eq 0 ]

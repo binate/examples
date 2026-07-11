@@ -1,0 +1,45 @@
+// The non-generic aggregators. Their variadic parameter has in-body type raw
+// slice `*[]int`, so `len()` and indexing apply directly. (Count and FirstOr are
+// generic, so their bodies live in agg.bni — a consumer monomorphizes them at
+// the call site.)
+package "pkg/agg"
+
+// Sum returns the total of its arguments (0 when given none).
+func Sum(xs ...int) int {
+	var total int = 0
+	for i := 0; i < len(xs); i++ {
+		total = total + xs[i]
+	}
+	return total
+}
+
+// Max returns the largest of first and rest.
+func Max(first int, rest ...int) int {
+	var m int = first
+	for i := 0; i < len(rest); i++ {
+		if rest[i] > m {
+			m = rest[i]
+		}
+	}
+	return m
+}
+
+// Min returns the smallest of first and rest.
+func Min(first int, rest ...int) int {
+	var m int = first
+	for i := 0; i < len(rest); i++ {
+		if rest[i] < m {
+			m = rest[i]
+		}
+	}
+	return m
+}
+
+// Fold reduces xs left-to-right through combine, starting from init.
+func Fold(init int, combine *func(int, int) int, xs ...int) int {
+	var acc int = init
+	for i := 0; i < len(xs); i++ {
+		acc = combine(acc, xs[i])
+	}
+	return acc
+}

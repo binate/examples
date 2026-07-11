@@ -1,0 +1,53 @@
+// demo composes the variadic aggregators in pkg/agg to show every shape of a
+// variadic call: individual arguments (packed into a stack array), the empty
+// case, a fixed parameter before the variadic, a `slice...` spread, a variadic
+// function value, and generic variadics over different element types.
+//
+// Variadic functions are an ordinary language feature (not FFI), so this runs
+// identically compiled and interpreted — tests/run.sh asserts the two modes and
+// the committed fixture all agree.
+package "main"
+
+import "pkg/agg"
+
+// add sums two ints. As a top-level function it is a non-capturing function
+// value, assignable to Fold's `*func(int, int) int` combiner parameter.
+func add(a int, b int) int { return a + b }
+
+// mul multiplies two ints — the other Fold combiner used below.
+func mul(a int, b int) int { return a * b }
+
+// main prints one aggregate per line; every value is deterministic, so the
+// output is a stable fixture.
+func main() {
+	// Individual arguments pack into the callee's slice — no heap allocation.
+	println(agg.Sum(1, 2, 3, 4))          // 10
+	println(agg.Sum())                    // 0   (empty variadic -> len 0)
+	println(agg.Max(3, 1, 4, 1, 5, 9, 2)) // 9   (fixed first + variadic rest)
+	println(agg.Min(3, 1, 4, 1, 5, 9, 2)) // 1
+
+	// A spread forwards an existing slice's {data, len} as the whole variadic —
+	// no per-element copy. First a managed-slice, then an array sub-slice.
+	var nums @[]int = @[]int{5, 10, 15, 20}
+	println(agg.Sum(nums...))             // 50
+	var arr [3]int
+	arr[0] = 2
+	arr[1] = 4
+	arr[2] = 6
+	println(agg.Sum(arr[:]...))           // 12
+
+	// Fold takes its operation as a function value, so the caller picks it.
+	println(agg.Fold(0, add, 1, 2, 3, 4)) // 10  (running sum)
+	println(agg.Fold(1, mul, 1, 2, 3, 4)) // 24  (running product)
+
+	// A variadic FUNCTION VALUE: variadic-ness is part of the type
+	// `*func(...int) int`; the call packs before the single indirection.
+	var total *func(...int) int = agg.Sum
+	println(total(10, 20, 30))            // 60
+
+	// Generic variadics: the same Count over two different element types.
+	println(agg.Count[int](1, 2, 3, 4, 5))    // 5
+	println(agg.Count[char]('x', 'y', 'z'))   // 3
+	println(agg.FirstOr[int](99, 7, 8))       // 7
+	println(agg.FirstOr[int](99))             // 99  (empty -> default)
+}
