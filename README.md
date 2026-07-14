@@ -44,16 +44,9 @@ BINATE_BUNDLE=/path/to/bundle ./scripts/build-compiled.sh hello/cmd/hello
 ```
 
 `BINATE_BUNDLE` skips the versioned download entirely; the directory just needs
-the bundle layout (`bin/`, `lib/`).
-
-Some examples use a language feature newer than the pinned release (already on
-binate `main`). They are **builder-gated**: `scripts/builder-gate.sh` compiles a
-tiny `.builder-probe` in the example with the resolved toolchain, and the CI
-sweeps (`build-all`, `test-all`, `lint`) and the example's own harness skip it
-while that probe fails. Point `BINATE_BUNDLE` at a `main` build to run them now;
-once `BUILDER_VERSION` catches up, the probe compiles and they rejoin CI with no
-edit. (`cinterop` is gated differently — it ships `csrc/` and is *permanently*
-built by its own harness, since the generic bnc-only sweep can never link its C.)
+the bundle layout (`bin/`, `lib/`). This is how to run an example that uses a
+language feature newer than the pinned release (already on binate `main`) before
+a release ships it: point `BINATE_BUNDLE` at a `main` build.
 
 ## Scripts
 
@@ -123,9 +116,7 @@ output.
   **spread** operator (`slice...`): an aggregation library (`pkg/agg` — `Sum`,
   `Max`, `Fold`, a generic `Count[T]`) showing individual-argument packing (zero
   heap), spread, a fixed parameter before the variadic, variadic function values,
-  and generic variadics. Runs in both modes with unit tests. Variadics landed
-  after `bnc-0.0.10`, so it is **builder-gated** — skipped by the CI sweeps and
-  its harness until the pinned toolchain supports it (see the example's README).
+  and generic variadics. Runs in both modes with unit tests.
 
 See [`TODO.md`](TODO.md) for planned work (a canary CI run against the latest
 release, the unit-test coverage sweep).

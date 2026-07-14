@@ -73,23 +73,5 @@ scripts/run-interpreted.sh variadics/cmd/demo
 scripts/test-all.sh both variadics/pkg/agg
 ```
 
-### Toolchain requirement
-
-Variadics landed on binate `main` **after `bnc-0.0.10`** (the pinned
-`BUILDER_VERSION`), so with the pinned toolchain this example is **skipped** by
-the CI sweeps and its harness. The gate is automatic: `scripts/builder-gate.sh`
-compiles [`.builder-probe`](.builder-probe) (a minimal `...int` program) with the
-resolved `bnc`; if that fails, the example is skipped. To run it now, build a
-bundle from a binate `main` checkout and point at it:
-
-```sh
-binate/scripts/make-bundle.sh --out-dir /tmp/dist          # writes a .tar.gz
-mkdir -p /tmp/binate-main && tar -xzf /tmp/dist/*.tar.gz -C /tmp/binate-main --strip-components=1
-
-BINATE_BUNDLE=/tmp/binate-main variadics/tests/run.sh      # -> PASS
-BINATE_BUNDLE=/tmp/binate-main scripts/test-all.sh both variadics/pkg/agg
-```
-
-Once `BUILDER_VERSION` names a release that includes variadics, the probe
-compiles and the example rejoins CI automatically — no edit needed (then the
-gate and `.builder-probe` can be removed; see the repo `TODO.md`).
+Variadics shipped in `bnc-0.0.11`, so this example builds and runs with the
+pinned toolchain — no special setup.
