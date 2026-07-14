@@ -1,5 +1,5 @@
 // Package io is minbasic's I/O-injection seam: the interpreter core depends only
-// on these interfaces — never on a concrete sink nor on pkg/bootstrap. A host
+// on these interfaces — never on a concrete sink nor a platform I/O package. A host
 // supplies the implementation (a real console, a capture buffer for conformance
 // tests, a future wasm sink) and injects it into the engine, keeping the core
 // free of any low-level I/O dependency.

@@ -1,8 +1,8 @@
 // Package host is minbasic's I/O delegate — the ONE place that reaches the
 // operating system. It implements the pkg/basic/io interfaces over the process's
 // standard streams via pkg/std/os, so the interpreter core never touches a file
-// descriptor. pkg/bootstrap survives here only for Args (process arguments) —
-// pkg/std/os has no argument or exit call yet.
+// descriptor. It reaches the OS through pkg/std/os alone (streams, file reads,
+// and command-line arguments) — no lower-level dependency.
 package "pkg/host"
 
 import "pkg/basic/io"
@@ -55,6 +55,7 @@ interface LineReader {
 // reads to end, and closes via pkg/std/os.
 func ReadFile(path *[]readonly char) (@[]char, bool)
 
-// Args returns the process command-line arguments as managed slices (the first
-// element is the program name, per the platform convention).
-func Args() @[]@[]char
+// Args returns the program's command-line arguments (os.Args): element 0 is the
+// program-name placeholder (currently empty) and elements 1.. are the arguments,
+// as a fully-readonly shared slice.
+func Args() @[]readonly @[]readonly char

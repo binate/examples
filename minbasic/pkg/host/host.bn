@@ -1,7 +1,6 @@
 package "pkg/host"
 
 import "pkg/basic/io"
-import "pkg/bootstrap"
 import "pkg/buf"
 import "pkg/std/errors"
 import "pkg/std/os"
@@ -183,8 +182,10 @@ func ReadFile(path *[]readonly char) (@[]char, bool) {
 	}
 }
 
-// Args returns the process command-line arguments (bootstrap.Args wrapped). This
-// is the one I/O job still on pkg/bootstrap — pkg/std/os has no argument accessor.
-func Args() @[]@[]char {
-	return bootstrap.Args()
+// Args returns the program's command-line arguments (os.Args). Element 0 is the
+// program-name placeholder (currently an empty string — nothing captures argv[0]
+// yet) and elements 1.. are the arguments; the result is the fully-readonly,
+// process-captured shared slice.
+func Args() @[]readonly @[]readonly char {
+	return os.Args()
 }
