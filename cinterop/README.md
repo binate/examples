@@ -68,23 +68,17 @@ cinterop/tests/run.sh
 
 It compiles `csrc/*.c`, links each cmd, runs it, and diffs against the fixtures.
 
-### Toolchain requirement
+### Requirements
 
-`__c_global` landed **after** `bnc-0.0.10` (the version pinned in the repo's
-`BUILDER_VERSION`), so with the pinned toolchain the harness **skips** itself and
-`build-all.sh` skips this example (it ships `csrc/`, so it is built by its own
-harness, not the generic sweep). To run it now, build a bundle from a binate
-`main` checkout and point at it:
+A C compiler: the harness compiles `csrc/*.c` with `$CC` (default `cc`) and
+**skips** itself when there is none on `PATH`. CI installs `clang`, so it runs
+there for real.
 
-```sh
-# in a binate checkout, once, to produce a bundle with __c_global:
-binate/scripts/make-bundle.sh --out-dir /tmp/dist          # writes a .tar.gz
-mkdir -p /tmp/binate-main && tar -xzf /tmp/dist/*.tar.gz -C /tmp/binate-main --strip-components=1
+The intrinsics need a toolchain no older than `bnc-0.0.11`, which the pinned
+`BUILDER_VERSION` satisfies; an older one fails the build with
+`undefined: __c_global`.
 
-BINATE_BUNDLE=/tmp/binate-main cinterop/tests/run.sh        # -> PASS
-```
-
-`BINATE_BUNDLE` points the example scripts at a pre-built bundle directly (no
-download, no version pin). Once `BUILDER_VERSION` names a release that includes
-`__c_global`, the harness activates on the pinned toolchain automatically — no
-edit here needed.
+The generic sweeps skip this example: because it ships `csrc/`, a bnc-only build
+(`build-all.sh`) could never resolve the C symbols, and the `lint` hygiene check
+skips it on the same key. `tests/run.sh`, run by `scripts/e2e-all.sh`, is what
+builds, links, runs, and diffs it.

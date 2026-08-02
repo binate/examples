@@ -10,13 +10,11 @@
 # for each cmd.  The RNG is deterministic (fixed seeds, host-independent output),
 # so one fixture per cmd pins the whole program.
 #
-# It SKIPS (exit 0) rather than fails when its prerequisites are absent, so it is
-# safe in a CI sweep that hasn't opted into C interop yet:
-#   - no C compiler on PATH (set $CC to choose one; defaults to cc);
-#   - the resolved bnc predates __c_global (landed after bnc-0.0.10).  Until a
-#     release ships it, point at a main build: BINATE_BUNDLE=<bundle> tests/run.sh
-#     (see cinterop/README.md).  Once BUILDER_VERSION names a release with it,
-#     this harness activates automatically — no edit needed.
+# It SKIPS (exit 0) rather than fails when there is no C compiler on PATH (set
+# $CC to choose one; defaults to cc), so it is safe in a CI sweep on a host
+# without one.  Everything else is a real failure — including a resolved bnc too
+# old for the C-interop intrinsics, which fails the build with
+# "undefined: __c_global" (see cinterop/README.md for the version floor).
 #
 # Run from anywhere (it self-locates the repo root):
 #   cinterop/tests/run.sh
@@ -60,17 +58,11 @@ build() {
         -o "$WORK/$1" "$EXAMPLE_DIR/cmd/$1" 2>&1
 }
 
-# Gate on __c_global support using globalrng (the cmd that needs it).  A build
-# that fails with "undefined: __c_global" means the resolved bnc predates the
-# feature — skip the whole example.  Any other build failure is a real error.
-if ! log="$(build globalrng)"; then
-    case "$log" in
-        *"undefined: __c_global"*)
-            skip "resolved bnc predates __c_global — see cinterop/README.md" ;;
-        *)  echo "cinterop/tests/run.sh: FAIL — globalrng failed to build"; echo "$log"; exit 1 ;;
-    esac
-fi
-build callrng >/dev/null || { echo "cinterop/tests/run.sh: FAIL — callrng failed to build"; exit 1; }
+for sub in callrng globalrng; do
+    if ! log="$(build "$sub")"; then
+        echo "cinterop/tests/run.sh: FAIL — $sub failed to build"; echo "$log"; exit 1
+    fi
+done
 
 fail=0
 for sub in callrng globalrng; do

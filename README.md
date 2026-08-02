@@ -110,8 +110,7 @@ output.
   the `__c_call` (call a C function) and `__c_global` (address a C global)
   intrinsics, against a small demo C library (`csrc/rng.c`, a deterministic
   PRNG) linked in with bnc's `--link-after-objs`. Compiled-mode only (the VM
-  does no FFI), and it needs a C compiler; its harness self-skips until the
-  pinned toolchain includes `__c_global` (see the example's README).
+  does no FFI); its harness needs a C compiler and skips itself without one.
 - [`variadics`](variadics/) — **variadic functions** (`func f(xs ...T)`) and the
   **spread** operator (`slice...`): an aggregation library (`pkg/agg` — `Sum`,
   `Max`, `Fold`, a generic `Count[T]`) showing individual-argument packing (zero
