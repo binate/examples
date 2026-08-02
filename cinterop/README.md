@@ -78,7 +78,7 @@ The intrinsics need a toolchain no older than `bnc-0.0.11`, which the pinned
 `BUILDER_VERSION` satisfies; an older one fails the build with
 `undefined: __c_global`.
 
-The generic sweeps skip this example: because it ships `csrc/`, a bnc-only build
-(`build-all.sh`) could never resolve the C symbols, and the `lint` hygiene check
-skips it on the same key. `tests/run.sh`, run by `scripts/e2e-all.sh`, is what
-builds, links, runs, and diffs it.
+`build-all.sh` skips this example: because it ships `csrc/`, that bnc-only build
+could never resolve the C symbols. `tests/run.sh`, run by `scripts/e2e-all.sh`,
+is what builds, links, runs, and diffs it. The `lint` hygiene check does cover
+it — bnlint checks sources without linking, so the C side never comes up.

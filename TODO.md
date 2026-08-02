@@ -25,9 +25,10 @@
   currently forward extra args as-is.
 
 - **`cinterop` stays built by its own harness (permanent).** The C-interop
-  example ships `csrc/`, so `build-all.sh` and the `lint` hygiene check skip it —
-  the generic bnc-only sweep can never compile/link a C example. Its
-  `tests/run.sh` (run by `e2e-all.sh`) builds, links (`--link-after-objs`), and
-  runs it, and CI installs `clang` (ubuntu-latest also has `cc`), so it exercises
-  the example for real. This is by design, not a temporary gate — no action
-  needed unless the C-interop build path changes.
+  example ships `csrc/`, so `build-all.sh` skips it — the generic bnc-only sweep
+  can never compile/link a C example. Its `tests/run.sh` (run by `e2e-all.sh`)
+  builds, links (`--link-after-objs`), and runs it, and CI installs `clang`
+  (ubuntu-latest also has `cc`), so it exercises the example for real. This is by
+  design, not a temporary gate — no action needed unless the C-interop build path
+  changes. (The `lint` hygiene check is not affected: bnlint checks sources
+  without linking, so it covers this example like any other.)
