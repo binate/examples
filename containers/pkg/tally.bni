@@ -1,0 +1,77 @@
+// Package tally counts words using the standard library's containers —
+// `Vec[T]`, `Map[K, V]`, and `Set[T]` from `pkg/stdx/containers`.
+//
+// The reason `Word` exists rather than keying the map on a bare `@[]char` is the
+// current shape of `lang.Hashable`: only the scalar primitives implement it, so a
+// char-slice — Binate's string — cannot be a map key directly. Wrapping the text
+// in a one-field struct that supplies `Hash` and `Compare` is the way to key on
+// text today, and it is worth seeing: the constraint's `Self` is the VALUE type,
+// so both methods take value receivers and the `impl` names `Word`, not `*Word`.
+//
+// Every operation here is an ordinary non-generic function over a concrete
+// instantiation (`@vec.Vec[Word]`, `@set.Set[int]`), so the bodies live in
+// tally.bn — only a generic declaration must ship its body in the `.bni`.
+//
+// The counting itself lives in cmd/wordcount rather than here, and that is not a
+// style choice: a `.bni` currently cannot NAME a generic instantiated on a type
+// its own package `impl`s, so `func Counts(…) @hashmap.Map[Word, int]` is
+// rejected with "type argument Word does not satisfy constraint Hashable" even
+// though the impl is a few lines below. A `Map[Word, int]` built in any `.bn` —
+// the command, or this package's own tests — is fine.
+package "pkg/tally"
+
+import "pkg/builtins/lang"
+import "pkg/stdx/containers/iter"
+import "pkg/stdx/containers/set"
+import "pkg/stdx/containers/vec"
+
+// Word is one word of text, owned rather than borrowed: Text is a `@[]readonly
+// char` the Word keeps alive, because a Word outlives the buffer it was split
+// out of and a map holds its keys indefinitely.
+//
+// The field is public because a by-value struct has to publish its layout to be
+// usable across the package boundary — not because callers should build a Word
+// by hand; use NewWord, which owns its copy of the text.
+type Word struct {
+	Text @[]readonly char
+}
+
+// NewWord returns a Word owning a lowercased copy of text. The copy is what
+// makes a Word safe to store: text itself is a borrow that may be a view into a
+// buffer the caller reuses or drops.
+func NewWord(text *[]readonly char) Word
+
+// Hash returns the FNV-1a hash of the word's text. It must agree with Compare:
+// equal words hash equally, which holds because both read the same bytes.
+func (w Word) Hash() uint
+
+// Compare orders words lexicographically by byte, returning a negative number,
+// zero, or a positive number as w sorts before, equal to, or after other. Zero
+// means equal — that is the whole equality contract a container relies on.
+func (w Word) Compare(other Word) int
+
+// Word satisfies lang.Hashable, which is what lets it key a Map or a Set.
+// Hashable extends Comparable, so declaring this impl requires both methods; a
+// matching method set alone would NOT satisfy the constraint (impls are nominal).
+impl Word : lang.Hashable
+
+// Split breaks text into words on any non-letter byte, lowercasing as it goes,
+// and returns them in order. The result is a Vec because the word count is not
+// known in advance — a growable container with an amortized O(1) Push, unlike
+// `slices.Append`, which reallocates and copies on every single element.
+func Split(text *[]readonly char) @vec.Vec[Word]
+
+// FirstSeen returns the distinct words in order of first appearance, using a Set
+// for the membership test. Insertion order is worth keeping precisely because a
+// Map and a Set iterate in UNSPECIFIED order: this Vec is what makes a report
+// over the counts reproducible.
+func FirstSeen(words @vec.Vec[Word]) @vec.Vec[Word]
+
+// Lengths returns the distinct word lengths present.
+func Lengths(words @vec.Vec[Word]) @set.Set[int]
+
+// Sum totals the values an iterator yields. It takes the BOXED
+// `@iter.Iterator[int]` rather than a concrete cursor, so one non-generic
+// function walks a Vec, a Set, or anything else that produces one — the price is
+// a dynamic dispatch per element, where a concrete cursor's Next is a direct call.
+func Sum(it @iter.Iterator[int]) int

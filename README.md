@@ -106,6 +106,13 @@ output.
   (`Orderable`/`Hashable`) — constraint-method dispatch, monomorphized,
   bodies-in-`.bni`, with both primitives and user types satisfying the bounds.
   `cmd/demo` composes the three (collect → sort → tally).
+- [`containers`](containers/) — the standard library's **containers**
+  (`pkg/stdx/containers`): a word counter over `Vec[T]`, `Map[K, V]`, and
+  `Set[T]`, keyed on a user type that implements `lang.Hashable` (the way to key
+  on text, since no slice does). Shows the shared cursor convention, the boxed
+  `@iter.Iterator[T]` that lets one non-generic function walk any container,
+  which iteration orders are guaranteed, and why `Vec.Push` beats repeated
+  `slices.Append`.
 - [`cinterop`](cinterop/) — calling **external C library code** from Binate via
   the `__c_call` (call a C function) and `__c_global` (address a C global)
   intrinsics, against a small demo C library (`csrc/rng.c`, a deterministic

@@ -1,0 +1,22 @@
+tokens 16, distinct 11
+  the 4
+  quick 1
+  brown 1
+  fox 2
+  jumps 1
+  over 1
+  lazy 1
+  dog 2
+  barks 1
+  and 1
+  runs 1
+cat: 0 false (removing an absent key: false)
+counts sum to 16 (== tokens: true)
+dog: has true, removed true, 10 entries left
+letters 59, distinct lengths 3 summing to 12
+lengths present: 3 4 5
+vec empty: len 0 cap 0
+vec: len 4 cap 8 get(0) 99 popped 40 true
+pop of an empty vec: false
+items: len 4, v.Get(1) -1
+appended: len 5 last 40

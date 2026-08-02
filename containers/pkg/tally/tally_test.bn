@@ -1,0 +1,174 @@
+package "pkg/tally"
+
+import "pkg/builtins/testing"
+import "pkg/stdx/containers/hashmap"
+import "pkg/stdx/containers/set"
+import "pkg/stdx/containers/vec"
+
+// eq reports whether a word's text equals want, so the assertions below read as
+// comparisons rather than loops (slices have no ==).
+func eq(w Word, want *[]readonly char) bool {
+	var other Word = NewWord(want)
+	return w.Compare(other) == 0
+}
+
+// TestSplitNormalizes checks that words come out lowercased, in order, with
+// every run of non-letters treated as one separator.
+func TestSplitNormalizes() testing.TestResult {
+	var words @vec.Vec[Word] = Split("  Hello,  WORLD!! hello  ")
+	if words.Len() != 3 {
+		return "three words"
+	}
+	if !eq(words.Get(0), "hello") || !eq(words.Get(1), "world") {
+		return "lowercased in order"
+	}
+	if words.Get(0).Compare(words.Get(2)) != 0 {
+		return "the two hellos are equal"
+	}
+	return ""
+}
+
+// TestSplitEmpty checks the degenerate inputs: no letters at all is no words.
+func TestSplitEmpty() testing.TestResult {
+	if Split("").Len() != 0 {
+		return "empty text"
+	}
+	if Split("...,;  ").Len() != 0 {
+		return "punctuation only"
+	}
+	if Split("x").Len() != 1 {
+		return "a single letter is a word"
+	}
+	return ""
+}
+
+// TestWordOwnsItsText checks the property NewWord exists for: the Word keeps its
+// own copy, so it survives a mutation of the buffer it was split out of.
+func TestWordOwnsItsText() testing.TestResult {
+	var buf @[]char = make_slice(char, 3)
+	buf[0] = 'a'
+	buf[1] = 'b'
+	buf[2] = 'c'
+	var w Word = NewWord(buf)
+	buf[0] = 'z'
+	if !eq(w, "abc") {
+		return "the Word kept its own copy"
+	}
+	return ""
+}
+
+// TestCompareOrders checks the total order Compare promises: lexicographic by
+// byte, with a prefix sorting before the longer word.
+func TestCompareOrders() testing.TestResult {
+	var ab Word = NewWord("ab")
+	var abc Word = NewWord("abc")
+	var b Word = NewWord("b")
+	if ab.Compare(abc) >= 0 {
+		return "a prefix sorts first"
+	}
+	if abc.Compare(b) >= 0 {
+		return "abc sorts before b"
+	}
+	if b.Compare(b) != 0 {
+		return "a word equals itself"
+	}
+	if abc.Compare(ab) <= 0 {
+		return "antisymmetric: reversing the operands flips the sign"
+	}
+	return ""
+}
+
+// TestHashAgreesWithCompare checks the contract a container depends on: equal
+// words hash equally. (Unequal words are allowed to collide.)
+func TestHashAgreesWithCompare() testing.TestResult {
+	var a Word = NewWord("Binate")
+	var b Word = NewWord("bInAtE")
+	if a.Compare(b) != 0 {
+		return "case-folded words are equal"
+	}
+	if a.Hash() != b.Hash() {
+		return "equal words hash equally"
+	}
+	if NewWord("").Hash() != NewWord("").Hash() {
+		return "the empty word hashes consistently"
+	}
+	return ""
+}
+
+// TestWordKeysAMap checks Word working as a map key end to end — the reason it
+// implements lang.Hashable at all.
+func TestWordKeysAMap() testing.TestResult {
+	var m @hashmap.Map[Word, int] = hashmap.New[Word, int]()
+	m.Put(NewWord("one"), 1)
+	m.Put(NewWord("ONE"), 2)
+	if m.Len() != 1 {
+		return "the second Put overwrote the first"
+	}
+	v, ok := m.Get(NewWord("one"))
+	if !ok || v != 2 {
+		return "the value is the one last written"
+	}
+	_, miss := m.Get(NewWord("two"))
+	if miss {
+		return "an absent key misses"
+	}
+	if !m.Remove(NewWord("one")) || m.Len() != 0 {
+		return "remove empties the map"
+	}
+	return ""
+}
+
+// TestFirstSeenDedupesInOrder checks that the distinct words come back in order
+// of first appearance — the property the report's determinism rests on.
+func TestFirstSeenDedupesInOrder() testing.TestResult {
+	var order @vec.Vec[Word] = FirstSeen(Split("b a b c a"))
+	if order.Len() != 3 {
+		return "three distinct words"
+	}
+	if !eq(order.Get(0), "b") || !eq(order.Get(1), "a") || !eq(order.Get(2), "c") {
+		return "first-appearance order"
+	}
+	return ""
+}
+
+// TestLengths checks the Set of word lengths, including that a repeated length
+// is stored once.
+func TestLengths() testing.TestResult {
+	var lens @set.Set[int] = Lengths(Split("a bb cc ddd"))
+	if lens.Len() != 3 {
+		return "three distinct lengths"
+	}
+	if !lens.Has(1) || !lens.Has(2) || !lens.Has(3) {
+		return "1, 2 and 3 present"
+	}
+	if lens.Has(4) {
+		return "4 absent"
+	}
+	if Lengths(Split("")).Len() != 0 {
+		return "no words, no lengths"
+	}
+	return ""
+}
+
+// TestSumWalksAnyIterator checks that one non-generic Sum walks both containers,
+// through the boxed iterator each produces.
+func TestSumWalksAnyIterator() testing.TestResult {
+	var v @vec.Vec[int] = vec.New[int]()
+	v.Push(1)
+	v.Push(2)
+	v.Push(3)
+	if Sum(v.AsIterator()) != 6 {
+		return "sum of a Vec"
+	}
+	var s @set.Set[int] = set.New[int]()
+	s.Add(4)
+	s.Add(4)
+	s.Add(5)
+	if Sum(s.AsIterator()) != 9 {
+		return "sum of a Set counts a member once"
+	}
+	if Sum(vec.New[int]().AsIterator()) != 0 {
+		return "sum of nothing is zero"
+	}
+	return ""
+}

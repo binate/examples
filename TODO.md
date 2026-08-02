@@ -27,14 +27,15 @@ Written roughly in the order they are worth doing:
   `%!d(?=42)` and needs `cast(int, x)`; a struct or slice operand renders
   `%!?(unknown)` (struct reflection is a later layer).
 
-- **`containers` — the stdlib containers (`pkg/stdx/containers`).** `Vec[T]`,
-  `Map[K, V]`, and `Set[T]` over both a primitive key and a user type that
-  implements `lang.Hashable` (`Hash` + `Compare`, value receivers — the
-  constraint's `Self` is the value type); the shared cursor convention
-  (`Iter()` → `Cursor`, `Next() (T, bool)`) and the boxed `iter.Iterator[T]` /
-  `iter.Iterable[T]` protocol that lets non-generic code walk any container;
-  and `stdx/slices.Append`. Distinct from `generics`, which *writes* generic
-  containers — this one *uses* the library's.
+- **`containers` — DONE.** One thing to revisit: `countWords` sits in
+  `cmd/wordcount` instead of `pkg/tally`, because a `.bni` cannot currently name
+  a generic instantiated on a type its own package `impl`s —
+  `func Counts(…) @hashmap.Map[Word, int]` is rejected with "type argument Word
+  does not satisfy constraint Hashable" though the `impl` is in the same file.
+  Tracked as a MAJOR checker bug on the binate side; when a release ships the
+  fix, move `countWords` into `pkg/tally` as `Counts` (with a unit test — the
+  package's own `.bn` tests can already build such a map) and drop the
+  explanations from `containers/README.md` and `pkg/tally.bni`.
 
 - **`files` — files and byte streams (`pkg/std/os`, `pkg/std/io`).**
   `Create`/`Open`/`Write`/`Read` with the `io.EOF` loop (`io.IsEOF`), `Seek`,

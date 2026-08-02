@@ -1,0 +1,164 @@
+// wordcount tallies the words of a fixed sentence with the standard library's
+// containers, and along the way shows the three things a user of
+// `pkg/stdx/containers` has to know: how a container is created and grown, how
+// its cursor iterates, and which orders are guaranteed.
+//
+// Every number printed is derived from the text below, so the output is a stable
+// fixture — but only because the report is driven by an insertion-ordered Vec. A
+// Map and a Set iterate in unspecified order; printing them directly would be a
+// fixture that happens to pass.
+package "main"
+
+import "pkg/stdx/containers/hashmap"
+import "pkg/stdx/containers/set"
+import "pkg/stdx/containers/vec"
+import "pkg/stdx/fmt"
+import "pkg/stdx/slices"
+import "pkg/tally"
+
+// text is the corpus: mixed case and punctuation, so Split has something to
+// normalize away, and repeats, so the counts are interesting. Adjacent string
+// literals concatenate at compile time — Binate has no `+` on strings.
+var text @[]readonly char = "the quick brown fox jumps over the lazy dog; "
+	"The DOG barks, and the fox runs."
+
+// countWords returns how many times each word occurs. Map.Get's second result
+// distinguishes "absent" from "present and zero", which is why a miss starts the
+// count at 1 rather than leaning on the zero value.
+//
+// This belongs in pkg/tally, next to Split and FirstSeen. It sits here because a
+// `.bni` cannot currently name `@hashmap.Map[Word, int]` — see that package's
+// doc comment; a `.bn` like this one has no such trouble.
+func countWords(words @vec.Vec[tally.Word]) @hashmap.Map[tally.Word, int] {
+	var counts @hashmap.Map[tally.Word, int] = hashmap.New[tally.Word, int]()
+	var it vec.Cursor[tally.Word] = words.Iter()
+	for {
+		w, ok := it.Next()
+		if !ok {
+			break
+		}
+		n, seen := counts.Get(w)
+		if seen {
+			counts.Put(w, n + 1)
+		} else {
+			counts.Put(w, 1)
+		}
+	}
+	return counts
+}
+
+// lengthsOf returns each word's length, in word order — the Vec[int] the boxed
+// iterator below walks.
+func lengthsOf(words @vec.Vec[tally.Word]) @vec.Vec[int] {
+	var lens @vec.Vec[int] = vec.New[int]()
+	var it vec.Cursor[tally.Word] = words.Iter()
+	for {
+		w, ok := it.Next()
+		if !ok {
+			break
+		}
+		lens.Push(len(w.Text))
+	}
+	return lens
+}
+
+// main prints the tally and then walks the containers directly, one derived
+// number per line; every value follows from `text`, so the output is a fixture.
+func main() {
+	var words @vec.Vec[tally.Word] = tally.Split(text)
+	var order @vec.Vec[tally.Word] = tally.FirstSeen(words)
+	var counts @hashmap.Map[tally.Word, int] = countWords(words)
+	fmt.Printf("tokens %d, distinct %d\n", words.Len(), order.Len())
+
+	// The report walks `order` (first-appearance) and looks each word up, rather
+	// than walking the map: a Map yields its entries in unspecified order.
+	var it vec.Cursor[tally.Word] = order.Iter()
+	for {
+		w, ok := it.Next()
+		if !ok {
+			break
+		}
+		n, _ := counts.Get(w)
+		fmt.Printf("  %s %d\n", w.Text, n)
+	}
+
+	// A miss returns the zero value AND false — the second result is the only
+	// thing that separates "absent" from "present, and the value is 0".
+	var absent tally.Word = tally.NewWord("cat")
+	missing, found := counts.Get(absent)
+	var removedAbsent bool = counts.Remove(absent)
+	fmt.Printf("cat: %d %t (removing an absent key: %t)\n",
+		missing, found, removedAbsent)
+
+	// Walking the map IS fine for an order-independent question. Its cursor
+	// yields a table.Entry with Key and Val; `:=` spares us spelling the fully
+	// applied cursor type, which carries the hash and equality policies too.
+	var viaMap int = 0
+	var entries = counts.Iter()
+	for {
+		e, ok := entries.Next()
+		if !ok {
+			break
+		}
+		viaMap = viaMap + e.Val
+	}
+	fmt.Printf("counts sum to %d (== tokens: %t)\n", viaMap, viaMap == words.Len())
+
+	// NewWord lowercases, so the key built from "DOG" is the key "dog" went in
+	// under: equality is Compare == 0 over the normalized bytes, not identity.
+	// Each step is its own statement: Has, Remove, and Len each see a different
+	// map, so folding them into one call would depend on argument order.
+	var dog tally.Word = tally.NewWord("DOG")
+	var hadDog bool = counts.Has(dog)
+	var removedDog bool = counts.Remove(dog)
+	fmt.Printf("dog: has %t, removed %t, %d entries left\n",
+		hadDog, removedDog, counts.Len())
+
+	// One non-generic Sum over two different containers, through the boxed
+	// @iter.Iterator[int] both produce.
+	var lens @vec.Vec[int] = lengthsOf(words)
+	var distinct @set.Set[int] = tally.Lengths(words)
+	fmt.Printf("letters %d, distinct lengths %d summing to %d\n",
+		tally.Sum(lens.AsIterator()), distinct.Len(), tally.Sum(distinct.AsIterator()))
+
+	// A Set answers membership without iterating, so scanning a known range
+	// prints in a deterministic order the Set itself cannot promise.
+	fmt.Print("lengths present:")
+	for n := 1; n <= 8; n++ {
+		if distinct.Has(n) {
+			fmt.Printf(" %d", n)
+		}
+	}
+	fmt.Println("")
+
+	// Vec growth: the backing doubles from a 4-element floor, so Cap is >= Len
+	// and Push is amortized O(1). Pop hands the element back and clears the slot.
+	var v @vec.Vec[int] = vec.New[int]()
+	fmt.Printf("vec empty: len %d cap %d\n", v.Len(), v.Cap())
+	for i := 0; i < 5; i++ {
+		v.Push(i * 10)
+	}
+	v.Set(0, 99)
+	last, had := v.Pop()
+	fmt.Printf("vec: len %d cap %d get(0) %d popped %d %t\n",
+		v.Len(), v.Cap(), v.Get(0), last, had)
+	_, more := vec.New[int]().Pop()
+	fmt.Printf("pop of an empty vec: %t\n", more)
+
+	// Items is a VIEW of the live elements over the Vec's own backing, not a
+	// copy: writing through it writes into the Vec. It is valid until a Push
+	// grows the Vec, after which it still points at the old backing — stale
+	// content, never a dangling pointer, since the managed-slice keeps it alive.
+	var view @[]int = v.Items()
+	view[1] = -1
+	fmt.Printf("items: len %d, v.Get(1) %d\n", len(view), v.Get(1))
+
+	// slices.Append is the other way to grow, and the contrast is the point: it
+	// allocates a new backing and copies every element on EVERY call, so the same
+	// loop is O(n^2) where the Vec above is amortized O(n).
+	var xs @[]int = make_slice(int, 0)
+	for i := 0; i < 5; i++ {
+		xs = slices.Append[int](xs, i * 10)
+	}
+	fmt.Printf("appended: len %d last %d\n", len(xs), xs[len(xs) - 1])
+}

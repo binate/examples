@@ -1,0 +1,123 @@
+package "pkg/tally"
+
+import "pkg/stdx/containers/iter"
+import "pkg/stdx/containers/set"
+import "pkg/stdx/containers/vec"
+
+// isLetter reports whether c is an ASCII letter — the only bytes Split keeps.
+func isLetter(c char) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// toLower maps an ASCII uppercase letter to lowercase, leaving anything else
+// alone, so "The" and "the" become the same Word.
+func toLower(c char) char {
+	if c >= 'A' && c <= 'Z' {
+		return c + ('a' - 'A')
+	}
+	return c
+}
+
+// NewWord returns a Word owning a lowercased copy of text.
+func NewWord(text *[]readonly char) Word {
+	var buf @[]char = make_slice(char, len(text))
+	for i := 0; i < len(text); i++ {
+		buf[i] = toLower(text[i])
+	}
+	var w Word
+	// A @[]char assigns to a @[]readonly char field directly: adding
+	// element-readonly is implicit (dropping it would need a cast).
+	w.Text = buf
+	return w
+}
+
+// Hash returns the FNV-1a hash of the word's text.
+func (w Word) Hash() uint {
+	var h uint = 2166136261
+	for i := 0; i < len(w.Text); i++ {
+		h = (h ^ cast(uint, w.Text[i])) * 16777619
+	}
+	return h
+}
+
+// Compare orders words lexicographically by byte.
+func (w Word) Compare(other Word) int {
+	var n int = len(w.Text)
+	if len(other.Text) < n {
+		n = len(other.Text)
+	}
+	for i := 0; i < n; i++ {
+		if w.Text[i] != other.Text[i] {
+			return cast(int, w.Text[i]) - cast(int, other.Text[i])
+		}
+	}
+	return len(w.Text) - len(other.Text)
+}
+
+// Split breaks text into lowercased words on any non-letter byte.
+func Split(text *[]readonly char) @vec.Vec[Word] {
+	var words @vec.Vec[Word] = vec.New[Word]()
+	var start int = -1
+	for i := 0; i < len(text); i++ {
+		if isLetter(text[i]) {
+			if start < 0 {
+				start = i
+			}
+			continue
+		}
+		if start >= 0 {
+			words.Push(NewWord(text[start:i]))
+			start = -1
+		}
+	}
+	if start >= 0 {
+		words.Push(NewWord(text[start:len(text)]))
+	}
+	return words
+}
+
+// FirstSeen returns the distinct words in order of first appearance.
+func FirstSeen(words @vec.Vec[Word]) @vec.Vec[Word] {
+	var seen @set.Set[Word] = set.New[Word]()
+	var order @vec.Vec[Word] = vec.New[Word]()
+	var it vec.Cursor[Word] = words.Iter()
+	for {
+		w, ok := it.Next()
+		if !ok {
+			break
+		}
+		// Add reports whether the element was NEW, so the membership test and
+		// the insert are one operation.
+		if seen.Add(w) {
+			order.Push(w)
+		}
+	}
+	return order
+}
+
+// Lengths returns the distinct word lengths present.
+func Lengths(words @vec.Vec[Word]) @set.Set[int] {
+	var lens @set.Set[int] = set.New[int]()
+	var it vec.Cursor[Word] = words.Iter()
+	for {
+		w, ok := it.Next()
+		if !ok {
+			break
+		}
+		lens.Add(len(w.Text))
+	}
+	return lens
+}
+
+// Sum totals the values an iterator yields.
+func Sum(it @iter.Iterator[int]) int {
+	var total int = 0
+	for {
+		x, ok := it.Next()
+		if !ok {
+			break
+		}
+		total = total + x
+	}
+	return total
+}
