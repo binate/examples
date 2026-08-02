@@ -1,0 +1,15 @@
+setup: true
+write: true
+read loop: 45 bytes
+fio.ReadAll: 45 bytes, matches: true, err: false
+seek to 7 read 5 [reads]; ReadAt 6 [Binate]; position still 12: true
+seek to end: true
+copy: 45 bytes, err false, identical true
+stat: err false, size matches true, regular true, dir false, mtime self-equal true
+stat sub: dir true, regular false
+dir: copy.txt notes.txt sub
+rename: err false, old gone true, new there true
+open missing: NotFound true, ConditionsUnmet true, message [open: not found]
+remove missing: NotFound true
+remove non-empty dir: fails true
+cleanup: gone true

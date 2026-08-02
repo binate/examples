@@ -1,0 +1,188 @@
+package "pkg/fio"
+
+import "pkg/builtins/testing"
+import "pkg/std/errors"
+import "pkg/std/io"
+import "pkg/std/strings"
+
+// chunkReader serves a fixed text a few bytes at a time, then reports io.EOF —
+// a Reader that behaves like a real one (short reads are always legal) without
+// touching the filesystem. Implementing io.Reader takes a matching Read plus the
+// `impl` line; the method set alone would not satisfy the interface.
+type chunkReader struct {
+	text  @[]readonly char
+	pos   int
+	chunk int
+}
+
+// newChunkReader returns a reader over text handing back at most chunk bytes per
+// Read. text is taken as `@[]readonly char` — an owning handle — because the
+// reader keeps it past the call; a `*[]readonly char` borrow would dangle. A
+// string literal is already that type (a free view of static data), so callers
+// pass one directly.
+func newChunkReader(text @[]readonly char, chunk int) @chunkReader {
+	var r @chunkReader = make(chunkReader)
+	r.text = text
+	r.pos = 0
+	r.chunk = chunk
+	return r
+}
+
+// Read copies the next piece into p, or reports io.EOF once the text is spent.
+func (r @chunkReader) Read(p *[]uint8) (int, @errors.Error) {
+	var none @errors.Error
+	if r.pos >= len(r.text) {
+		return 0, io.EOF
+	}
+	var n int = len(r.text) - r.pos
+	if n > r.chunk {
+		n = r.chunk
+	}
+	if n > len(p) {
+		n = len(p)
+	}
+	for i := 0; i < n; i++ {
+		p[i] = r.text[r.pos + i]
+	}
+	r.pos = r.pos + n
+	return n, none
+}
+
+impl @chunkReader : io.Reader
+
+// lastGaspReader delivers one byte and fails in the SAME call — the awkward case
+// io.Reader explicitly allows and every consumer has to handle.
+type lastGaspReader struct {
+	done bool
+}
+
+// Read hands back a single byte together with a failure.
+func (r @lastGaspReader) Read(p *[]uint8) (int, @errors.Error) {
+	var none @errors.Error
+	if r.done {
+		return 0, none
+	}
+	r.done = true
+	p[0] = 'X'
+	return 1, errors.New("disk gave up")
+}
+
+impl @lastGaspReader : io.Reader
+
+// stubbornWriter accepts only a fixed number of bytes per Write and reports the
+// short write as an error, as io.Writer requires.
+type stubbornWriter struct {
+	limit   int
+	written int
+}
+
+// Write accepts up to limit bytes and fails if it could not take them all.
+func (w @stubbornWriter) Write(p *[]readonly uint8) (int, @errors.Error) {
+	var none @errors.Error
+	var n int = len(p)
+	if n > w.limit {
+		n = w.limit
+	}
+	w.written = w.written + n
+	if n < len(p) {
+		return n, errors.New("writer is full")
+	}
+	return n, none
+}
+
+impl @stubbornWriter : io.Writer
+
+// textEq reports whether two texts hold the same bytes (slices have no ==, and
+// the `same` builtin asks a different question: whether they share a referent).
+func textEq(got @[]readonly char, want *[]readonly char) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := 0; i < len(got); i++ {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestReadAllAcrossChunks checks that ReadAll reassembles a stream delivered in
+// pieces — the whole reason it loops rather than calling Read once.
+func TestReadAllAcrossChunks() testing.TestResult {
+	var text @[]readonly char = "the quick brown fox"
+	text3, err := ReadAll(newChunkReader(text, 3))
+	if present(err) {
+		return "a clean stream reports no error"
+	}
+	if !textEq(text3, "the quick brown fox") {
+		return "3-byte chunks reassemble"
+	}
+	text1, _ := ReadAll(newChunkReader(text, 1))
+	if !textEq(text1, "the quick brown fox") {
+		return "1-byte chunks reassemble"
+	}
+	big, _ := ReadAll(newChunkReader(text, 9999))
+	if !textEq(big, "the quick brown fox") {
+		return "one big chunk reassembles"
+	}
+	return ""
+}
+
+// TestReadAllEmpty checks that an immediately-exhausted reader is success with an
+// empty result, not a failure: end of input is not an error.
+func TestReadAllEmpty() testing.TestResult {
+	got, err := ReadAll(newChunkReader("", 4))
+	if present(err) {
+		return "EOF is absorbed, not reported"
+	}
+	if len(got) != 0 {
+		return "nothing read"
+	}
+	return ""
+}
+
+// TestReadAllKeepsBytesFromAFailingRead checks the n-before-err rule: the byte
+// delivered alongside the failure is kept, and the failure is still reported.
+func TestReadAllKeepsBytesFromAFailingRead() testing.TestResult {
+	var r @lastGaspReader = make(lastGaspReader)
+	got, err := ReadAll(r)
+	if !present(err) {
+		return "the failure is reported"
+	}
+	if !textEq(got, "X") {
+		return "the byte delivered with the failure is kept"
+	}
+	return ""
+}
+
+// TestCopyMovesEverything checks Copy's byte count and that the bytes land in
+// the destination — here a strings.Builder, which is an io.Writer.
+func TestCopyMovesEverything() testing.TestResult {
+	var b @strings.Builder = strings.NewBuilder()
+	n, err := Copy(b, newChunkReader("hello, world", 5))
+	if present(err) {
+		return "a clean copy reports no error"
+	}
+	if n != 12 {
+		return "12 bytes copied"
+	}
+	if !textEq(b.String(), "hello, world") {
+		return "the destination holds the source"
+	}
+	return ""
+}
+
+// TestCopyStopsOnAShortWrite checks that Copy surfaces a destination that could
+// not take everything, rather than looping or silently dropping bytes.
+func TestCopyStopsOnAShortWrite() testing.TestResult {
+	var w @stubbornWriter = make(stubbornWriter)
+	w.limit = 4
+	n, err := Copy(w, newChunkReader("hello, world", 12))
+	if !present(err) {
+		return "a short write is a failure"
+	}
+	if n != 4 {
+		return "the count covers only what was accepted"
+	}
+	return ""
+}

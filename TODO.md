@@ -37,11 +37,7 @@ Written roughly in the order they are worth doing:
   package's own `.bn` tests can already build such a map) and drop the
   explanations from `containers/README.md` and `pkg/tally.bni`.
 
-- **`files` — files and byte streams (`pkg/std/os`, `pkg/std/io`).**
-  `Create`/`Open`/`Write`/`Read` with the `io.EOF` loop (`io.IsEOF`), `Seek`,
-  `ReadAt`, `Stat` (size, `FileMode`, `ModTime`), `ReadDir`, `Mkdir`/`MkdirAll`,
-  `Rename`, `Remove`, and `errors.Is(err, errors.NotFound)`. Works in a temp
-  directory and prints derived facts, so the fixture stays deterministic.
+- **`files` — DONE.**
 
 - **`errors` — errors as values (`pkg/std/errors`).** `present(err)` rather
   than a nil test; `New`/`Wrap` and walking a cause chain with `Unwrap`;

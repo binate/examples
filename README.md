@@ -113,6 +113,12 @@ output.
   `@iter.Iterator[T]` that lets one non-generic function walk any container,
   which iteration orders are guaranteed, and why `Vec.Push` beats repeated
   `slices.Append`.
+- [`files`](files/) — **files and byte streams** (`pkg/std/os`, `pkg/std/io`):
+  create/write/read/seek/stat/list/rename/remove in a scratch directory, the
+  `io.EOF` read loop and its honor-`n`-before-`err` rule, and errors classified
+  against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
+  `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
+  tests drive them with fake streams and never touch the disk.
 - [`cinterop`](cinterop/) — calling **external C library code** from Binate via
   the `__c_call` (call a C function) and `__c_global` (address a C global)
   intrinsics, against a small demo C library (`csrc/rng.c`, a deterministic

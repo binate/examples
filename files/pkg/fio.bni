@@ -1,0 +1,35 @@
+// Package fio holds the two whole-stream helpers `pkg/std/io` deliberately
+// leaves out: read everything, and copy everything.
+//
+// Both take INTERFACES (`@io.Reader`, `@io.Writer`), not `@os.File`, which is
+// the point of the io package existing at all: nothing here knows what a file
+// is, so the same code serves a file, a `strings.Builder`, or the fake streams
+// in fio_test.bn — and the tests need no filesystem.
+//
+// Both also encode the Reader contract that trips people up: a Read may deliver
+// bytes AND fail in the same call, so `n` is honored before the error is
+// inspected. End of input is not a failure — it arrives as `io.EOF`, which these
+// helpers absorb (`io.IsEOF`) and report as success.
+package "pkg/fio"
+
+import "pkg/std/errors"
+import "pkg/std/io"
+
+// ChunkSize is how many bytes ReadAll and Copy move per underlying Read. Any
+// size is correct — a Reader may return fewer bytes than asked for at any time —
+// so this trades syscalls against buffer size, nothing else.
+const ChunkSize int = 4096
+
+// ReadAll reads r until end of input and returns everything it produced. The
+// result is `@[]readonly char`: rendered text the caller owns and reads, which is
+// what a `strings.Builder` hands back.
+//
+// On failure it returns the bytes read so far along with the error — a partial
+// read is usually more useful than nothing, and the caller can tell the cases
+// apart with `present(err)`.
+func ReadAll(r @io.Reader) (@[]readonly char, @errors.Error)
+
+// Copy reads src until end of input, writing everything to dst, and returns the
+// number of bytes written. A short write (dst accepting fewer bytes than offered)
+// is a failure by io.Writer's contract, and Copy stops at the first one.
+func Copy(dst @io.Writer, src @io.Reader) (int, @errors.Error)

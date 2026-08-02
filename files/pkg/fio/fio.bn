@@ -1,0 +1,55 @@
+package "pkg/fio"
+
+import "pkg/std/errors"
+import "pkg/std/io"
+import "pkg/std/strings"
+
+// ReadAll reads r until end of input and returns everything it produced.
+func ReadAll(r @io.Reader) (@[]readonly char, @errors.Error) {
+	var none @errors.Error
+	var b @strings.Builder = strings.NewBuilder()
+	var buf @[]uint8 = make_slice(uint8, ChunkSize)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			// Honor n BEFORE looking at err: a Read is allowed to deliver bytes
+			// and report a problem in the same call, and those bytes are gone
+			// from the stream either way.
+			_, werr := b.Write(buf[0:n])
+			if present(werr) {
+				return b.String(), werr
+			}
+		}
+		if present(err) {
+			if io.IsEOF(err) {
+				return b.String(), none
+			}
+			return b.String(), err
+		}
+	}
+	return b.String(), none
+}
+
+// Copy reads src until end of input, writing everything to dst.
+func Copy(dst @io.Writer, src @io.Reader) (int, @errors.Error) {
+	var none @errors.Error
+	var total int = 0
+	var buf @[]uint8 = make_slice(uint8, ChunkSize)
+	for {
+		n, err := src.Read(buf)
+		if n > 0 {
+			w, werr := dst.Write(buf[0:n])
+			total = total + w
+			if present(werr) {
+				return total, werr
+			}
+		}
+		if present(err) {
+			if io.IsEOF(err) {
+				return total, none
+			}
+			return total, err
+		}
+	}
+	return total, none
+}
