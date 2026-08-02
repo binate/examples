@@ -99,6 +99,17 @@ Written roughly in the order they are worth doing:
   covered indirectly (the `setup`/`usesarray` load helpers, the DIM/DEF parser
   internals). Add unit tests for any new example as it lands.
 
+  Every other example package now carries unit tests, and every example has an
+  end-to-end harness. Two deliberate exceptions remain:
+  - **`minbasic/pkg/host`** — the dependency-injection layer that binds the
+    interpreter to real stdin/stdout/files. Unit-testing it needs fake
+    descriptors; it is exercised for real by `minbasic/tests` and
+    `minbasic/sessions`, which drive whole programs and REPL transcripts
+    through it.
+  - **`cinterop`** — compiled-only by nature (a `__c_call` cannot run under the
+    VM), so it has no unit tests at all; its `tests/run.sh` builds, links, runs
+    and diffs both runnables against fixtures.
+
 - **Canary CI against the latest release.** Add a CI job that builds
   every `*/cmd/*` with `BUILDER_VERSION=latest`, separate from the pinned
   build, so a newly-published release that breaks an example is surfaced

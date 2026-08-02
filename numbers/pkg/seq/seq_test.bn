@@ -1,0 +1,122 @@
+package "pkg/seq"
+
+import "pkg/builtins/testing"
+
+// TestFibBaseCases checks the two values that define the sequence — the ones an
+// off-by-one in the loop would break first.
+func TestFibBaseCases() testing.TestResult {
+	if Fib(0) != 0 {
+		return "Fib(0) = 0"
+	}
+	if Fib(1) != 1 {
+		return "Fib(1) = 1"
+	}
+	if Fib(2) != 1 {
+		return "Fib(2) = 1"
+	}
+	return ""
+}
+
+// TestFibSequence checks the run the demo prints, plus a larger value that a
+// wrong accumulator order would get wrong without disturbing the small cases.
+func TestFibSequence() testing.TestResult {
+	var want [11]int
+	want[0] = 0
+	want[1] = 1
+	want[2] = 1
+	want[3] = 2
+	want[4] = 3
+	want[5] = 5
+	want[6] = 8
+	want[7] = 13
+	want[8] = 21
+	want[9] = 34
+	want[10] = 55
+	for i := 0; i <= 10; i++ {
+		if Fib(i) != want[i] {
+			return "the first 11 Fibonacci numbers"
+		}
+	}
+	if Fib(30) != 832040 {
+		return "Fib(30) = 832040"
+	}
+	return ""
+}
+
+// TestFibRecurrence checks the defining property across the whole range rather
+// than a table: every term is the sum of the two before it.
+func TestFibRecurrence() testing.TestResult {
+	for n := 2; n < 40; n++ {
+		if Fib(n) != Fib(n - 1) + Fib(n - 2) {
+			return "Fib(n) = Fib(n-1) + Fib(n-2)"
+		}
+	}
+	return ""
+}
+
+// TestGcdPairs checks the pairs the demo prints and a coprime pair.
+func TestGcdPairs() testing.TestResult {
+	if Gcd(48, 36) != 12 {
+		return "Gcd(48, 36) = 12"
+	}
+	if Gcd(1071, 462) != 21 {
+		return "Gcd(1071, 462) = 21"
+	}
+	if Gcd(17, 5) != 1 {
+		return "coprime pair gives 1"
+	}
+	return ""
+}
+
+// TestGcdEdges checks the cases Euclid's loop handles by falling through: a zero
+// operand, equal operands, and a divisor of the other.
+func TestGcdEdges() testing.TestResult {
+	if Gcd(0, 5) != 5 {
+		return "Gcd(0, 5) = 5"
+	}
+	if Gcd(5, 0) != 5 {
+		return "Gcd(5, 0) = 5"
+	}
+	if Gcd(0, 0) != 0 {
+		return "Gcd(0, 0) = 0"
+	}
+	if Gcd(7, 7) != 7 {
+		return "Gcd(7, 7) = 7"
+	}
+	if Gcd(9, 3) != 3 {
+		return "Gcd(9, 3) = 3 (b divides a)"
+	}
+	return ""
+}
+
+// TestGcdIsSymmetric checks that the argument order does not matter, which the
+// first iteration of the loop is what makes true.
+func TestGcdIsSymmetric() testing.TestResult {
+	for a := 1; a <= 12; a++ {
+		for b := 1; b <= 12; b++ {
+			if Gcd(a, b) != Gcd(b, a) {
+				return "Gcd(a, b) = Gcd(b, a)"
+			}
+		}
+	}
+	return ""
+}
+
+// TestGcdDivides checks the defining property: the result divides both operands,
+// and no larger value does.
+func TestGcdDivides() testing.TestResult {
+	for a := 1; a <= 24; a++ {
+		for b := 1; b <= 24; b++ {
+			var g int = Gcd(a, b)
+			if g < 1 || a % g != 0 || b % g != 0 {
+				return "the result divides both operands"
+			}
+			for d := g + 1; d <= a; d++ {
+				if a % d == 0 && b % d == 0 {
+					return "no larger common divisor exists"
+				}
+			}
+		}
+	}
+	return ""
+}
