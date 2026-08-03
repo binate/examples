@@ -1,0 +1,46 @@
+// Package proc wraps `pkg/std/os/process` for the two things a caller does with
+// a child program: describe how it ended, and run a shell command.
+//
+// The shape worth understanding is that a non-zero exit is NOT an error. The
+// trailing `@errors.Error` is present only when the child could not be STARTED
+// (the path did not resolve, or fork/exec failed); once it starts, everything —
+// exit 0, exit 7, killed by a signal — comes back in the ExitStatus. So a
+// caller checks `present(err)` for "did it run at all" and the ExitStatus for
+// "how did it go", and the two questions never get confused.
+//
+// The child inherits this process's standard input, output, and error: there is
+// no pipe or capture in this API, so a child's output lands directly on ours.
+// That is why the functions here communicate through EXIT CODES — which is also
+// what makes them testable without capturing anything.
+package "pkg/proc"
+
+import "pkg/std/errors"
+import "pkg/std/os/process"
+
+// Describe renders an ExitStatus as short text: "exit 0", "exit 7", or
+// "signal 15". Exactly one of the two forms applies, which is the invariant
+// ExitStatus guarantees — a signal death reports Code() == -1 precisely so that
+// a naive `Code() == 0` check cannot read it as a clean exit.
+func Describe(st process.ExitStatus) @[]readonly char
+
+// EnvValue returns the value bound to name in a "NAME=value" list — the POSIX
+// environ shape that os.Env() returns — and whether it was there at all. The
+// value may itself contain '=' (only the first one separates), and a name that
+// is a prefix of another entry's name does not match it.
+func EnvValue(env @[]readonly @[]readonly char, name *[]readonly char) (@[]readonly char, bool)
+
+// Sh runs `sh -c script`, resolving `sh` along PATH, with this process's
+// environment inherited.
+//
+// script is an owning `@[]readonly char` rather than the borrow a read-only
+// parameter would normally be, because ShEnv has to place it into an
+// `@[]readonly @[]readonly char` — a slice of OWNING handles — to build
+// Options.Args, and a raw borrow never converts to an owning handle. A string
+// literal is already `@[]readonly char`, so callers pass one directly.
+func Sh(script @[]readonly char) (process.ExitStatus, @errors.Error)
+
+// ShEnv runs `sh -c script` with EXACTLY the given environment — nothing is
+// inherited, so an empty list gives the child an empty environment. That is the
+// difference between `Options{Env: e}` and the zero `Options{}`, which inherits.
+func ShEnv(script @[]readonly char,
+	env @[]readonly @[]readonly char) (process.ExitStatus, @errors.Error)

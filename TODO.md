@@ -47,11 +47,7 @@ Written roughly in the order they are worth doing:
   `errors/tests/run.sh` (it becomes the usual two-way diff), and drop the note
   from the example's README and from the entry in the top-level README.
 
-- **`processes` — running a child program (`pkg/std/os/process`).**
-  `RunArgs`/`RunArgsPath`/`LookPath`, `Options` (`Args`, `Env`, `ReplaceEnv`,
-  `SearchPath`), and the `ExitStatus` shape that makes a non-zero exit *not* an
-  error: `Exited`/`Code`/`Signaled`/`Signal`/`Success`, including a
-  signal-killed child. Plus `os.Env()`/`os.Args()`.
+- **`processes` — DONE.**
 
 - **`scripting` — `#!` shebang scripts and `bni -x`.** One `.bn` file that runs
   three ways: `bni -x script.bn args…`, directly as `./script.bn args…` via the

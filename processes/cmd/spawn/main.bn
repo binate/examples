@@ -1,0 +1,77 @@
+// spawn runs a series of child programs and reports how each one ended, showing
+// the distinction the API is built around: a child that could not be STARTED is
+// an error, and everything a started child does — any exit code, or death by
+// signal — is an ExitStatus, not an error.
+//
+// The children write to this process's own stdout (there is no capture in this
+// API), so a few lines below come from `echo` rather than from here. Everything
+// is fixed text or a derived fact, so the output is a fixture.
+package "main"
+
+import "pkg/proc"
+import "pkg/std/errors"
+import "pkg/std/os"
+import "pkg/std/os/process"
+import "pkg/stdx/fmt"
+
+// report runs a shell script and prints how it ended.
+func report(label *[]readonly char, script @[]readonly char) {
+	st, err := proc.Sh(script)
+	if present(err) {
+		fmt.Printf("%s: could not start: %s\n", label, err.Error())
+		return
+	}
+	fmt.Printf("%s: %s (success %t)\n", label, proc.Describe(st), st.Success())
+}
+
+// main walks the API: a plain run, exit codes, a signal, the environment, argv0,
+// and the two ways a lookup fails.
+func main() {
+	// The simplest form: an exact path, arguments after it, environment
+	// inherited. The child's own output appears on the next line.
+	st, err := process.RunArgs("/bin/echo", "hello", "from", "the", "child")
+	fmt.Printf("echo: %s, start error %t\n", proc.Describe(st), present(err))
+
+	// A non-zero exit is not an error, and neither is a signal death.
+	report("exit 0", "exit 0")
+	report("exit 7", "exit 7")
+	report("sigterm", "kill -TERM $$")
+
+	// Only a child that never started is an error — and then there is no
+	// meaningful status to inspect.
+	_, missing := process.RunArgs("/definitely/not/a/program")
+	fmt.Printf("missing program: start error %t, NotFound %t\n",
+		present(missing), errors.Is(missing, errors.NotFound))
+
+	// LookPath answers "where would this run from" without running it.
+	p, perr := process.LookPath("sh")
+	fmt.Printf("look up sh: found %t, absolute %t\n",
+		!present(perr), len(p) > 0 && p[0] == '/')
+	_, nerr := process.LookPath("definitely-not-a-program-xyz")
+	fmt.Printf("look up nonsense: NotFound %t\n", errors.Is(nerr, errors.NotFound))
+
+	// The zero Options inherit this process's environment; an explicit Env
+	// REPLACES it. The child answers through its exit code either way.
+	var one @[]readonly @[]readonly char = @[]readonly @[]readonly char{"MARK=3"}
+	set, _ := proc.ShEnv("exit ${MARK:-9}", one)
+	var nothing @[]readonly @[]readonly char = make_slice(@[]readonly char, 0)
+	unset, _ := proc.ShEnv("exit ${MARK:-9}", nothing)
+	fmt.Printf("env: given MARK=3 -> %s; given an empty environment -> %s\n",
+		proc.Describe(set), proc.Describe(unset))
+
+	// argv[0] is not the program path: Options.Argv0 sets what the child sees as
+	// its own name, which is how a busybox-style multi-call binary works.
+	var opts process.Options
+	opts.SearchPath = true
+	opts.Argv0 = "renamed"
+	opts.Args = @[]readonly @[]readonly char{"-c", "echo child argv0 is $0"}
+	named, _ := process.Run("sh", &opts)
+	fmt.Printf("argv0: %s\n", proc.Describe(named))
+
+	// This process's own environment, read as the "NAME=value" list it is.
+	var env @[]readonly @[]readonly char = os.Env()
+	_, hasPath := proc.EnvValue(env, "PATH")
+	_, hasNonsense := proc.EnvValue(env, "BINATE_DEFINITELY_UNSET")
+	fmt.Printf("own env: entries %t, PATH set %t, nonsense set %t\n",
+		len(env) > 0, hasPath, hasNonsense)
+}

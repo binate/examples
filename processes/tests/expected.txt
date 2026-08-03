@@ -1,0 +1,12 @@
+hello from the child
+echo: exit 0, start error false
+exit 0: exit 0 (success true)
+exit 7: exit 7 (success false)
+sigterm: signal 15 (success false)
+missing program: start error true, NotFound true
+look up sh: found true, absolute true
+look up nonsense: NotFound true
+env: given MARK=3 -> exit 3; given an empty environment -> exit 9
+child argv0 is renamed
+argv0: exit 0
+own env: entries true, PATH set true, nonsense set false

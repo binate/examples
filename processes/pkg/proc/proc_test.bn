@@ -1,0 +1,177 @@
+package "pkg/proc"
+
+import "pkg/builtins/testing"
+import "pkg/std/errors"
+import "pkg/std/os/process"
+
+// textEq reports whether two texts hold the same bytes; slices have no ==.
+func textEq(a @[]readonly char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestEnvValueFinds checks the ordinary lookups against a hand-built environment.
+func TestEnvValueFinds() testing.TestResult {
+	var env @[]readonly @[]readonly char = @[]readonly @[]readonly char{
+		"HOME=/root", "PATH=/bin:/usr/bin", "EMPTY=", "ODD=a=b=c"}
+	v, ok := EnvValue(env, "PATH")
+	if !ok || !textEq(v, "/bin:/usr/bin") {
+		return "PATH"
+	}
+	e, eok := EnvValue(env, "EMPTY")
+	if !eok {
+		return "a set-but-empty value is still SET"
+	}
+	if len(e) != 0 {
+		return "and its value is empty"
+	}
+	o, ook := EnvValue(env, "ODD")
+	if !ook || !textEq(o, "a=b=c") {
+		return "only the first '=' separates"
+	}
+	return ""
+}
+
+// TestEnvValueMisses checks the ways a lookup must NOT match: an absent name, a
+// name that is a prefix of a present one, and one the present name prefixes.
+func TestEnvValueMisses() testing.TestResult {
+	var env @[]readonly @[]readonly char = @[]readonly @[]readonly char{
+		"PATHEXT=.EXE", "HO=x"}
+	_, ok := EnvValue(env, "MISSING")
+	if ok {
+		return "an absent name misses"
+	}
+	_, pre := EnvValue(env, "PATH")
+	if pre {
+		return "PATH does not match PATHEXT"
+	}
+	_, long := EnvValue(env, "HOME")
+	if long {
+		return "HOME does not match HO"
+	}
+	var empty @[]readonly @[]readonly char = make_slice(@[]readonly char, 0)
+	_, none := EnvValue(empty, "ANY")
+	if none {
+		return "an empty environment has nothing"
+	}
+	return ""
+}
+
+// TestShExitCodes checks that a child's exit code arrives in the ExitStatus and
+// is NOT reported as an error — the central property of this API.
+func TestShExitCodes() testing.TestResult {
+	ok, err := Sh("exit 0")
+	if present(err) {
+		return "a child that starts reports no error"
+	}
+	if !ok.Success() || ok.Code() != 0 || !ok.Exited() {
+		return "exit 0 is a success"
+	}
+	bad, berr := Sh("exit 7")
+	if present(berr) {
+		return "a NON-ZERO exit is still not an error"
+	}
+	if bad.Success() {
+		return "exit 7 is not a success"
+	}
+	if bad.Code() != 7 || !bad.Exited() || bad.Signaled() {
+		return "exit 7 exited with code 7"
+	}
+	return ""
+}
+
+// TestShSignalDeath checks the other half of the ExitStatus contract: a child
+// killed by a signal is not an error either, and cannot be mistaken for exit 0.
+func TestShSignalDeath() testing.TestResult {
+	st, err := Sh("kill -TERM $$")
+	if present(err) {
+		return "a signal death is not a start failure"
+	}
+	if !st.Signaled() || st.Exited() {
+		return "signaled, not exited"
+	}
+	if st.Signal() != 15 {
+		return "SIGTERM is 15 on every POSIX host"
+	}
+	if st.Code() != -1 {
+		return "Code() is -1 so a Code()==0 check cannot misread it"
+	}
+	if st.Success() {
+		return "a signal death is not a success"
+	}
+	return ""
+}
+
+// TestDescribe checks the rendering of both ExitStatus forms, over real children
+// rather than hand-built values.
+func TestDescribe() testing.TestResult {
+	zero, _ := Sh("exit 0")
+	if !textEq(Describe(zero), "exit 0") {
+		return "exit 0"
+	}
+	seven, _ := Sh("exit 7")
+	if !textEq(Describe(seven), "exit 7") {
+		return "exit 7"
+	}
+	killed, _ := Sh("kill -TERM $$")
+	if !textEq(Describe(killed), "signal 15") {
+		return "signal 15"
+	}
+	return ""
+}
+
+// TestShEnvReplaces checks that ShEnv gives the child EXACTLY the environment it
+// is handed. The child answers through its exit code, so no output is captured.
+func TestShEnvReplaces() testing.TestResult {
+	var env @[]readonly @[]readonly char = @[]readonly @[]readonly char{"MARK=3"}
+	set, err := ShEnv("exit ${MARK:-9}", env)
+	if present(err) {
+		return "the child starts"
+	}
+	if set.Code() != 3 {
+		return "the child sees MARK=3"
+	}
+	var empty @[]readonly @[]readonly char = make_slice(@[]readonly char, 0)
+	unset, _ := ShEnv("exit ${MARK:-9}", empty)
+	if unset.Code() != 9 {
+		return "an empty list means an EMPTY environment, not an inherited one"
+	}
+	return ""
+}
+
+// TestStartFailureIsAnError checks the one case that IS an error: a child that
+// could not be started at all, which yields no meaningful ExitStatus.
+func TestStartFailureIsAnError() testing.TestResult {
+	_, err := process.RunArgs("/definitely/not/a/program")
+	if !present(err) {
+		return "a program that cannot start is an error"
+	}
+	_, lerr := process.LookPath("definitely-not-a-program-xyz")
+	if !errors.Is(lerr, errors.NotFound) {
+		return "LookPath reports NotFound"
+	}
+	return ""
+}
+
+// TestLookPathFindsSh checks the successful lookup. The resolved path differs
+// across systems (/bin/sh, /usr/bin/sh), so only its shape is asserted.
+func TestLookPathFindsSh() testing.TestResult {
+	p, err := process.LookPath("sh")
+	if present(err) {
+		return "sh is on PATH"
+	}
+	if len(p) < 3 || p[0] != '/' {
+		return "the result is an absolute path"
+	}
+	if p[len(p) - 1] != 'h' || p[len(p) - 2] != 's' {
+		return "and it ends in sh"
+	}
+	return ""
+}

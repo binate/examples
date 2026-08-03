@@ -1,0 +1,56 @@
+package "pkg/proc"
+
+import "pkg/std/errors"
+import "pkg/std/os/process"
+import "pkg/stdx/fmt"
+
+// Describe renders an ExitStatus as short text.
+func Describe(st process.ExitStatus) @[]readonly char {
+	if st.Signaled() {
+		return fmt.Sprintf("signal %d", st.Signal())
+	}
+	return fmt.Sprintf("exit %d", st.Code())
+}
+
+// EnvValue returns the value bound to name in a "NAME=value" list.
+func EnvValue(env @[]readonly @[]readonly char,
+		name *[]readonly char) (@[]readonly char, bool) {
+	for i := 0; i < len(env); i++ {
+		var entry @[]readonly char = env[i]
+		if len(entry) < len(name) + 1 {
+			continue
+		}
+		if entry[len(name)] != '=' {
+			continue
+		}
+		var match bool = true
+		for j := 0; j < len(name); j++ {
+			if entry[j] != name[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return entry[len(name) + 1:len(entry)], true
+		}
+	}
+	return "", false
+}
+
+// Sh runs `sh -c script` with PATH lookup and the inherited environment.
+func Sh(script @[]readonly char) (process.ExitStatus, @errors.Error) {
+	return process.RunArgsPath("sh", "-c", script)
+}
+
+// ShEnv runs `sh -c script` with exactly the given environment.
+func ShEnv(script @[]readonly char,
+		env @[]readonly @[]readonly char) (process.ExitStatus, @errors.Error) {
+	var opts process.Options
+	opts.SearchPath = true
+	opts.Args = @[]readonly @[]readonly char{"-c", script}
+	opts.Env = env
+	// ReplaceEnv makes an EMPTY list mean "an empty environment" rather than
+	// "inherit"; without it, Options{Env: <empty>} would inherit.
+	opts.ReplaceEnv = true
+	return process.Run("sh", &opts)
+}

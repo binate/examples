@@ -125,6 +125,12 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`processes`](processes/) — **running a child program**
+  (`pkg/std/os/process`): exit codes, death by signal, `LookPath`, and the
+  `Options` fields (`Args`, `Argv0`, `Env`/`ReplaceEnv`, `SearchPath`). Built
+  around the distinction that a non-zero exit is *not* an error — only a child
+  that could not be started is — and that a signal death reports `Code() == -1`
+  so it cannot be misread as a clean exit.
 - [`errors`](errors/) — **errors as values** (`pkg/std/errors`): a config parser
   that fails four ways, showing `present(err)` instead of a nil test, the
   difference between wrapping (keeps the cause and its classification), rooting
