@@ -1,0 +1,4 @@
+argc 3
+started from source: false
+hello, world
+hello, friend

@@ -1,0 +1,37 @@
+#!/bin/sh
+# bnrun — run a Binate source file as a script: `bnrun script.bn [args...]`.
+#
+# This is the launcher a `#!` line names. It exists because a shebang can only
+# name a fixed path or (via /usr/bin/env) something on PATH, and neither can
+# carry the toolchain's `-I`/`-L` search paths — which are hundreds of characters
+# long and different on every machine, while the kernel truncates a `#!` line at
+# around 256 bytes. So the script names one short, stable thing, and that thing
+# works out the rest.
+#
+# It resolves the same toolchain the rest of the repo uses (honoring
+# BINATE_BUNDLE and BUILDER_VERSION, since it goes through fetch-builder.sh) and
+# prepends this example's directory to the search paths, so a script here can
+# import the example's own `pkg/...` as well as the standard library.
+#
+# Being a shell script is fine: the kernel forbids a shebang whose interpreter is
+# itself a script, but `/usr/bin/env` is a binary, and it execs this from user
+# space where that rule does not apply.
+#
+# Exit code: the script's, or 2 on a usage error.
+set -e
+
+[ $# -ge 1 ] || { echo "usage: bnrun <script.bn> [args...]" >&2; exit 2; }
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+EXAMPLE_DIR="$(cd "$BIN_DIR/.." && pwd)"
+REPO_DIR="$(cd "$EXAMPLE_DIR/.." && pwd)"
+
+BNI="$("$REPO_DIR/scripts/fetch-builder.sh" --tool bni)"
+LIB="$("$REPO_DIR/scripts/fetch-builder.sh" --lib)"
+BP="$(dirname "$LIB")/bin/binate-paths"
+I="$("$BP" --iface --base "$LIB" --prepend "$EXAMPLE_DIR")"
+L="$("$BP" --impl --base "$LIB" --prepend "$EXAMPLE_DIR")"
+
+# -x is bni's script mode: exactly one source file, and everything after it goes
+# to the program rather than being taken as more sources or bni flags.
+exec "$BNI" -x -I "$I" -L "$L" "$@"

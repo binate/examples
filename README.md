@@ -125,6 +125,12 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`scripting`](scripting/) — **`#!` scripts and `bni -x`**: one source file that
+  runs through the kernel, through bni's script mode, and compiled. All the
+  toolchain owes a script is ignoring the `#!` line (which `bnc` does too); the
+  rest is the ordinary shebang deployment problem, solved the ordinary way — the
+  line names a small launcher of the example's own (`bin/bnrun`) rather than an
+  interpreter it cannot locate.
 - [`interfaces`](interfaces/) — **nominal dispatch and type recovery**: an
   `impl` is what satisfies an interface (a type with the exact method set and no
   impl is included, to prove it), impls may live in any package that sees both

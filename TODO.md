@@ -49,15 +49,20 @@ Written roughly in the order they are worth doing:
 
 - **`processes` — DONE.**
 
-- **`scripting` — `#!` shebang scripts and `bni -x`.** One `.bn` file that runs
-  three ways: `bni -x script.bn args…`, directly as `./script.bn args…` via the
-  kernel, and compiled by `bnc` (the lexer skips the `#!` line, so the same
-  source is a valid program). `os.Args()` differs between them — under `bni -x`
-  element 0 is the script path; a compiled binary gets a placeholder. Note the
-  deployment constraint: this bni resolves no stdlib of its own, so the shebang
-  must carry `-I`/`-L`, and the real bundle paths blow past the kernel's ~256-byte
-  shebang limit — the harness stamps a runnable script (short symlinked search
-  paths) the way binate's own `e2e/shebang-exec.sh` does.
+- **`scripting` — DONE.** The shebang names `bin/bnrun`, a launcher of the
+  example's own, rather than the interpreter: `bni` has no default search path,
+  and the real `-I`/`-L` are far past the kernel's ~256-byte shebang limit. If
+  `bni` ever defaults its search paths to its own installation (tracked on the
+  binate side), `#!/usr/bin/env bni -x` becomes a complete shebang — but the shim
+  stays the honest thing to teach for an *uninstalled* tree, so at most the
+  README gains a note.
+
+  One thing to undo: `cmd/greet/main.bn` copies each argument into an unqualified
+  local before printing it, because `fmt` has no case for the
+  `readonly @[]readonly char` an `os.Args()` element has and renders it
+  `%!?(unknown)`. Tracked as a `fmt` gap on the binate side; when a release
+  carries the fix, print `args[i]` directly and drop the comment and the README
+  section about it.
 
 - **`text` — DONE.**
 
