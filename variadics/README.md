@@ -3,10 +3,15 @@
 A small aggregation library and a demo that exercise Binate's **variadic
 functions** (`func f(xs ...T)`) and the **spread** operator (`slice...`).
 
-Binate variadics are **homogeneous** — a variadic parameter has one element type
-`T`, so `Sum(1, 2, 3)` takes `...int`, not an arbitrary mix of types (there is no
-`printf(fmt, ...)`-style heterogeneous variadic; `print`/`println` are separate
-predeclared forms). Key properties this example shows:
+Binate variadics are **homogeneous**: a variadic parameter has one element type
+`T`, so `Sum(1, 2, 3)` takes `...int` and cannot also take a string. A
+`printf`-style call that mixes types is not an exception to that rule — it is the
+rule with `T` chosen as an interface. `fmt.Printf(format, args ...*any)` takes a
+variadic of *raw interface values*, each operand boxed at the call site, and
+dispatches on the dynamic type at run time. Homogeneous in the parameter,
+heterogeneous in what it can carry.
+
+Key properties this example shows:
 
 - **Zero heap allocation.** Individual arguments (`Sum(1, 2, 3)`) are packed into
   a caller-side stack array; the callee sees a raw slice `*[]T` — a *borrow*,

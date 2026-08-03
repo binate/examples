@@ -87,30 +87,11 @@ Written roughly in the order they are worth doing:
 
 ## Other
 
-- **Migrate off the `print`/`println` builtins to `pkg/stdx/fmt`.** They are
-  transitional debug output, slated for removal from the language; every example
-  written since `fmt` shipped uses it, and the older ones should follow. The
-  remaining users are **7 files, 40 call sites**, all of them `cmd/*` mains — no
-  library code is affected, and `minbasic` (injected `ConsoleOut`) and
-  `mandelbrot` (a caller-supplied plot closure) are already clean:
-
-  | file | sites |
-  |---|---|
-  | `variadics/cmd/demo/main.bn` | 13 |
-  | `generics/cmd/demo/main.bn` | 9 |
-  | `cinterop/cmd/callrng/main.bn` | 7 |
-  | `cinterop/cmd/globalrng/main.bn` | 6 |
-  | `numbers/cmd/{fib,gcd}/main.bn` | 3 |
-  | `hello/cmd/hello/main.bn` | 1 |
-
-  Every one of those examples now has a fixture-pinned e2e harness, so the
-  migration is fully verifiable: the output must not move by a byte. Points to
-  watch — `fmt.Println` inserts a space between two operands when neither is a
-  string, which bare `println` does not, so a multi-argument line usually wants
-  `Printf` with an explicit format; a `print(x)` with no newline becomes
-  `Printf` too; and `fmt` does not yet format a `char`, a `uint`, or a sized int
-  (they render as `%!d(?=42)`), so a value of one of those types needs
-  `cast(int, x)` at the call — `cinterop` already casts, for its own reasons.
+- **Migration off `print`/`println` — DONE.** No example calls the builtins any
+  more; all output goes through `pkg/stdx/fmt`. A repo-wide grep is the check
+  (`grep -rn '\bprintln(\|\bprint(' --include='*.bn' --include='*.bni'`), and it
+  should stay empty: they are transitional debug output slated for removal from
+  the language, so a new example must not reach for them.
 
 - **Unit-test coverage sweep (largely complete).** minbasic's `pkg/buf` and
   the whole `pkg/basic` core are unit-tested (~166 tests, green under both

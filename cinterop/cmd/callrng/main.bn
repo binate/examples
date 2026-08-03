@@ -11,6 +11,8 @@
 // interpreted path and no unit tests (a __c_call cannot run under the VM).
 package "main"
 
+import "pkg/stdx/fmt"
+
 // main seeds the generator, then draws two short deterministic sequences —
 // exercising the three call shapes __c_call supports: a void-return call, a
 // no-argument call, and a call with a value argument.
@@ -22,25 +24,25 @@ func main() {
 
 	// rng_next takes no arguments and returns the raw 32-bit state.  Mask each
 	// draw down to 10 bits so the printed line is small and host-independent.
-	print("next & 1023:")
+	fmt.Print("next & 1023:")
 	var i int = 0
 	for i < 4 {
 		var v uint32 = __c_call("rng_next", uint32)
-		print(" ")
-		print(cast(int, v & cast(uint32, 1023)))
+		// fmt does not format a uint32 (it renders as an error verb), so the
+		// masked draw is cast to int at the call — as it was for print.
+		fmt.Printf(" %d", cast(int, v & cast(uint32, 1023)))
 		i = i + 1
 	}
-	println("")
+	fmt.Println("")
 
 	// rng_below takes one argument (the exclusive bound) — a C call with a
 	// value argument.  Reseed first so this line stands alone.
 	__c_call("rng_seed", "void", cast(uint32, 20260710))
-	print("below 100:")
+	fmt.Print("below 100:")
 	i = 0
 	for i < 6 {
-		print(" ")
-		print(cast(int, __c_call("rng_below", uint32, cast(uint32, 100))))
+		fmt.Printf(" %d", cast(int, __c_call("rng_below", uint32, cast(uint32, 100))))
 		i = i + 1
 	}
-	println("")
+	fmt.Println("")
 }

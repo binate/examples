@@ -1,6 +1,13 @@
 package "main"
 
 // The minimal Binate example: print a line and exit.
+//
+// Output goes through pkg/stdx/fmt rather than the `println` builtin, which is
+// transitional debug output on its way out of the language. So even the smallest
+// program carries one import — that is the real shape of a Binate program.
+import "pkg/stdx/fmt"
+
+// main prints a greeting.
 func main() {
-	println("Hello from Binate!")
+	fmt.Println("Hello from Binate!")
 }
