@@ -1,0 +1,23 @@
+points from constants:
+  epoch                  1970-01-01 00:00:00 UTC
+  one second before      1969-12-31 23:59:59 UTC
+  1000000000             2001-09-09 01:46:40 UTC
+  2000-02-29 (leap)      2000-02-29 00:00:00 UTC
+  day before             2100-02-28 00:00:00 UTC
+  day after              2100-03-01 00:00:00 UTC
+round trip: unix 1000000000.000000000, since year 1 63135596800, nanosecond 0
+ordering: before true, after false, equal false, self-equal true
+deltas:
+  2000 - 1000            16m40s
+  1000 - 2000            -16m40s
+  same point             0s
+  with a fraction        1h13m30.5s (4410500000000 ns)
+  a century              876600h0m0s
+normalization:
+  2000-13-01             2001-01-01 00:00:00 UTC
+  2000-03-00             2000-02-29 00:00:00 UTC
+  2000-01-366            2000-12-31 00:00:00 UTC
+civil: 2009-02-13 23:31:30, round trip true
+leap years: 1900 false, 2000 true, 2024 true, 2100 false; Feb 2024 29, Feb 2023 28
+file time: readable true, after 2020 true, month in range true, self-equal true
+and it is after the epoch: true

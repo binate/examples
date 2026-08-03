@@ -1,0 +1,57 @@
+// Package cal turns a `time.Point` into a date a person can read, and back.
+//
+// It exists because `pkg/std/time` deliberately stops short of a calendar: a
+// Point is a position on an idealized timeline with no leap seconds, and a Delta
+// is a signed difference between two of them. Neither knows about years, months,
+// or time zones — so a program that wants "2001-09-09 01:46:40" has to compute
+// it, which is what this package does (in UTC, proleptic Gregorian).
+//
+// The other thing time does not have is a CLOCK. There is no `Now()`, no `Sleep`,
+// and no syscall underneath either — so every Point here comes from a constant,
+// from arithmetic, or from a file's modification time. That is a real limitation
+// of the current library rather than a stylistic choice, and the example works
+// within it rather than around it.
+package "pkg/cal"
+
+import "pkg/std/time"
+
+// Date is a civil date and time in UTC — the human-facing decomposition of a
+// Point. Month is 1..12 and Day is 1..31, as a person would write them, not the
+// 0-based forms a C tm struct uses.
+type Date struct {
+	Year   int
+	Month  int
+	Day    int
+	Hour   int
+	Minute int
+	Second int
+}
+
+// Civil returns the UTC calendar date of p. It is exact for any Point whose Unix
+// seconds fit in an int64, before the epoch as well as after: the conversion uses
+// FLOOR division throughout, because Binate's `/` truncates toward zero and a
+// pre-epoch timestamp would otherwise round the wrong way.
+func Civil(p time.Point) Date
+
+// At returns the Point for a UTC calendar date — the inverse of Civil. Fields
+// outside their natural range are normalized the way `mktime` does (month 13 is
+// January of the next year, day 0 is the last day of the previous month), so
+// arithmetic on a Date does not need a carry step.
+func At(d Date) time.Point
+
+// Format renders p as "YYYY-MM-DD HH:MM:SS UTC", zero-padded, with a year before
+// 1 rendered with a leading minus.
+func Format(p time.Point) @[]readonly char
+
+// FormatDelta renders a Delta as a signed, compact duration — "1h30m0s",
+// "-45s", "0s" — dropping leading units that are zero, as Go's Duration does.
+// Sub-second parts appear as a fractional seconds value.
+func FormatDelta(d time.Delta) @[]readonly char
+
+// IsLeap reports whether year is a leap year in the proleptic Gregorian
+// calendar — divisible by 4, except centuries, except multiples of 400.
+func IsLeap(year int) bool
+
+// DaysInMonth returns the number of days in month (1..12) of year; an
+// out-of-range month gives 0.
+func DaysInMonth(year int, month int) int

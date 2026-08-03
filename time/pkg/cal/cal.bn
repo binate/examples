@@ -1,0 +1,216 @@
+package "pkg/cal"
+
+import "pkg/std/strconv"
+import "pkg/std/strings"
+import "pkg/std/time"
+
+// secondsPerDay is 86400 — no leap seconds exist on a Point's timeline, so a day
+// is always exactly this long.
+const secondsPerDay int64 = 86400
+
+// floorDiv divides rounding toward negative infinity, unlike Binate's `/`, which
+// truncates toward zero. Every calendar conversion here needs floor semantics: a
+// pre-epoch timestamp has a negative second count, and truncation would place it
+// one day late.
+func floorDiv(a int64, b int64) int64 {
+	var q int64 = a / b
+	if (a % b) != 0 && ((a < 0) != (b < 0)) {
+		q = q - 1
+	}
+	return q
+}
+
+// floorMod is the remainder matching floorDiv: its sign follows the DIVISOR, so
+// it is always in [0, b) for a positive b.
+func floorMod(a int64, b int64) int64 {
+	var r int64 = a % b
+	if r != 0 && ((r < 0) != (b < 0)) {
+		r = r + b
+	}
+	return r
+}
+
+// civilFromDays converts a day count since 1970-01-01 into (year, month, day).
+// It is Howard Hinnant's shift-the-epoch-to-March algorithm: with March as month
+// 0, the leap day lands at the END of the year, so the month-length pattern
+// becomes a simple arithmetic sequence and no table is needed.
+func civilFromDays(z int64) Date {
+	var d Date
+	var shifted int64 = z + 719468
+	var era int64 = floorDiv(shifted, 146097)
+	var doe int64 = shifted - era * 146097
+	var yoe int64 = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+	var y int64 = yoe + era * 400
+	var doy int64 = doe - (365 * yoe + yoe / 4 - yoe / 100)
+	var mp int64 = (5 * doy + 2) / 153
+	var day int64 = doy - (153 * mp + 2) / 5 + 1
+	var month int64 = mp + 3
+	if mp >= 10 {
+		month = mp - 9
+	}
+	if month <= 2 {
+		y = y + 1
+	}
+	d.Year = cast(int, y)
+	d.Month = cast(int, month)
+	d.Day = cast(int, day)
+	return d
+}
+
+// daysFromCivil is the inverse of civilFromDays.
+func daysFromCivil(year int, month int, day int) int64 {
+	var y int64 = cast(int64, year)
+	if month <= 2 {
+		y = y - 1
+	}
+	var era int64 = floorDiv(y, 400)
+	var yoe int64 = y - era * 400
+	var m int64 = cast(int64, month)
+	var mp int64 = m - 3
+	if m <= 2 {
+		mp = m + 9
+	}
+	var doy int64 = (153 * mp + 2) / 5 + cast(int64, day) - 1
+	var doe int64 = yoe * 365 + yoe / 4 - yoe / 100 + doy
+	return era * 146097 + doe - 719468
+}
+
+// Civil returns the UTC calendar date of p.
+func Civil(p time.Point) Date {
+	sec, _ := p.ToUnix()
+	var days int64 = floorDiv(sec, secondsPerDay)
+	var rest int64 = floorMod(sec, secondsPerDay)
+	var d Date = civilFromDays(days)
+	d.Hour = cast(int, rest / 3600)
+	d.Minute = cast(int, (rest % 3600) / 60)
+	d.Second = cast(int, rest % 60)
+	return d
+}
+
+// At returns the Point for a UTC calendar date.
+func At(d Date) time.Point {
+	// Normalize the month first, so daysFromCivil sees a month in 1..12; the day
+	// needs no normalization, since the day count is linear in it.
+	var y int64 = cast(int64, d.Year)
+	var m int64 = cast(int64, d.Month) - 1
+	y = y + floorDiv(m, 12)
+	m = floorMod(m, 12) + 1
+	var days int64 = daysFromCivil(cast(int, y), cast(int, m), d.Day)
+	var sec int64 = days * secondsPerDay + cast(int64, d.Hour) * 3600 +
+			cast(int64, d.Minute) * 60 + cast(int64, d.Second)
+	return time.FromUnix(sec, 0)
+}
+
+// pad2 appends v as two digits, zero-padded.
+func pad2(b *strings.Builder, v int) {
+	if v < 10 {
+		_ = b.WriteByte('0')
+	}
+	_, _ = b.Write(strconv.Itoa(v))
+}
+
+// Format renders p as "YYYY-MM-DD HH:MM:SS UTC".
+func Format(p time.Point) @[]readonly char {
+	var d Date = Civil(p)
+	var b @strings.Builder = strings.NewBuilder()
+	var y int = d.Year
+	if y < 0 {
+		_ = b.WriteByte('-')
+		y = -y
+	}
+	if y < 1000 {
+		_ = b.WriteByte('0')
+	}
+	if y < 100 {
+		_ = b.WriteByte('0')
+	}
+	if y < 10 {
+		_ = b.WriteByte('0')
+	}
+	_, _ = b.Write(strconv.Itoa(y))
+	_ = b.WriteByte('-')
+	pad2(b, d.Month)
+	_ = b.WriteByte('-')
+	pad2(b, d.Day)
+	_ = b.WriteByte(' ')
+	pad2(b, d.Hour)
+	_ = b.WriteByte(':')
+	pad2(b, d.Minute)
+	_ = b.WriteByte(':')
+	pad2(b, d.Second)
+	_, _ = b.Write(" UTC")
+	return b.String()
+}
+
+// writeUnit appends a value and its unit suffix.
+func writeUnit(b *strings.Builder, v int64, unit *[]readonly char) {
+	_, _ = b.Write(strconv.FormatInt(v, 10))
+	_, _ = b.Write(unit)
+}
+
+// FormatDelta renders a Delta as a signed, compact duration.
+func FormatDelta(d time.Delta) @[]readonly char {
+	var ns int64 = d.Nanoseconds()
+	var b @strings.Builder = strings.NewBuilder()
+	if ns < 0 {
+		_ = b.WriteByte('-')
+		ns = -ns
+	}
+	var secs int64 = ns / 1000000000
+	var frac int64 = ns % 1000000000
+	var hours int64 = secs / 3600
+	var mins int64 = (secs % 3600) / 60
+	var rest int64 = secs % 60
+	if hours != 0 {
+		writeUnit(b, hours, "h")
+	}
+	if hours != 0 || mins != 0 {
+		writeUnit(b, mins, "m")
+	}
+	_, _ = b.Write(strconv.FormatInt(rest, 10))
+	if frac != 0 {
+		// A fractional second renders as a decimal, trailing zeros trimmed.
+		_ = b.WriteByte('.')
+		var digits @[]char = make_slice(char, 9)
+		var v int64 = frac
+		for i := 8; i >= 0; i-- {
+			digits[i] = cast(char, cast(int, v % 10) + cast(int, '0'))
+			v = v / 10
+		}
+		var last int = 8
+		for last > 0 && digits[last] == '0' {
+			last = last - 1
+		}
+		_, _ = b.Write(digits[0:last + 1])
+	}
+	_ = b.WriteByte('s')
+	return b.String()
+}
+
+// IsLeap reports whether year is a leap year.
+func IsLeap(year int) bool {
+	if year % 4 != 0 {
+		return false
+	}
+	if year % 100 != 0 {
+		return true
+	}
+	return year % 400 == 0
+}
+
+// DaysInMonth returns the number of days in month of year.
+func DaysInMonth(year int, month int) int {
+	if month < 1 || month > 12 {
+		return 0
+	}
+	if month == 2 {
+		if IsLeap(year) {
+			return 29
+		}
+		return 28
+	}
+	if month == 4 || month == 6 || month == 9 || month == 11 {
+		return 30
+	}
+	return 31
+}

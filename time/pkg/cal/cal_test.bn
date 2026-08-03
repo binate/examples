@@ -1,0 +1,226 @@
+package "pkg/cal"
+
+import "pkg/builtins/testing"
+import "pkg/std/time"
+
+// eq reports whether a text equals want; slices have no ==.
+func eq(a @[]readonly char, want *[]readonly char) bool {
+	if len(a) != len(want) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// at is FromUnix with the nanoseconds left at zero.
+func at(sec int64) time.Point {
+	return time.FromUnix(sec, 0)
+}
+
+// delta returns the Delta from a to b, the only way to construct one.
+func delta(a int64, an int32, b int64, bn int32) time.Delta {
+	return time.FromUnix(b, bn).Sub(time.FromUnix(a, an))
+}
+
+// TestFormatKnownDates checks a handful of timestamps whose civil dates are
+// independently known, including the leap day and the century that is not one.
+func TestFormatKnownDates() testing.TestResult {
+	if !eq(Format(at(0)), "1970-01-01 00:00:00 UTC") {
+		return "the epoch"
+	}
+	if !eq(Format(at(1000000000)), "2001-09-09 01:46:40 UTC") {
+		return "1e9"
+	}
+	if !eq(Format(at(1234567890)), "2009-02-13 23:31:30 UTC") {
+		return "1234567890"
+	}
+	if !eq(Format(at(951782400)), "2000-02-29 00:00:00 UTC") {
+		return "2000 is a leap year"
+	}
+	if !eq(Format(at(4107542400)), "2100-03-01 00:00:00 UTC") {
+		return "2100 is not"
+	}
+	return ""
+}
+
+// TestFormatBeforeTheEpoch checks the floor-division trap: a negative second
+// count must round DOWN to the earlier day, not toward zero.
+func TestFormatBeforeTheEpoch() testing.TestResult {
+	if !eq(Format(at(-1)), "1969-12-31 23:59:59 UTC") {
+		return "one second before the epoch"
+	}
+	if !eq(Format(at(-86400)), "1969-12-31 00:00:00 UTC") {
+		return "exactly one day before"
+	}
+	if !eq(Format(at(-86401)), "1969-12-30 23:59:59 UTC") {
+		return "one second more than a day before"
+	}
+	// A date deep in the past, across the Gregorian leap rules.
+	if !eq(Format(at(-11670998400)), "1600-02-29 00:00:00 UTC") {
+		return "1600 was a leap year (a century divisible by 400)"
+	}
+	return ""
+}
+
+// TestFormatPadsYears checks the width rules for years outside four digits.
+func TestFormatPadsYears() testing.TestResult {
+	var d Date
+	d.Year = 999
+	d.Month = 1
+	d.Day = 2
+	if !eq(Format(At(d)), "0999-01-02 00:00:00 UTC") {
+		return "a three-digit year pads to four"
+	}
+	d.Year = 5
+	if !eq(Format(At(d)), "0005-01-02 00:00:00 UTC") {
+		return "a one-digit year pads to four"
+	}
+	d.Year = -44
+	if !eq(Format(At(d)), "-0044-01-02 00:00:00 UTC") {
+		return "a negative year keeps its sign"
+	}
+	return ""
+}
+
+// TestRoundTrip checks At(Civil(p)) == p over a wide spread of timestamps,
+// including negatives — a property that catches an off-by-one the spot checks
+// above would miss.
+func TestRoundTrip() testing.TestResult {
+	var sec int64 = -63000000000
+	for i := 0; i < 400; i++ {
+		var p time.Point = at(sec)
+		if !At(Civil(p)).Equal(p) {
+			return "every timestamp round-trips through Civil and At"
+		}
+		// A stride that is not a whole number of days, so hours, minutes and
+		// seconds all vary.
+		sec = sec + 317520037
+	}
+	return ""
+}
+
+// TestCivilFields checks that the decomposition fills every field, not just the
+// date half.
+func TestCivilFields() testing.TestResult {
+	var d Date = Civil(at(1234567890))
+	if d.Year != 2009 || d.Month != 2 || d.Day != 13 {
+		return "the date"
+	}
+	if d.Hour != 23 || d.Minute != 31 || d.Second != 30 {
+		return "the time"
+	}
+	var mid Date = Civil(at(43200))
+	if mid.Hour != 12 || mid.Minute != 0 || mid.Second != 0 {
+		return "noon on the epoch day"
+	}
+	return ""
+}
+
+// TestAtNormalizes checks the carry rules that make date arithmetic work without
+// a separate normalization step.
+func TestAtNormalizes() testing.TestResult {
+	var d Date
+	d.Year = 2000
+	d.Month = 13
+	d.Day = 1
+	if !eq(Format(At(d)), "2001-01-01 00:00:00 UTC") {
+		return "month 13 is January of the next year"
+	}
+	d.Month = 0
+	if !eq(Format(At(d)), "1999-12-01 00:00:00 UTC") {
+		return "month 0 is December of the previous year"
+	}
+	d.Month = 3
+	d.Day = 0
+	if !eq(Format(At(d)), "2000-02-29 00:00:00 UTC") {
+		return "day 0 is the last day of the previous month"
+	}
+	d.Month = 1
+	d.Day = 366
+	if !eq(Format(At(d)), "2000-12-31 00:00:00 UTC") {
+		return "day 366 of a leap year is the last day"
+	}
+	d.Month = -11
+	d.Day = 1
+	if !eq(Format(At(d)), "1999-01-01 00:00:00 UTC") {
+		return "a negative month carries backwards"
+	}
+	return ""
+}
+
+// TestFormatDelta checks the compact duration rendering, including the units it
+// drops and the ones it must not.
+func TestFormatDelta() testing.TestResult {
+	if !eq(FormatDelta(delta(0, 0, 0, 0)), "0s") {
+		return "zero"
+	}
+	if !eq(FormatDelta(delta(0, 0, 1, 0)), "1s") {
+		return "one second drops the empty hours and minutes"
+	}
+	if !eq(FormatDelta(delta(0, 0, 61, 0)), "1m1s") {
+		return "a minute appears once it is nonzero"
+	}
+	if !eq(FormatDelta(delta(0, 0, 3661, 0)), "1h1m1s") {
+		return "an hour brings the minutes with it"
+	}
+	if !eq(FormatDelta(delta(0, 0, 3600, 0)), "1h0m0s") {
+		return "a zero minute is kept once an hour is present"
+	}
+	if !eq(FormatDelta(delta(0, 0, -45, 0)), "-45s") {
+		return "a negative delta keeps its sign"
+	}
+	return ""
+}
+
+// TestFormatDeltaFractions checks sub-second rendering, where trailing zeros are
+// trimmed but leading ones are not.
+func TestFormatDeltaFractions() testing.TestResult {
+	if !eq(FormatDelta(delta(0, 0, 0, 500000000)), "0.5s") {
+		return "half a second"
+	}
+	if !eq(FormatDelta(delta(0, 0, 1, 250000000)), "1.25s") {
+		return "a second and a quarter"
+	}
+	if !eq(FormatDelta(delta(0, 0, 0, 1)), "0.000000001s") {
+		return "one nanosecond keeps its leading zeros"
+	}
+	if !eq(FormatDelta(delta(0, 500000000, 1, 0)), "0.5s") {
+		return "a fraction that comes from the LEFT operand"
+	}
+	return ""
+}
+
+// TestLeapRules checks the three-part Gregorian rule and the month lengths that
+// follow from it.
+func TestLeapRules() testing.TestResult {
+	if !IsLeap(2024) || !IsLeap(1996) {
+		return "an ordinary multiple of 4"
+	}
+	if IsLeap(2023) || IsLeap(1900) || IsLeap(2100) {
+		return "a non-multiple, and centuries that are not multiples of 400"
+	}
+	if !IsLeap(2000) || !IsLeap(1600) {
+		return "centuries that ARE multiples of 400"
+	}
+	if DaysInMonth(2024, 2) != 29 || DaysInMonth(2023, 2) != 28 {
+		return "February follows the leap rule"
+	}
+	if DaysInMonth(2023, 1) != 31 || DaysInMonth(2023, 4) != 30 {
+		return "the fixed months"
+	}
+	if DaysInMonth(2023, 0) != 0 || DaysInMonth(2023, 13) != 0 {
+		return "an out-of-range month has no days"
+	}
+	var total int = 0
+	for m := 1; m <= 12; m++ {
+		total = total + DaysInMonth(2023, m)
+	}
+	if total != 365 {
+		return "the months of a common year sum to 365"
+	}
+	return ""
+}

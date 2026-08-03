@@ -1,0 +1,143 @@
+// dates works with `pkg/std/time` and the calendar in pkg/cal: fixed Points,
+// the differences between them, and calendar arithmetic.
+//
+// The thing to notice is what is NOT here. `time` has no clock — no `Now()`, no
+// `Sleep`, and no syscall underneath to build one from — so a Binate program
+// cannot ask what time it is. Every Point below comes from a constant or from
+// arithmetic, with exactly one exception at the end: the modification time of a
+// file this program writes, which is the only way it can learn anything about
+// the present.
+//
+// Everything printed is therefore fixed, except that last section, which reports
+// derived facts rather than a timestamp.
+package "main"
+
+import "pkg/cal"
+import "pkg/std/errors"
+import "pkg/std/os"
+import "pkg/std/time"
+import "pkg/stdx/fmt"
+
+// show prints a Point with a label.
+func show(label *[]readonly char, p time.Point) {
+	fmt.Printf("  %-22s %s\n", label, cal.Format(p))
+}
+
+// workDir returns the scratch directory: the first argument, or a default.
+func workDir() @[]readonly char {
+	var args @[]readonly @[]readonly char = os.Args()
+	if len(args) > 1 {
+		return args[1]
+	}
+	return "/tmp/binate-time-dates"
+}
+
+// touch writes a file in dir and returns its modification time, plus whether
+// everything succeeded. It is the program's only contact with the present.
+func touch(dir @[]readonly char) (time.Point, bool) {
+	var zero time.Point
+	var derr @errors.Error = os.MkdirAll(dir, cast(os.FileMode, 0o755))
+	if present(derr) {
+		return zero, false
+	}
+	// A path built by hand: Binate has no string concatenation operator.
+	var tail @[]readonly char = "/stamp"
+	var path @[]char = make_slice(char, len(dir) + len(tail))
+	for i := 0; i < len(dir); i++ {
+		path[i] = dir[i]
+	}
+	for i := 0; i < len(tail); i++ {
+		path[len(dir) + i] = tail[i]
+	}
+	f, oerr := os.Create(path)
+	if present(oerr) {
+		return zero, false
+	}
+	_, _ = f.Write("now")
+	_ = f.Close()
+	fi, serr := os.Stat(path)
+	_ = os.Remove(path)
+	_ = os.Remove(dir)
+	if present(serr) {
+		return zero, false
+	}
+	return fi.ModTime(), true
+}
+
+// main walks Points, deltas, calendar arithmetic, and the one real timestamp.
+func main() {
+	fmt.Println("points from constants:")
+	show("epoch", time.FromUnix(0, 0))
+	show("one second before", time.FromUnix(-1, 0))
+	show("1000000000", time.FromUnix(1000000000, 0))
+	show("2000-02-29 (leap)", time.FromUnix(951782400, 0))
+	// 2100 is NOT a leap year (a century that is not a multiple of 400), so the
+	// day after 2100-02-28 is March 1st — the boundary a naive "divisible by 4"
+	// rule gets wrong.
+	show("day before", time.FromUnix(4107456000, 0))
+	show("day after", time.FromUnix(4107542400, 0))
+
+	// A Point carries seconds since year 1 as well as Unix seconds; the two
+	// differ by the 1969 years between the calendar origin and the epoch.
+	var p time.Point = time.FromUnix(1000000000, 0)
+	sec, nsec := p.ToUnix()
+	fmt.Printf("round trip: unix %d.%09d, since year 1 %d, nanosecond %d\n",
+		sec, cast(int, nsec), p.SecondsSinceEpoch(), cast(int, p.Nanosecond()))
+
+	// Ordering. A Point has no clock identity, so comparing two of them is only
+	// meaningful when you know they share a source — here, both are constants.
+	var earlier time.Point = time.FromUnix(1000, 0)
+	var later time.Point = time.FromUnix(2000, 0)
+	fmt.Printf("ordering: before %t, after %t, equal %t, self-equal %t\n",
+		earlier.Before(later), earlier.After(later), earlier.Equal(later),
+		earlier.Equal(earlier))
+
+	// A Delta is a signed difference with no clock identity of its own: once
+	// computed it is just a quantity of nanoseconds.
+	fmt.Println("deltas:")
+	fmt.Printf("  %-22s %s\n", "2000 - 1000", cal.FormatDelta(later.Sub(earlier)))
+	fmt.Printf("  %-22s %s\n", "1000 - 2000", cal.FormatDelta(earlier.Sub(later)))
+	fmt.Printf("  %-22s %s\n", "same point", cal.FormatDelta(earlier.Sub(earlier)))
+	var frac time.Point = time.FromUnix(5410, 500000000)
+	fmt.Printf("  %-22s %s (%d ns)\n", "with a fraction",
+		cal.FormatDelta(frac.Sub(earlier)), frac.Sub(earlier).Nanoseconds())
+	var century time.Point = time.FromUnix(4155760000, 0)
+	fmt.Printf("  %-22s %s\n", "a century", cal.FormatDelta(century.Sub(p)))
+
+	// Calendar arithmetic falls out of normalization: an out-of-range field
+	// carries, so "month 13" and "day 0" mean what you would want them to.
+	fmt.Println("normalization:")
+	var d cal.Date
+	d.Year = 2000
+	d.Month = 13
+	d.Day = 1
+	show("2000-13-01", cal.At(d))
+	d.Month = 3
+	d.Day = 0
+	show("2000-03-00", cal.At(d))
+	d.Month = 1
+	d.Day = 366
+	show("2000-01-366", cal.At(d))
+
+	// The Civil/At round trip, over a value that exercises every field.
+	var full cal.Date = cal.Civil(time.FromUnix(1234567890, 0))
+	fmt.Printf("civil: %04d-%02d-%02d %02d:%02d:%02d, round trip %t\n",
+		full.Year, full.Month, full.Day, full.Hour, full.Minute, full.Second,
+		cal.At(full).Equal(time.FromUnix(1234567890, 0)))
+
+	fmt.Printf("leap years: 1900 %t, 2000 %t, 2024 %t, 2100 %t; Feb 2024 %d, Feb 2023 %d\n",
+		cal.IsLeap(1900), cal.IsLeap(2000), cal.IsLeap(2024), cal.IsLeap(2100),
+		cal.DaysInMonth(2024, 2), cal.DaysInMonth(2023, 2))
+
+	// The one Point that comes from outside the program. Its value differs on
+	// every run, so only derived facts are printed.
+	mtime, ok := touch(workDir())
+	if !ok {
+		fmt.Println("file time: unavailable")
+		return
+	}
+	var now cal.Date = cal.Civil(mtime)
+	fmt.Printf("file time: readable %t, after 2020 %t, month in range %t, self-equal %t\n",
+		ok, now.Year >= 2020, now.Month >= 1 && now.Month <= 12, mtime.Equal(mtime))
+	fmt.Printf("and it is after the epoch: %t\n", mtime.After(time.FromUnix(0, 0)))
+}

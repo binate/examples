@@ -61,11 +61,11 @@ Written roughly in the order they are worth doing:
 
 - **`text` — DONE.**
 
-- **`time` — points and deltas (`pkg/std/time`).** `FromUnix`/`ToUnix`,
-  ordering (`Before`/`After`/`Equal`), `Sub` → `Delta`, and a file's `ModTime`
-  from `os.Stat` as the one Point that comes from the outside world. Note there
-  is **no clock**: the library has no `Now()` and no `Sleep`, so an example can
-  only do arithmetic on constructed Points and on file times.
+- **`time` — DONE.** It ships an example-local UTC calendar (`pkg/cal`), since
+  the library has none. If `time` ever grows one, fold the example onto it. The
+  no-clock gap is tracked on the binate side; when `time.Now()` lands, the
+  file-mtime section in `cmd/dates` becomes a curiosity rather than the only way
+  to see the present, and the README should say so.
 
 - **`interfaces` — nominal interfaces and type recovery.** `impl T : I` being
   required (a matching method set is never enough), interface values as `*I` /

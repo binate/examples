@@ -125,6 +125,11 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`time`](time/) — **points, deltas, and the calendar that isn't there**
+  (`pkg/std/time`): Point ordering and Delta arithmetic, plus an example-local
+  UTC calendar, because the library has none. Also the honest demonstration of a
+  gap: there is no clock at all, so the only way the program learns today's date
+  is by writing a file and reading its modification time back.
 - [`text`](text/) — **building and parsing text** (`pkg/std/strings`,
   `pkg/std/strconv`): a tiny record format that needs both halves of strconv —
   the allocating `Format*`/`Itoa` and the no-allocation `Append*` with its
