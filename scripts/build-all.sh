@@ -5,7 +5,7 @@
 # non-zero if any example fails to build.
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+. "$SCRIPT_DIR/_common.sh"
 cd "$REPO_DIR"
 
 found=0
@@ -24,6 +24,11 @@ for dir in */cmd/*/; do
         skipped=$((skipped + 1))
         continue
     fi
+    if reason="$(sweep_skip_reason "$example")"; then
+        echo "=== $cmd (skipped: $reason) ==="
+        skipped=$((skipped + 1))
+        continue
+    fi
     found=$((found + 1))
     echo "=== $cmd ==="
     if "$SCRIPT_DIR/build-compiled.sh" "$cmd"; then
@@ -38,5 +43,5 @@ if [ "$found" -eq 0 ] && [ "$skipped" -eq 0 ]; then
     echo "build-all: no runnable examples found (looked for */cmd/*/)" >&2
     exit 1
 fi
-echo "build-all: $((found - failed))/$found example(s) built, $skipped skipped (csrc/)"
+echo "build-all: $((found - failed))/$found example(s) built, $skipped skipped"
 [ "$failed" -eq 0 ]

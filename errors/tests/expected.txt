@@ -1,0 +1,21 @@
+ok: err present false, name server, port 8080, debug true
+no '=': [line 2: expected key = value]
+  ParseError, line 2, detail [expected key = value]
+no '=': BadData true, InvalidArgument false, NotFound false, ConditionsUnmet true
+bad port: [line 2: port: strconv.Atoi: parsing "eighty": invalid syntax]
+  ParseError, line 2, detail [port: strconv.Atoi: parsing "eighty": invalid syntax]
+bad port: BadData true, InvalidArgument false, NotFound false, ConditionsUnmet true
+unknown key: [line 2: unknown key "colour"]
+  ParseError, line 2, detail [unknown key "colour"]
+unknown key: BadData false, InvalidArgument true, NotFound false, ConditionsUnmet false
+missing name: [required key 'name' is missing]
+  not a ParseError
+missing name: BadData false, InvalidArgument false, NotFound true, ConditionsUnmet true
+load: [reading /definitely/not/here.conf: open: not found]
+load: BadData false, InvalidArgument false, NotFound true, ConditionsUnmet true
+  0: [reading /definitely/not/here.conf: open: not found]
+  1: [open: not found]
+  2: [not found]
+  3: [conditions unmet]
+  chain depth 4
+bases: NotFound [not found], in ConditionsUnmet true, in BadData false

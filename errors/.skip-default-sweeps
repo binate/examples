@@ -1,0 +1,17 @@
+bni SIGSEGVs on errors.Is over a user-defined errors.Error (tracked MAJOR)
+
+The example's ParseError — a concrete error type carrying a line number — is
+exactly the shape that crashes the bytecode VM: `errors.Is(err, base)` segfaults
+when err's dynamic type implements errors.Error from user code. Reproduced on
+released bnc-0.0.12 and on a main-built bnc-0.0.13-pre1 bundle; the same program
+compiled with bnc is correct throughout.
+
+So the interpreted leg of both this example's unit tests and its e2e harness
+dies, and the whole example sits out the default sweeps rather than reddening
+them. Everything still works compiled, and is run that way by hand:
+
+    scripts/run-tests-compiled.sh errors/pkg/config     # 10 tests
+    errors/tests/run.sh                                 # compiled vs fixture
+
+Remove this file (and restore the interpreted leg in errors/tests/run.sh) once a
+toolchain carrying the fix is pinned in BUILDER_VERSION.

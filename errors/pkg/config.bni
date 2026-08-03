@@ -1,0 +1,70 @@
+// Package config parses a tiny `key = value` configuration, and exists to fail:
+// it is a worked example of Binate's errors-as-values convention, where every
+// way of going wrong is a value the caller can classify and act on.
+//
+// Three shapes of failure appear here, and they are not interchangeable:
+//
+//   - **Wrapping** (`errors.Wrap`) adds context and KEEPS the cause, including
+//     its classification. Load wraps whatever `os.Open` returned, so a caller
+//     still sees `errors.NotFound` through the wrap.
+//   - **Rooting** (`errors.Rooted`) mints a NEW error under a chosen base. That
+//     is how you re-classify: with a single `Unwrap` link a wrapper inherits its
+//     cause's classification, so an error that needs a different one is minted
+//     fresh, with the cause's text folded into the message.
+//   - **A concrete error type** (`ParseError`) carries structured data the
+//     message cannot — here, the line number. A caller recovers it from the
+//     chain with a type assertion and reads the field.
+package "pkg/config"
+
+import "pkg/std/errors"
+
+// Config is a parsed configuration. Port and Debug have the usual zero values
+// when their keys are absent; a missing Name is an error, since it is required.
+type Config struct {
+	Name  @[]readonly char
+	Port  int
+	Debug bool
+}
+
+// ParseError reports a line that could not be parsed, keeping the line number as
+// a FIELD rather than only in the message — that is the point of a concrete
+// error type. Recover one from an error chain with `err.(@ParseError)`.
+//
+// base is the standard base this error roots in, returned by Unwrap: a concrete
+// type roots itself by handing its base back, which is exactly what
+// errors.Rooted does for the anonymous case.
+type ParseError struct {
+	Line   int
+	Detail @[]readonly char
+	base   @errors.Error
+}
+
+// NewParseError returns a ParseError at line (1-based) rooted in base.
+func NewParseError(line int, detail @[]readonly char, base @errors.Error) @ParseError
+
+// Error renders "line N: detail". Note the result type: errors.Error returns
+// `@[]readonly char`, unlike lang.Stringer's `@[]char`.
+func (e @ParseError) Error() @[]readonly char
+
+// Unwrap returns the base this error roots in, which is what makes
+// `errors.Is(err, errors.BadData)` true for a syntax problem.
+func (e @ParseError) Unwrap() @errors.Error
+
+// A ParseError satisfies errors.Error. Declaring the impl in the .bni is what
+// lets another package hold one AS an @errors.Error.
+impl @ParseError : errors.Error
+
+// Parse reads text as a sequence of `key = value` lines, ignoring blank lines and
+// `#` comments, and returns the configuration.
+//
+// It stops at the first problem and classifies it: a line with no `=` or an
+// unparsable value is a ParseError rooted in errors.BadData; an unrecognized key
+// is a ParseError rooted in errors.InvalidArgument; and a text with no `name` is
+// rooted in errors.NotFound (no line to point at, so it is a plain Rooted error,
+// not a ParseError).
+func Parse(text @[]readonly char) (@Config, @errors.Error)
+
+// Load reads the file at path and parses it. A failure to read is wrapped with
+// context and keeps its classification — `errors.Is(err, errors.NotFound)` holds
+// for a missing file — while a failure to parse comes back from Parse unchanged.
+func Load(path *[]readonly char) (@Config, @errors.Error)

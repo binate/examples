@@ -1,0 +1,195 @@
+package "pkg/config"
+
+import "pkg/builtins/testing"
+import "pkg/std/errors"
+
+// TestParseGood checks a clean parse: no error, and every key applied.
+func TestParseGood() testing.TestResult {
+	cfg, err := Parse("# comment\nname = server\nport = 8080\ndebug = true\n")
+	if present(err) {
+		return "a valid config parses"
+	}
+	if !textEq(cfg.Name, "server") {
+		return "name"
+	}
+	if cfg.Port != 8080 {
+		return "port"
+	}
+	if !cfg.Debug {
+		return "debug"
+	}
+	return ""
+}
+
+// TestParseDefaults checks that absent optional keys keep their zero values —
+// only name is required.
+func TestParseDefaults() testing.TestResult {
+	cfg, err := Parse("name = x\n")
+	if present(err) {
+		return "name alone is enough"
+	}
+	if cfg.Port != 0 || cfg.Debug {
+		return "absent keys keep zero values"
+	}
+	return ""
+}
+
+// TestParseSkipsBlanksAndComments checks that blank lines, indentation, and
+// comments are ignored — and that they still COUNT, so a reported line number
+// matches what an editor shows.
+func TestParseSkipsBlanksAndComments() testing.TestResult {
+	cfg, err := Parse("\n  # note\n\n   name   =   spaced   \n")
+	if present(err) {
+		return "blanks and comments are skipped"
+	}
+	if !textEq(cfg.Name, "spaced") {
+		return "the value is trimmed"
+	}
+	_, bad := Parse("# one\n\nname = x\nbroken\n")
+	pe, ok := bad.(@ParseError)
+	if !ok {
+		return "a broken line is a ParseError"
+	}
+	if pe.Line != 4 {
+		return "the line number counts blanks and comments"
+	}
+	return ""
+}
+
+// TestMissingNameIsNotFound checks the required-key failure: it roots in
+// NotFound (and so in ConditionsUnmet), and is NOT a ParseError, since no single
+// line is at fault.
+func TestMissingNameIsNotFound() testing.TestResult {
+	_, err := Parse("port = 1\n")
+	if !present(err) {
+		return "a missing name fails"
+	}
+	if !errors.Is(err, errors.NotFound) {
+		return "rooted in NotFound"
+	}
+	if !errors.Is(err, errors.ConditionsUnmet) {
+		return "and so in NotFound's parent"
+	}
+	_, ok := err.(@ParseError)
+	if ok {
+		return "not a ParseError"
+	}
+	return ""
+}
+
+// TestSyntaxErrorIsBadData checks a line with no `=`: a ParseError carrying the
+// line number, rooted in BadData.
+func TestSyntaxErrorIsBadData() testing.TestResult {
+	_, err := Parse("name = x\nport 8080\n")
+	if !errors.Is(err, errors.BadData) {
+		return "rooted in BadData"
+	}
+	if !errors.Is(err, errors.ConditionsUnmet) {
+		return "and so in BadData's parent"
+	}
+	if errors.Is(err, errors.InvalidArgument) {
+		return "not InvalidArgument — a different branch"
+	}
+	pe, ok := err.(@ParseError)
+	if !ok {
+		return "recovers as a ParseError"
+	}
+	if pe.Line != 2 {
+		return "line 2"
+	}
+	return ""
+}
+
+// TestBadValueIsBadData checks that an unparsable value fails the same way for
+// both typed keys, and keeps the underlying reason in its message.
+func TestBadValueIsBadData() testing.TestResult {
+	_, perr := Parse("name = x\nport = eighty\n")
+	if !errors.Is(perr, errors.BadData) {
+		return "a bad port is BadData"
+	}
+	pe, ok := perr.(@ParseError)
+	if !ok || pe.Line != 2 {
+		return "a bad port points at its line"
+	}
+	if len(pe.Detail) == 0 {
+		return "the detail carries the cause's text"
+	}
+	_, derr := Parse("name = x\ndebug = perhaps\n")
+	if !errors.Is(derr, errors.BadData) {
+		return "a bad debug is BadData"
+	}
+	return ""
+}
+
+// TestUnknownKeyIsInvalidArgument checks the classification that distinguishes
+// "I cannot read this" from "this is not a thing I accept".
+func TestUnknownKeyIsInvalidArgument() testing.TestResult {
+	_, err := Parse("name = x\ncolour = red\n")
+	if !errors.Is(err, errors.InvalidArgument) {
+		return "rooted in InvalidArgument"
+	}
+	if errors.Is(err, errors.BadData) {
+		return "not BadData"
+	}
+	if errors.Is(err, errors.ConditionsUnmet) {
+		return "InvalidArgument is a top-level base, not under ConditionsUnmet"
+	}
+	return ""
+}
+
+// TestParseErrorShape checks the concrete type's own surface: the rendered
+// message, and Unwrap handing back the base it roots in.
+func TestParseErrorShape() testing.TestResult {
+	var e @ParseError = NewParseError(7, "something", errors.BadData)
+	if !textEq(e.Error(), "line 7: something") {
+		return "Error() renders line and detail"
+	}
+	if !present(e.Unwrap()) {
+		return "Unwrap returns the base"
+	}
+	var as @errors.Error = e
+	if !errors.Is(as, errors.BadData) {
+		return "held as an @errors.Error, it still classifies"
+	}
+	return ""
+}
+
+// TestLoadMissingFileWraps checks the wrap: Load adds context to what os.Open
+// returned, and the classification survives the wrapping.
+func TestLoadMissingFileWraps() testing.TestResult {
+	_, err := Load("/definitely/not/here.conf")
+	if !present(err) {
+		return "loading a missing file fails"
+	}
+	if !errors.Is(err, errors.NotFound) {
+		return "NotFound survives the wrap"
+	}
+	if len(err.Error()) <= len(err.Unwrap().Error()) {
+		return "the wrapper's message adds context to the cause's"
+	}
+	return ""
+}
+
+// TestChainEndsAtABase checks that walking Unwrap terminates, and that the
+// bottom of the chain is one of the standard bases rather than something else.
+func TestChainEndsAtABase() testing.TestResult {
+	_, err := Parse("name = x\nbroken\n")
+	var e @errors.Error = err
+	var last @errors.Error = err
+	var depth int = 0
+	for present(e) {
+		last = e
+		e = e.Unwrap()
+		depth = depth + 1
+		if depth > 16 {
+			return "the chain terminates"
+		}
+	}
+	if depth < 2 {
+		return "a rooted error has at least two links"
+	}
+	if !errors.Is(errors.ConditionsUnmet, last) {
+		return "the chain bottoms out at a base"
+	}
+	return ""
+}

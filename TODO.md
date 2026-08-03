@@ -28,22 +28,24 @@ Written roughly in the order they are worth doing:
   `%!?(unknown)` (struct reflection is a later layer).
 
 - **`containers` — DONE.** One thing to revisit: `countWords` sits in
-  `cmd/wordcount` instead of `pkg/tally`, because a `.bni` cannot currently name
-  a generic instantiated on a type its own package `impl`s —
-  `func Counts(…) @hashmap.Map[Word, int]` is rejected with "type argument Word
-  does not satisfy constraint Hashable" though the `impl` is in the same file.
-  Tracked as a MAJOR checker bug on the binate side; when a release ships the
-  fix, move `countWords` into `pkg/tally` as `Counts` (with a unit test — the
+  `cmd/wordcount` instead of `pkg/tally`, because the pinned `bnc-0.0.12` rejects
+  a `.bni` that names a generic instantiated on a type its own package `impl`s —
+  `func Counts(…) @hashmap.Map[Word, int]` fails with "type argument Word does
+  not satisfy constraint Hashable" though the `impl` is in the same file. **Fixed
+  upstream** (binate `ff505c92`); once `BUILDER_VERSION` names a release carrying
+  it, move `countWords` into `pkg/tally` as `Counts` (with a unit test — the
   package's own `.bn` tests can already build such a map) and drop the
   explanations from `containers/README.md` and `pkg/tally.bni`.
 
 - **`files` — DONE.**
 
-- **`errors` — errors as values (`pkg/std/errors`).** `present(err)` rather
-  than a nil test; `New`/`Wrap` and walking a cause chain with `Unwrap`;
-  `errors.Is` finding a sentinel through wrapping; `Rooted` and the standard
-  base hierarchy (`NotFound ⊂ ConditionsUnmet`, …) that stdlib errors classify
-  under; and a user type implementing the `Error` interface.
+- **`errors` — DONE, but compiled-only and outside the default sweeps.** `bni`
+  SIGSEGVs on `errors.Is` over a user-defined `errors.Error`, which the example's
+  `ParseError` is — a tracked MAJOR, reproduced on both the pinned `bnc-0.0.12`
+  and a `main` build. When a toolchain carrying the fix is pinned: delete
+  `errors/.skip-default-sweeps`, restore the interpreted leg in
+  `errors/tests/run.sh` (it becomes the usual two-way diff), and drop the note
+  from the example's README and from the entry in the top-level README.
 
 - **`processes` — running a child program (`pkg/std/os/process`).**
   `RunArgs`/`RunArgsPath`/`LookPath`, `Options` (`Args`, `Env`, `ReplaceEnv`,

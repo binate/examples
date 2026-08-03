@@ -83,6 +83,12 @@ An example can also carry **end-to-end suites** — any executable `run.sh` unde
 the example directory (e.g. `minbasic/tests/run.sh`, `minbasic/sessions/run.sh`).
 `scripts/e2e-all.sh` discovers and runs them all (also in CI).
 
+An example blocked by a tracked toolchain defect can opt out of all three sweeps
+by carrying a `.skip-default-sweeps` file whose first line is the reason (which
+the sweeps print). It keeps its tests and harness, to be run by hand, and its
+README says what is blocked and on what. This is not for an example that is
+merely broken — that gets fixed or removed.
+
 ## Examples
 
 Each example directory has its own `README.md` with run commands and expected
@@ -119,6 +125,13 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`errors`](errors/) — **errors as values** (`pkg/std/errors`): a config parser
+  that fails four ways, showing `present(err)` instead of a nil test, the
+  difference between wrapping (keeps the cause and its classification), rooting
+  (mints a new error under a chosen base), and a concrete error type carrying
+  structured data, plus `errors.Is` classifying through any amount of wrapping
+  and a type assertion recovering the concrete error back out. **Compiled-only
+  and outside the default sweeps** — a tracked VM bug (see the example's README).
 - [`cinterop`](cinterop/) — calling **external C library code** from Binate via
   the `__c_call` (call a C function) and `__c_global` (address a C global)
   intrinsics, against a small demo C library (`csrc/rng.c`, a deterministic

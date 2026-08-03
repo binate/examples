@@ -1,0 +1,91 @@
+// report feeds pkg/config a series of inputs, each broken a different way, and
+// shows what a caller can do with the failure: test it, classify it, recover the
+// structured error behind it, and walk the chain of causes.
+//
+// Every line is derived from the fixed inputs below, so the output is a fixture.
+package "main"
+
+import "pkg/config"
+import "pkg/std/errors"
+import "pkg/stdx/fmt"
+
+// good parses cleanly. Adjacent string literals concatenate at compile time.
+var good @[]readonly char = "# a comment\n"
+	"name = server\n"
+	"port = 8080\n"
+	"debug = true\n"
+
+// classify prints how an error answers the standard bases. errors.Is walks the
+// whole chain, so it finds a base through any amount of wrapping.
+func classify(label *[]readonly char, err @errors.Error) {
+	fmt.Printf("%s: BadData %t, InvalidArgument %t, NotFound %t, ConditionsUnmet %t\n",
+		label, errors.Is(err, errors.BadData), errors.Is(err, errors.InvalidArgument),
+		errors.Is(err, errors.NotFound), errors.Is(err, errors.ConditionsUnmet))
+}
+
+// describe prints an error's message, then recovers the concrete ParseError from
+// it if there is one. The comma-ok form never aborts: the bare `err.(@T)` form
+// would abort on a miss, and there is no recover.
+func describe(label *[]readonly char, err @errors.Error) {
+	fmt.Printf("%s: [%s]\n", label, err.Error())
+	pe, ok := err.(@config.ParseError)
+	if ok {
+		fmt.Printf("  ParseError, line %d, detail [%s]\n", pe.Line, pe.Detail)
+	} else {
+		fmt.Println("  not a ParseError")
+	}
+}
+
+// walk prints every layer of an error's cause chain. A wrapping error renders
+// its cause too, so the messages get shorter as the walk descends.
+func walk(err @errors.Error) {
+	var e @errors.Error = err
+	var depth int = 0
+	for present(e) {
+		fmt.Printf("  %d: [%s]\n", depth, e.Error())
+		depth = depth + 1
+		e = e.Unwrap()
+	}
+	fmt.Printf("  chain depth %d\n", depth)
+}
+
+// main runs one good parse and four broken ones, then a failing Load.
+func main() {
+	// Success is the absence of an error, tested with present() — an interface
+	// value has no nil to compare against.
+	cfg, err := config.Parse(good)
+	fmt.Printf("ok: err present %t, name %s, port %d, debug %t\n",
+		present(err), cfg.Name, cfg.Port, cfg.Debug)
+
+	_, noEq := config.Parse("name = x\nport 8080\n")
+	describe("no '='", noEq)
+	classify("no '='", noEq)
+
+	_, badPort := config.Parse("name = x\nport = eighty\n")
+	describe("bad port", badPort)
+	classify("bad port", badPort)
+
+	_, unknown := config.Parse("name = x\ncolour = red\n")
+	describe("unknown key", unknown)
+	classify("unknown key", unknown)
+
+	// A missing required key has no line to point at, so it is a plain rooted
+	// error rather than a ParseError — and the assertion reports that rather
+	// than aborting.
+	_, missing := config.Parse("port = 1\n")
+	describe("missing name", missing)
+	classify("missing name", missing)
+
+	// Load wraps whatever os.Open returned: the message gains context and the
+	// classification survives.
+	_, notThere := config.Load("/definitely/not/here.conf")
+	fmt.Printf("load: [%s]\n", notThere.Error())
+	classify("load", notThere)
+	walk(notThere)
+
+	// The base singletons are themselves errors, and the hierarchy is just their
+	// own chains: NotFound roots in ConditionsUnmet.
+	fmt.Printf("bases: NotFound [%s], in ConditionsUnmet %t, in BadData %t\n",
+		errors.NotFound.Error(), errors.Is(errors.NotFound, errors.ConditionsUnmet),
+		errors.Is(errors.NotFound, errors.BadData))
+}

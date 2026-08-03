@@ -12,7 +12,7 @@
 # Exits non-zero if any package's tests fail to build or fail.
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+. "$SCRIPT_DIR/_common.sh"
 cd "$REPO_DIR"
 
 mode="${1:-both}"
@@ -33,7 +33,13 @@ fi
 
 found=0
 failed=0
+skipped=0
 for pkg in $pkgs; do
+    if reason="$(sweep_skip_reason "${pkg%%/*}")"; then
+        echo "=== $pkg (skipped: $reason) ==="
+        skipped=$((skipped + 1))
+        continue
+    fi
     found=$((found + 1))
     echo "=== $pkg ==="
     if [ "$mode" != interpreted ]; then
@@ -50,5 +56,5 @@ for pkg in $pkgs; do
     fi
 done
 
-echo "test-all: $found package(s) tested, $failed failure(s)"
+echo "test-all: $found package(s) tested, $failed failure(s), $skipped skipped"
 [ "$failed" -eq 0 ]

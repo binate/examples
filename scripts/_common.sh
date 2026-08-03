@@ -8,6 +8,22 @@
 
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# An example opts OUT of the default sweeps (build-all / test-all / e2e-all) by
+# carrying a `.skip-default-sweeps` file whose first line is the reason, which the
+# sweeps print. sweep_skip_reason <example> prints that reason and succeeds when
+# the example opts out, and fails when it participates.
+#
+# This is for an example blocked by a TRACKED toolchain defect — one that cannot
+# run today through no fault of its own. It is not a way to quiet a failure the
+# example itself causes: an example that is merely broken gets fixed or removed.
+# The opted-out example still carries its own harness and unit tests, so it can be
+# run by hand, and its README says what is blocked and on what.
+sweep_skip_reason() {
+    _marker="$REPO_DIR/$1/.skip-default-sweeps"
+    [ -f "$_marker" ] || return 1
+    head -1 "$_marker"
+}
+
 parse_cmd_path() {
     _cmd="${1%/}"
     case "$_cmd" in

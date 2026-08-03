@@ -15,7 +15,7 @@
 # Used by CI. Exits non-zero if any harness fails.
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+. "$SCRIPT_DIR/_common.sh"
 cd "$REPO_DIR"
 
 # Executable run.sh outside scripts/ (the toolchain harness) and out/
@@ -32,7 +32,13 @@ fi
 
 found=0
 failed=0
+skipped=0
 for h in $harnesses; do
+    if reason="$(sweep_skip_reason "${h%%/*}")"; then
+        echo "=== $h (skipped: $reason) ==="
+        skipped=$((skipped + 1))
+        continue
+    fi
     found=$((found + 1))
     echo "=== $h ==="
     if "$REPO_DIR/$h"; then
@@ -43,5 +49,5 @@ for h in $harnesses; do
     fi
 done
 
-echo "e2e-all: $found harness(es) run, $failed failure(s)"
+echo "e2e-all: $found harness(es) run, $failed failure(s), $skipped skipped"
 [ "$failed" -eq 0 ]
