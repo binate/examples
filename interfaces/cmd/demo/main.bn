@@ -1,0 +1,119 @@
+// demo exercises Binate's interfaces from the outside: it builds a mixed
+// collection behind one interface, adds a shape type the library has never heard
+// of, and then takes values apart again through assertions and a type switch.
+//
+// Two properties drive everything here. Interfaces are NOMINAL — an `impl` is
+// what makes a type satisfy one, never a matching method set. And there is no
+// orphan rule — this package declares an `impl` pairing its own type with the
+// library's interface, and the library's functions then dispatch to it.
+package "main"
+
+import "pkg/shape"
+import "pkg/stdx/fmt"
+
+// Triangle is this command's own shape type. The library knows nothing about it.
+type Triangle struct {
+	Base   float64
+	Height float64
+}
+
+// Area returns the triangle's area.
+func (t *readonly Triangle) Area() float64 {
+	return t.Base * t.Height / 2.0
+}
+
+// Name returns "triangle".
+func (t *readonly Triangle) Name() @[]readonly char {
+	return "triangle"
+}
+
+// The impl lives HERE, in neither the type's nor the interface's package — the
+// no-orphan-rule point. From this line on, pkg/shape's functions accept a
+// Triangle without having been changed.
+impl *readonly Triangle : shape.Shape
+
+// describe prints what the library makes of a value.
+func describe(label *[]readonly char, v *any) {
+	fmt.Printf("  %-12s %s\n", label, shape.Describe(v))
+}
+
+// main builds a collection, dispatches through it, then recovers values back out.
+func main() {
+	var r shape.Rect
+	r.W = 3.0
+	r.H = 4.0
+	var c shape.Circle
+	c.R = 1.0
+	var t Triangle
+	t.Base = 6.0
+	t.Height = 5.0
+
+	// A managed-slice of OWNING interface values. An @Shape needs an owning
+	// source, so each element is boxed: box(v) copies v into a fresh managed
+	// allocation the interface value owns. A raw `&r` would not do here — that
+	// is a borrow, and it builds a `*Shape`, not an `@Shape`.
+	var shapes @[]@shape.Shape = make_slice(@shape.Shape, 3)
+	shapes[0] = box(r)
+	shapes[1] = box(c)
+	shapes[2] = box(t)
+	fmt.Println("dispatch through the interface:")
+	for i := 0; i < len(shapes); i++ {
+		fmt.Printf("  %-12s %g\n", shapes[i].Name(), shapes[i].Area())
+	}
+	fmt.Printf("total area %g\n", shape.TotalArea(shapes))
+
+	best, ok := shape.Largest(shapes)
+	fmt.Printf("largest: %s (%g), found %t\n", best.Name(), best.Area(), ok)
+	var none @[]@shape.Shape = make_slice(@shape.Shape, 0)
+	empty, emptyOk := shape.Largest(none)
+	// An interface value has no nil to compare against: present() asks whether
+	// it was ever set.
+	fmt.Printf("largest of nothing: found %t, value present %t\n",
+		emptyOk, present(empty))
+
+	// The other way to build an interface value: a BORROW. `&r` gives a *Shape
+	// that views r rather than copying it, so it tracks later mutations — while
+	// the boxed copy in the slice above does not. The difference is the whole
+	// distinction between @ and * in one line.
+	var view *shape.Shape = &r
+	fmt.Printf("borrow %g and box %g", view.Area(), shapes[0].Area())
+	r.W = 10.0
+	fmt.Printf("; after widening the Rect: borrow %g, box %g\n",
+		view.Area(), shapes[0].Area())
+
+	// What the library makes of assorted values. It recognizes a Shape it has
+	// never seen, and falls back to concrete recovery for everything else.
+	fmt.Println("recovery:")
+	describe("rect", &r)
+	describe("triangle", &t)
+	var n int = 42
+	describe("int", &n)
+	var f float64 = 2.5
+	describe("float", &f)
+	var s @[]readonly char = "hello"
+	describe("text", s)
+	var l shape.Label
+	l.Text = "not a shape"
+	describe("label", &l)
+
+	// Assertions carry a recovery kind: `.(T)` copies, `.(*T)` borrows, `.(@T)`
+	// retains. The comma-ok form never aborts; the bare form would, and there is
+	// no recover.
+	var v *any = &r
+	copied, copyOk := v.(shape.Rect)
+	borrowed, borrowOk := v.(*shape.Rect)
+	fmt.Printf("assertions: copy ok %t (%gx%g), borrow ok %t\n",
+		copyOk, copied.W, copied.H, borrowOk)
+	r.W = 99.0
+	fmt.Printf("after mutating: the borrow sees %g, the copy still %g\n",
+		borrowed.W, copied.W)
+	_, wrongOk := v.(shape.Circle)
+	fmt.Printf("a wrong guess: ok %t (no abort, because of the comma)\n", wrongOk)
+
+	// Interface values never compare with ==. same() asks the only question that
+	// makes sense: do these two refer to the same thing?
+	var alias *any = &r
+	var other *any = &c
+	fmt.Printf("identity: same(v, alias) %t, same(v, other) %t, same(v, v) %t\n",
+		same(v, alias), same(v, other), same(v, v))
+}

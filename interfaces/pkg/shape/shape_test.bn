@@ -1,0 +1,199 @@
+package "pkg/shape"
+
+import "pkg/builtins/testing"
+
+// eq reports whether a text equals want; slices have no ==.
+func eq(a @[]readonly char, want *[]readonly char) bool {
+	if len(a) != len(want) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// square is a shape declared in the TEST file, to check that dispatch reaches a
+// type the package's own code never mentions.
+type square struct {
+	side float64
+}
+
+// Area returns the square's area.
+func (s *readonly square) Area() float64 {
+	return s.side * s.side
+}
+
+// Name returns "square".
+func (s *readonly square) Name() @[]readonly char {
+	return "square"
+}
+
+impl *readonly square : Shape
+
+// rect3x4 returns a 3x4 Rect.
+func rect3x4() Rect {
+	var r Rect
+	r.W = 3.0
+	r.H = 4.0
+	return r
+}
+
+// TestAreas checks the two built-in shapes compute what they should.
+func TestAreas() testing.TestResult {
+	var r Rect = rect3x4()
+	if r.Area() != 12.0 {
+		return "a 3x4 rect has area 12"
+	}
+	if !eq(r.Name(), "rect") {
+		return "and is named rect"
+	}
+	var c Circle
+	c.R = 2.0
+	if c.Area() < 12.56 || c.Area() > 12.57 {
+		return "a circle of radius 2 has area about 12.566"
+	}
+	return ""
+}
+
+// TestDispatch checks that calls through the interface reach each concrete
+// implementation, including one the package's own code never names.
+func TestDispatch() testing.TestResult {
+	var r Rect = rect3x4()
+	var sq square
+	sq.side = 5.0
+	var shapes @[]@Shape = make_slice(@Shape, 2)
+	shapes[0] = box(r)
+	shapes[1] = box(sq)
+	if TotalArea(shapes) != 37.0 {
+		return "12 + 25"
+	}
+	best, ok := Largest(shapes)
+	if !ok || !eq(best.Name(), "square") {
+		return "the square is largest"
+	}
+	return ""
+}
+
+// TestLargestOfNothing checks the empty case: no value, and the returned
+// interface value is simply not set — there is no nil to compare against.
+func TestLargestOfNothing() testing.TestResult {
+	var none @[]@Shape = make_slice(@Shape, 0)
+	empty, ok := Largest(none)
+	if ok {
+		return "nothing is largest"
+	}
+	if present(empty) {
+		return "and the value was never set"
+	}
+	return ""
+}
+
+// TestLabelIsNotAShape is the nominal-typing check: Label has exactly Shape's
+// method set and still does not satisfy it, because no impl says so.
+func TestLabelIsNotAShape() testing.TestResult {
+	var l Label
+	l.Text = "hi"
+	// Label HAS both methods — calling them directly works.
+	if l.Area() != 0.0 || !eq(l.Name(), "label") {
+		return "Label has Area and Name"
+	}
+	var v *any = &l
+	_, isShape := v.(*Shape)
+	if isShape {
+		return "yet it does not satisfy Shape, because there is no impl"
+	}
+	if !eq(Describe(v), "a Label reading \"hi\", not a Shape") {
+		return "so Describe recovers it as a concrete struct"
+	}
+	return ""
+}
+
+// TestDescribeRecognizesShapes checks the interface-targeted assertion, over
+// both a package type and one declared in this file.
+func TestDescribeRecognizesShapes() testing.TestResult {
+	var r Rect = rect3x4()
+	if !eq(Describe(&r), "rect of area 12") {
+		return "a Rect is a Shape"
+	}
+	var sq square
+	sq.side = 3.0
+	if !eq(Describe(&sq), "square of area 9") {
+		return "and so is a type this package's code never mentions"
+	}
+	return ""
+}
+
+// TestDescribeRecoversValues checks the type switch: scalars, text, and a struct
+// all come back by value.
+func TestDescribeRecoversValues() testing.TestResult {
+	var n int = 42
+	if !eq(Describe(&n), "int 42") {
+		return "int"
+	}
+	var b bool = true
+	if !eq(Describe(&b), "bool true") {
+		return "bool"
+	}
+	var f float64 = 2.5
+	if !eq(Describe(&f), "float 2.5") {
+		return "float64"
+	}
+	var s @[]readonly char = "hi"
+	if !eq(Describe(s), "text \"hi\"") {
+		return "text"
+	}
+	var u uint = 1
+	if !eq(Describe(&u), "something else") {
+		return "an unhandled type falls through rather than guessing"
+	}
+	return ""
+}
+
+// TestAssertionKinds checks that a copy and a borrow really differ: the borrow
+// tracks its source, the copy does not.
+func TestAssertionKinds() testing.TestResult {
+	var r Rect = rect3x4()
+	var v *any = &r
+	copied, copyOk := v.(Rect)
+	borrowed, borrowOk := v.(*Rect)
+	if !copyOk || !borrowOk {
+		return "both recoveries hit"
+	}
+	r.W = 100.0
+	if borrowed.W != 100.0 {
+		return "the borrow sees the mutation"
+	}
+	if copied.W != 3.0 {
+		return "the copy does not"
+	}
+	// The comma-ok form reports a miss instead of aborting.
+	_, wrong := v.(Circle)
+	if wrong {
+		return "a wrong type misses"
+	}
+	return ""
+}
+
+// TestIdentity checks `same`, which is the only identity question an interface
+// value answers — they never compare with ==.
+func TestIdentity() testing.TestResult {
+	var r Rect = rect3x4()
+	var c Circle
+	c.R = 1.0
+	var a *any = &r
+	var alias *any = &r
+	var other *any = &c
+	if !same(a, alias) {
+		return "two views of the same value are the same"
+	}
+	if same(a, other) {
+		return "views of different values are not"
+	}
+	if !same(a, a) {
+		return "a value is itself"
+	}
+	return ""
+}

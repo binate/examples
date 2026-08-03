@@ -125,6 +125,12 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`interfaces`](interfaces/) — **nominal dispatch and type recovery**: an
+  `impl` is what satisfies an interface (a type with the exact method set and no
+  impl is included, to prove it), impls may live in any package that sees both
+  sides, `@I` owns while `*I` borrows, and assertions carry a mandatory recovery
+  kind — `.(T)` copies, `.(*T)` borrows, `.(@T)` retains — with type switches
+  and `same`/`present` for the questions `==` cannot answer.
 - [`time`](time/) — **points, deltas, and the calendar that isn't there**
   (`pkg/std/time`): Point ordering and Delta arithmetic, plus an example-local
   UTC calendar, because the library has none. Also the honest demonstration of a

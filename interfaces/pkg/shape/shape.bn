@@ -1,0 +1,89 @@
+package "pkg/shape"
+
+import "pkg/std/math"
+import "pkg/stdx/fmt"
+
+// Area returns the rectangle's area.
+func (r *readonly Rect) Area() float64 {
+	return r.W * r.H
+}
+
+// Name returns "rect".
+func (r *readonly Rect) Name() @[]readonly char {
+	return "rect"
+}
+
+// Area returns the circle's area.
+func (c *readonly Circle) Area() float64 {
+	return math.Pi * c.R * c.R
+}
+
+// Name returns "circle".
+func (c *readonly Circle) Name() @[]readonly char {
+	return "circle"
+}
+
+// Area returns 0 — a label has no extent.
+func (l *readonly Label) Area() float64 {
+	return 0.0
+}
+
+// Name returns "label".
+func (l *readonly Label) Name() @[]readonly char {
+	return "label"
+}
+
+// TotalArea sums the areas of every shape.
+func TotalArea(shapes @[]@Shape) float64 {
+	var total float64 = 0.0
+	for i := 0; i < len(shapes); i++ {
+		total = total + shapes[i].Area()
+	}
+	return total
+}
+
+// Largest returns the shape with the greatest area.
+func Largest(shapes @[]@Shape) (@Shape, bool) {
+	var best @Shape
+	if len(shapes) == 0 {
+		// An interface value has no nil; the zero value is simply not set, and
+		// present() is what asks.
+		return best, false
+	}
+	best = shapes[0]
+	for i := 1; i < len(shapes); i++ {
+		if shapes[i].Area() > best.Area() {
+			best = shapes[i]
+		}
+	}
+	return best, true
+}
+
+// Describe renders any value as text.
+func Describe(v *any) @[]readonly char {
+	// An interface-targeted assertion: "does whatever this is satisfy Shape?"
+	// The comma-ok form never aborts — the bare `v.(*Shape)` would, and there is
+	// no recover.
+	s, isShape := v.(*Shape)
+	if isShape {
+		return fmt.Sprintf("%s of area %g", s.Name(), s.Area())
+	}
+	// A type switch recovers the concrete type. Each case binds x at that type;
+	// a scalar, a struct, and a slice are all recoverable by value.
+	switch x := v.(type) {
+	case int:
+		return fmt.Sprintf("int %d", x)
+	case bool:
+		return fmt.Sprintf("bool %t", x)
+	case float64:
+		return fmt.Sprintf("float %g", x)
+	case @[]readonly char:
+		return fmt.Sprintf("text %q", x)
+	case Label:
+		// Label has Area and Name, so it looks like a Shape — but no `impl`
+		// pairs them, so the assertion above missed it and it arrives here as
+		// the plain struct it is.
+		return fmt.Sprintf("a Label reading %q, not a Shape", x.Text)
+	}
+	return "something else"
+}

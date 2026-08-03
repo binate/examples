@@ -67,12 +67,7 @@ Written roughly in the order they are worth doing:
   file-mtime section in `cmd/dates` becomes a curiosity rather than the only way
   to see the present, and the README should say so.
 
-- **`interfaces` — nominal interfaces and type recovery.** `impl T : I` being
-  required (a matching method set is never enough), interface values as `*I` /
-  `@I`, construction borrowing, and the assertion forms with their mandatory
-  recovery kind — `v.(@T)` / `v.(*T)` / `v.(T)`, comma-ok vs. the aborting bare
-  form — plus type switches and `present`/`same`. `minbasic` uses interfaces
-  for its injected I/O, but nothing here shows assertions or type switches.
+- **`interfaces` — DONE.**
 
 - **`math` — DONE, with one thing to undo.** The example builds its negative
   zero with `math.Copysign(0.0, -1.0)` instead of writing the `-0.0` literal,

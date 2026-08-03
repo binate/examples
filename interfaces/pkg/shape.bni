@@ -1,0 +1,89 @@
+// Package shape is a small polymorphic surface — two shapes behind one
+// interface — and the inspector that takes them apart again.
+//
+// Binate interfaces are **nominal**: a type satisfies an interface only when an
+// `impl` says so. Having the right methods is never enough, and there is no
+// structural fallback. The upside is that satisfaction is deliberate and
+// greppable; the cost is one extra line per pairing.
+//
+// There is no orphan rule. An `impl` may live in ANY package that can see both
+// the type and the interface — not just the one that declares either — so a
+// consumer can retrofit a type it does not own into an interface it does not
+// own. (Methods still belong to the type's own package; only the `impl` moves.)
+// The command in this example uses that: it declares its own shape and hands it
+// back to the functions here, which discover it through the interface.
+package "pkg/shape"
+
+// Shape is anything with an area and a name.
+//
+// A Shape value is spelled `*Shape` (a borrow) or `@Shape` (owning) — a bare
+// `Shape` is not a value type. Constructing one from a pointer-shaped source
+// BORROWS it, so a stored `*Shape` sees later mutations of the value behind it.
+interface Shape {
+	Area() float64
+	Name() @[]readonly char
+}
+
+// Rect is an axis-aligned rectangle.
+type Rect struct {
+	W float64
+	H float64
+}
+
+// Area returns the rectangle's area.
+func (r *readonly Rect) Area() float64
+
+// Name returns "rect".
+func (r *readonly Rect) Name() @[]readonly char
+
+// A readonly borrow of a Rect is a Shape. The receiver form is part of the
+// pairing: it is `*readonly Rect` that satisfies Shape, not `Rect`.
+impl *readonly Rect : Shape
+
+// Circle is a circle of the given radius.
+type Circle struct {
+	R float64
+}
+
+// Area returns the circle's area.
+func (c *readonly Circle) Area() float64
+
+// Name returns "circle".
+func (c *readonly Circle) Name() @[]readonly char
+
+impl *readonly Circle : Shape
+
+// Label has exactly the method set Shape asks for — an Area and a Name — and is
+// deliberately NOT impl'd, because that is the whole point of nominal typing: a
+// matching method set does not make a Shape. Nothing here rejects it at compile
+// time either; `Describe` simply finds, at run time, that it does not satisfy
+// the interface, and recovers it as the concrete struct it is.
+type Label struct {
+	Text @[]readonly char
+}
+
+// Area returns 0 — a label has no extent.
+func (l *readonly Label) Area() float64
+
+// Name returns "label".
+func (l *readonly Label) Name() @[]readonly char
+
+// TotalArea sums the areas of every shape, calling through the interface — the
+// dispatch happens at run time, through each value's own vtable.
+func TotalArea(shapes @[]@Shape) float64
+
+// Largest returns the shape with the greatest area, and whether there was one.
+// The result borrows from the slice rather than copying, since a Shape value is
+// a handle either way.
+func Largest(shapes @[]@Shape) (@Shape, bool)
+
+// Describe renders any value as text, and is the example's tour of type
+// recovery. It asks three questions in order:
+//
+//  1. Does it satisfy Shape? An assertion whose target is an INTERFACE answers
+//     that at run time — which is how a package can recognize a type declared
+//     somewhere it has never heard of.
+//  2. Failing that, what concrete type is it? A type switch recovers scalars,
+//     text, and structs by value.
+//  3. Otherwise, say so rather than guessing.
+func Describe(v *any) @[]readonly char

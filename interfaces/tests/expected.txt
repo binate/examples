@@ -1,0 +1,19 @@
+dispatch through the interface:
+  rect         12
+  circle       3.141592653589793
+  triangle     15
+total area 30.141592653589793
+largest: triangle (15), found true
+largest of nothing: found false, value present false
+borrow 12 and box 12; after widening the Rect: borrow 40, box 12
+recovery:
+  rect         rect of area 40
+  triangle     triangle of area 15
+  int          int 42
+  float        float 2.5
+  text         text "hello"
+  label        a Label reading "not a shape", not a Shape
+assertions: copy ok true (10x4), borrow ok true
+after mutating: the borrow sees 99, the copy still 10
+a wrong guess: ok false (no abort, because of the comma)
+identity: same(v, alias) true, same(v, other) false, same(v, v) true
