@@ -59,12 +59,7 @@ Written roughly in the order they are worth doing:
   shebang limit — the harness stamps a runnable script (short symlinked search
   paths) the way binate's own `e2e/shebang-exec.sh` does.
 
-- **`text` — building and parsing text (`pkg/std/strings`, `pkg/std/strconv`).**
-  `strings.Builder` as an `io.Writer` (`Write`/`WriteByte`/`Grow`/`Reset`, and
-  `String()` sharing the backing without a copy); `strconv`'s `Parse*` family
-  with its error reporting, the allocating `Format*`/`Itoa`, and the
-  no-allocation `Append*` family with its negative "space needed" overflow
-  contract.
+- **`text` — DONE.**
 
 - **`time` — points and deltas (`pkg/std/time`).** `FromUnix`/`ToUnix`,
   ordering (`Before`/`After`/`Equal`), `Sub` → `Delta`, and a file's `ModTime`

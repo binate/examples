@@ -1,0 +1,196 @@
+package "pkg/csv"
+
+import "pkg/builtins/testing"
+import "pkg/std/errors"
+
+// eq reports whether a text equals want; slices have no ==.
+func eq(a @[]readonly char, want *[]readonly char) bool {
+	if len(a) != len(want) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestParseFields checks a well-formed line, including the two shapes a naive
+// parser gets wrong: a negative integer and an exponent float.
+func TestParseFields() testing.TestResult {
+	rec, err := Parse("alpha,3,0.5")
+	if present(err) {
+		return "a valid line parses"
+	}
+	if !eq(rec.Name, "alpha") || rec.Count != 3 || rec.Ratio != 0.5 {
+		return "the three fields"
+	}
+	neg, nerr := Parse("beta,-7,2.25")
+	if present(nerr) || neg.Count != -7 {
+		return "a negative count"
+	}
+	exp, eerr := Parse("gamma,1000000,1e-9")
+	if present(eerr) || exp.Ratio != 0.000000001 {
+		return "an exponent float"
+	}
+	// A field may be empty as long as it parses — the ratio here is 0.
+	zero, zerr := Parse("delta,0,0")
+	if present(zerr) || zero.Count != 0 || zero.Ratio != 0.0 {
+		return "zeros"
+	}
+	return ""
+}
+
+// TestParseErrors checks every way a line can fail, and that each is classified
+// rather than merely described.
+func TestParseErrors() testing.TestResult {
+	_, few := Parse("alpha,3")
+	if !errors.Is(few, errors.BadData) {
+		return "too few fields"
+	}
+	_, many := Parse("alpha,3,0.5,extra")
+	if !errors.Is(many, errors.BadData) {
+		return "too many fields"
+	}
+	_, noName := Parse(",3,0.5")
+	if !errors.Is(noName, errors.BadData) {
+		return "an empty name"
+	}
+	_, badInt := Parse("alpha,three,0.5")
+	if !errors.Is(badInt, errors.BadData) {
+		return "an unparsable count"
+	}
+	_, badFloat := Parse("alpha,3,half")
+	if !errors.Is(badFloat, errors.BadData) {
+		return "an unparsable ratio"
+	}
+	// BadData roots in ConditionsUnmet, so a caller can match either level —
+	// the classification strconv's own error does not carry.
+	if !errors.Is(badInt, errors.ConditionsUnmet) {
+		return "and matches BadData's parent"
+	}
+	if len(badInt.Error()) == 0 {
+		return "the message survives the classification"
+	}
+	return ""
+}
+
+// TestParseAllSkipsBlanks checks the document-level rules: blank lines are
+// skipped, and a failure names the line it happened on.
+func TestParseAllSkipsBlanks() testing.TestResult {
+	recs, err := ParseAll("a,1,1\n\n\nb,2,2\n")
+	if present(err) {
+		return "blank lines are skipped"
+	}
+	if len(recs) != 2 {
+		return "two records"
+	}
+	if !eq(recs[0].Name, "a") || !eq(recs[1].Name, "b") {
+		return "in order"
+	}
+	empty, eerr := ParseAll("")
+	if present(eerr) || len(empty) != 0 {
+		return "an empty document is no records, not an error"
+	}
+	// The blank line means the failure is on line 4, not line 3.
+	_, ferr := ParseAll("a,1,1\n\nb,2,2\nbroken\n")
+	if !errors.Is(ferr, errors.BadData) {
+		return "a broken line fails the document"
+	}
+	if !eq(ferr.Error(), "line 4: expected name,count,ratio") {
+		return "and reports the line number, counting blanks"
+	}
+	return ""
+}
+
+// TestRenderRoundTrips checks that Render's output is exactly what Parse reads,
+// including floats that need the shortest-round-trip form to survive.
+func TestRenderRoundTrips() testing.TestResult {
+	var text @[]readonly char = "alpha,3,0.5\nbeta,-7,2.25\ngamma,1000000,1e-09\n"
+	recs, err := ParseAll(text)
+	if present(err) {
+		return "the fixture parses"
+	}
+	if !eq(Render(recs), text) {
+		return "and renders back byte for byte"
+	}
+	// A value with no exact short decimal: the round trip has to preserve it
+	// bit for bit, which prec = -1 is what guarantees.
+	var third @[]Record = make_slice(Record, 1)
+	third[0].Name = "third"
+	third[0].Count = 1
+	third[0].Ratio = 1.0 / 3.0
+	back, berr := ParseAll(Render(third))
+	if present(berr) || len(back) != 1 {
+		return "a rendered third parses back"
+	}
+	if back[0].Ratio != 1.0 / 3.0 {
+		return "as exactly the same float64"
+	}
+	if len(Render(make_slice(Record, 0))) != 0 {
+		return "no records renders as nothing"
+	}
+	return ""
+}
+
+// TestAppendRecordFits checks the successful path: the text lands at the
+// position given, and the return is where the next append would start.
+func TestAppendRecordFits() testing.TestResult {
+	var rec Record
+	rec.Name = "alpha"
+	rec.Count = 3
+	rec.Ratio = 0.5
+	var buf @[]char = make_slice(char, 128)
+	var end int = AppendRecord(buf, 0, &rec)
+	if end != 11 {
+		return "alpha,3,0.5 is 11 bytes"
+	}
+	if !eq(buf[0:end], "alpha,3,0.5") {
+		return "written at position 0"
+	}
+	// Appending at a position writes THERE, leaving what came before alone.
+	var next int = AppendRecord(buf, end, &rec)
+	if !eq(buf[0:next], "alpha,3,0.5alpha,3,0.5") {
+		return "a second append continues from the returned position"
+	}
+	return ""
+}
+
+// TestAppendRecordOverflow checks the contract that makes the no-allocation
+// family usable: on overflow NOTHING is written, and the negative result is a
+// length that would suffice.
+func TestAppendRecordOverflow() testing.TestResult {
+	var rec Record
+	rec.Name = "alpha"
+	rec.Count = 3
+	rec.Ratio = 0.5
+	var tiny @[]char = make_slice(char, 4)
+	for i := 0; i < len(tiny); i++ {
+		tiny[i] = '#'
+	}
+	var got int = AppendRecord(tiny, 0, &rec)
+	if got >= 0 {
+		return "it does not fit"
+	}
+	for i := 0; i < len(tiny); i++ {
+		if tiny[i] != '#' {
+			return "and nothing was written"
+		}
+	}
+	// Retrying with the reported size must succeed — that is what makes the
+	// number useful rather than merely a failure signal.
+	var buf @[]char = make_slice(char, -got)
+	var end int = AppendRecord(buf, 0, &rec)
+	if end < 0 || !eq(buf[0:end], "alpha,3,0.5") {
+		return "the retry fits"
+	}
+	// A position past the end is an overflow too, not a wild write.
+	if AppendRecord(buf, len(buf) - 1, &rec) >= 0 {
+		return "no room at the end is an overflow"
+	}
+	if AppendRecord(buf, -1, &rec) >= 0 {
+		return "a negative position is rejected"
+	}
+	return ""
+}

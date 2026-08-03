@@ -1,0 +1,135 @@
+package "pkg/csv"
+
+import "pkg/std/errors"
+import "pkg/std/strconv"
+import "pkg/std/strings"
+import "pkg/stdx/fmt"
+import "pkg/stdx/slices"
+
+// maxRecordText is an upper bound on one rendered record: the name, plus the
+// widest an int and a shortest-round-trip float64 can render, plus separators.
+const maxRecordText int = 64
+
+// badData returns an error rooted in errors.BadData carrying msg. strconv's own
+// errors root in nothing, so a caller of this package that wants to classify a
+// failure gets the classification from here.
+func badData(msg @[]readonly char) @errors.Error {
+	return errors.Rooted(errors.BadData, msg)
+}
+
+// splitOn returns the index of the first occurrence of c at or after start, or
+// -1. Text is a byte slice, so scanning is an ordinary loop.
+func splitOn(line @[]readonly char, c char, start int) int {
+	for i := start; i < len(line); i++ {
+		if line[i] == c {
+			return i
+		}
+	}
+	return -1
+}
+
+// Parse reads one `name,count,ratio` line.
+func Parse(line @[]readonly char) (Record, @errors.Error) {
+	var none @errors.Error
+	var rec Record
+	var first int = splitOn(line, ',', 0)
+	if first < 0 {
+		return rec, badData("expected name,count,ratio")
+	}
+	var second int = splitOn(line, ',', first + 1)
+	if second < 0 {
+		return rec, badData("expected name,count,ratio")
+	}
+	if splitOn(line, ',', second + 1) >= 0 {
+		return rec, badData("too many fields")
+	}
+	var name @[]readonly char = line[0:first]
+	if len(name) == 0 {
+		return rec, badData("the name is empty")
+	}
+	// A sub-slice of a managed-slice shares its backing and retains it, so the
+	// name needs no copy to be safe to keep.
+	rec.Name = name
+
+	var countText @[]readonly char = line[first + 1:second]
+	n, cerr := strconv.Atoi(countText)
+	if present(cerr) {
+		return rec, badData(fmt.Sprintf("count: %s", cerr.Error()))
+	}
+	rec.Count = n
+
+	var ratioText @[]readonly char = line[second + 1:len(line)]
+	f, ferr := strconv.ParseFloat(ratioText, 64)
+	if present(ferr) {
+		return rec, badData(fmt.Sprintf("ratio: %s", ferr.Error()))
+	}
+	rec.Ratio = f
+	return rec, none
+}
+
+// ParseAll reads a whole document, one record per line.
+func ParseAll(text @[]readonly char) (@[]Record, @errors.Error) {
+	var none @errors.Error
+	var recs @[]Record = make_slice(Record, 0)
+	var start int = 0
+	var num int = 0
+	for i := 0; i <= len(text); i++ {
+		if i < len(text) && text[i] != '\n' {
+			continue
+		}
+		num = num + 1
+		var line @[]readonly char = text[start:i]
+		start = i + 1
+		if len(line) == 0 {
+			continue
+		}
+		rec, err := Parse(line)
+		if present(err) {
+			var empty @[]Record = make_slice(Record, 0)
+			return empty, badData(fmt.Sprintf("line %d: %s", num, err.Error()))
+		}
+		recs = slices.Append[Record](recs, rec)
+	}
+	return recs, none
+}
+
+// Render writes the records back out, one line each.
+func Render(recs @[]Record) @[]readonly char {
+	var b @strings.Builder = strings.NewBuilder()
+	// One Grow up front sizes the backing once; without it the Builder would
+	// still be amortized O(1), just with a few more reallocations.
+	b.Grow(len(recs) * maxRecordText)
+	for i := 0; i < len(recs); i++ {
+		_, _ = b.Write(recs[i].Name)
+		_ = b.WriteByte(',')
+		// The allocating Format* family is the convenient half of strconv; the
+		// Append* family below is the half that allocates nothing.
+		_, _ = b.Write(strconv.Itoa(recs[i].Count))
+		_ = b.WriteByte(',')
+		_, _ = b.Write(strconv.FormatFloat(recs[i].Ratio, 'g', -1, 64))
+		_ = b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// AppendRecord writes one record's text into dst starting at pos.
+func AppendRecord(dst *[]char, pos int, r *readonly Record) int {
+	var need int = len(r.Name) + maxRecordText
+	if pos < 0 || pos + need > len(dst) {
+		// Nothing written, and the magnitude is a length that would suffice —
+		// strconv's contract, propagated.
+		return -need
+	}
+	var at int = pos
+	for i := 0; i < len(r.Name); i++ {
+		dst[at] = r.Name[i]
+		at = at + 1
+	}
+	dst[at] = ','
+	at = at + 1
+	at = strconv.AppendInt(dst, at, cast(int64, r.Count), 10)
+	dst[at] = ','
+	at = at + 1
+	at = strconv.AppendFloat(dst, at, r.Ratio, 'g', -1, 64)
+	return at
+}

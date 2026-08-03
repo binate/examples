@@ -125,6 +125,12 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`text`](text/) — **building and parsing text** (`pkg/std/strings`,
+  `pkg/std/strconv`): a tiny record format that needs both halves of strconv —
+  the allocating `Format*`/`Itoa` and the no-allocation `Append*` with its
+  negative "space needed" overflow contract — plus saturating `Parse*`,
+  shortest-round-trip float formatting, and `strings.Builder`, whose `String()`
+  shares its backing and whose earlier results survive a `Reset`.
 - [`math`](math/) — **floating point and big integers** (`pkg/std/math`,
   `pkg/std/math/big`): the IEEE classes, NaN, signed zero, five ways to round,
   and where precision ends — alongside Binate's defined-everything arithmetic

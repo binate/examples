@@ -1,0 +1,22 @@
+parsed 3 records (blank lines skipped), error false
+  alpha           3 0.5
+  beta           -7 2.25
+  gamma     1000000 1e-09
+round trip: same text true, same count 3, error false
+parse failures:
+  [alpha,3] -> expected name,count,ratio (BadData true)
+  [,3,0.5] -> the name is empty (BadData true)
+  [alpha,three,0.5] -> count: strconv.Atoi: parsing "three": invalid syntax (BadData true)
+  [alpha,3,half] -> ratio: strconv.ParseFloat: parsing "half": invalid syntax (BadData true)
+  [alpha,3,0.5,extra] -> too many fields (BadData true)
+overflow: int64 9223372036854775807 (err true), int8 127 (err true)
+bases: 0x2a 42, 0o52 42, 1_000_000 1000000
+append into 4 bytes: -69 (negative means it did not fit)
+retry with 69 bytes: wrote 11 -> [alpha,3,0.5]
+two in one buffer: [alpha,3,0.5 beta,-7,2.25]
+AppendInt: 42 -> 2, 1234567890123 into 8 bytes -> -13
+bases out: 255 base 16 -> [ff], FormatInt base 2 -> [101]
+builder: len 0 cap 0
+after writes: len 4 text [abc!]
+after Grow(64): len 4, cap >= 64 true
+after Reset: len 8 text [replaced], earlier string still [abc!]

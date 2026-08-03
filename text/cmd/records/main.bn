@@ -1,0 +1,127 @@
+// records parses a small document, renders it back, and then goes underneath the
+// convenient functions to the ones that allocate nothing — the two halves of
+// `pkg/std/strconv`, plus the `strings.Builder` that ties them together.
+//
+// Binate has no string type and no `+` on text: a "string" is a slice of char,
+// and building one means appending bytes to something that owns them. Everything
+// below is a consequence of that.
+package "main"
+
+import "pkg/csv"
+import "pkg/std/errors"
+import "pkg/std/strconv"
+import "pkg/std/strings"
+import "pkg/stdx/fmt"
+
+// document is the input, with a blank line and a negative number in it.
+var document @[]readonly char = "alpha,3,0.5\n"
+	"beta,-7,2.25\n"
+	"\n"
+	"gamma,1000000,1e-9\n"
+
+// textEq reports whether two texts hold the same bytes; slices have no ==.
+func textEq(a @[]readonly char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// tryParse parses one line and prints either the record or the classified error.
+func tryParse(line @[]readonly char) {
+	rec, err := csv.Parse(line)
+	if present(err) {
+		fmt.Printf("  [%s] -> %s (BadData %t)\n",
+			line, err.Error(), errors.Is(err, errors.BadData))
+		return
+	}
+	fmt.Printf("  [%s] -> name %s, count %d, ratio %g\n",
+		line, rec.Name, rec.Count, rec.Ratio)
+}
+
+// main walks parsing, rendering, the no-allocation append, and Builder mechanics.
+func main() {
+	recs, err := csv.ParseAll(document)
+	fmt.Printf("parsed %d records (blank lines skipped), error %t\n",
+		len(recs), present(err))
+	for i := 0; i < len(recs); i++ {
+		fmt.Printf("  %-8s %8d %g\n", recs[i].Name, recs[i].Count, recs[i].Ratio)
+	}
+
+	// Round trip. The float fields survive exactly because FormatFloat with a
+	// precision of -1 emits the SHORTEST text that reads back as the same value.
+	var out @[]readonly char = csv.Render(recs)
+	again, aerr := csv.ParseAll(out)
+	fmt.Printf("round trip: same text %t, same count %d, error %t\n",
+		textEq(out, "alpha,3,0.5\nbeta,-7,2.25\ngamma,1000000,1e-09\n"),
+		len(again), present(aerr))
+
+	fmt.Println("parse failures:")
+	tryParse("alpha,3")
+	tryParse(",3,0.5")
+	tryParse("alpha,three,0.5")
+	tryParse("alpha,3,half")
+	tryParse("alpha,3,0.5,extra")
+
+	// Parse* reports overflow by SATURATING and returning an error, so the value
+	// is usable even when the input was out of range.
+	big, berr := strconv.ParseInt("99999999999999999999", 10, 64)
+	small, serr := strconv.ParseInt("300", 10, 8)
+	fmt.Printf("overflow: int64 %d (err %t), int8 %d (err %t)\n",
+		big, present(berr), small, present(serr))
+	// Base 0 infers the base from the prefix, and accepts _ separators.
+	hex, _ := strconv.ParseInt("0x2a", 0, 64)
+	oct, _ := strconv.ParseInt("0o52", 0, 64)
+	sep, _ := strconv.ParseInt("1_000_000", 0, 64)
+	fmt.Printf("bases: 0x2a %d, 0o52 %d, 1_000_000 %d\n", hex, oct, sep)
+
+	// The Append* family writes into a buffer the CALLER owns: no allocation,
+	// and a negative result means "nothing written, this many bytes would do".
+	var tiny @[]char = make_slice(char, 4)
+	var short int = csv.AppendRecord(tiny, 0, &recs[0])
+	fmt.Printf("append into 4 bytes: %d (negative means it did not fit)\n", short)
+	var buf @[]char = make_slice(char, -short)
+	var end int = csv.AppendRecord(buf, 0, &recs[0])
+	fmt.Printf("retry with %d bytes: wrote %d -> [%s]\n", len(buf), end, buf[0:end])
+
+	// Two records into one buffer, back to back — the point of a position-taking
+	// API: no intermediate values, no allocation per field.
+	var pair @[]char = make_slice(char, 128)
+	var p int = csv.AppendRecord(pair, 0, &recs[0])
+	pair[p] = ' '
+	p = p + 1
+	p = csv.AppendRecord(pair, p, &recs[1])
+	fmt.Printf("two in one buffer: [%s]\n", pair[0:p])
+
+	// strconv's own Append*, with the same contract, one value at a time.
+	var cell @[]char = make_slice(char, 8)
+	fmt.Printf("AppendInt: 42 -> %d, 1234567890123 into 8 bytes -> %d\n",
+		strconv.AppendInt(cell, 0, 42, 10),
+		strconv.AppendInt(cell, 0, 1234567890123, 10))
+	var hexBuf @[]char = make_slice(char, 16)
+	var hexEnd int = strconv.AppendInt(hexBuf, 0, 255, 16)
+	fmt.Printf("bases out: 255 base 16 -> [%s], FormatInt base 2 -> [%s]\n",
+		hexBuf[0:hexEnd], strconv.FormatInt(5, 2))
+
+	// A Builder owns its backing and grows it exponentially; String() hands back
+	// a view of that same memory, with no copy.
+	var b @strings.Builder = strings.NewBuilder()
+	fmt.Printf("builder: len %d cap %d\n", b.Len(), b.Cap())
+	_, _ = b.Write("abc")
+	_ = b.WriteByte('!')
+	var first @[]readonly char = b.String()
+	fmt.Printf("after writes: len %d text [%s]\n", b.Len(), first)
+	b.Grow(64)
+	fmt.Printf("after Grow(64): len %d, cap >= 64 %t\n", b.Len(), b.Cap() >= 64)
+	// Reset drops the Builder's backing, but a string handed out earlier keeps
+	// its own reference to the old bytes — it does not turn to garbage.
+	b.Reset()
+	_, _ = b.Write("replaced")
+	fmt.Printf("after Reset: len %d text [%s], earlier string still [%s]\n",
+		b.Len(), b.String(), first)
+}

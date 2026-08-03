@@ -1,0 +1,54 @@
+// Package csv parses and renders a deliberately tiny record format —
+// `name,count,ratio` lines — as a vehicle for the two halves of text handling in
+// the standard library: `pkg/std/strconv` converts between values and their text,
+// and `pkg/std/strings.Builder` accumulates that text without quadratic copying.
+//
+// Binate has no string type. Text is a slice of `char` (which IS `uint8`), so
+// "parsing" here is slicing and "rendering" is appending bytes — and the
+// ownership rules that apply to any slice apply to text as well. A field of a
+// parsed Record is a VIEW into the line it came from, so a Record does not
+// outlive its input unless the caller copies it; Render's result, by contrast, is
+// owned.
+package "pkg/csv"
+
+import "pkg/std/errors"
+
+// Record is one parsed line: a name, a count, and a ratio.
+//
+// Name is `@[]readonly char` — an owning handle — but Parse fills it with a
+// SUB-SLICE of the line, which shares that line's backing rather than copying.
+// A managed sub-slice retains the whole backing, so this is safe (never a
+// dangling view), at the cost of keeping the entire line alive for as long as
+// any Record cut from it.
+type Record struct {
+	Name  @[]readonly char
+	Count int
+	Ratio float64
+}
+
+// Parse reads one `name,count,ratio` line.
+//
+// A malformed line is an error rooted in `errors.BadData`, carrying the reason —
+// wrong field count, empty name, or an unparsable number. The value errors quote
+// strconv's own message, because it says exactly which field and why; the
+// classification is added here, since strconv's errors carry none of their own.
+func Parse(line @[]readonly char) (Record, @errors.Error)
+
+// ParseAll reads a whole document, one record per line, skipping blank lines. A
+// failure reports the 1-based line number alongside the reason, and no records.
+func ParseAll(text @[]readonly char) (@[]Record, @errors.Error)
+
+// Render writes the records back out, one line each, in the format Parse reads —
+// so `ParseAll(Render(rs))` returns rs. It accumulates into a single
+// `strings.Builder`, which grows exponentially, rather than concatenating (which
+// Binate has no operator for, and which would be O(n^2) by hand).
+func Render(recs @[]Record) @[]readonly char
+
+// AppendRecord writes one record's text into dst starting at pos, allocating
+// nothing, and returns the position just past what it wrote.
+//
+// It follows strconv's overflow contract exactly: when dst has too little room,
+// NOTHING is written and the result is negative — its magnitude being a length
+// that is sufficient (here an upper bound, not the exact need). So a caller sizes
+// a buffer by trying, and retrying once with `-result` bytes.
+func AppendRecord(dst *[]char, pos int, r *readonly Record) int
