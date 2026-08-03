@@ -1,0 +1,37 @@
+// Package fp holds the float64 helpers `pkg/std/math` leaves to the caller:
+// naming a value's IEEE class, and converting to an integer without silently
+// losing the fact that it did not fit.
+//
+// Both exist because of a rule that surprises people coming from C: in Binate
+// EVERY arithmetic operation is defined, so nothing here can trap or be
+// undefined. A float→int `cast` SATURATES at the integer extremes (and NaN
+// becomes 0) rather than producing garbage, and comparisons follow IEEE, so
+// `x != x` is the NaN test and `-0.0 == 0.0` is true even though the two have
+// different bit patterns. Defined does not mean lossless — these two functions
+// are how a caller notices.
+package "pkg/fp"
+
+// Class names the IEEE class of x: "nan", "+inf", "-inf", "zero", "-zero",
+// "subnormal", or "normal".
+//
+// Zero is split because the sign of zero survives arithmetic and is observable
+// (`math.Signbit`, `1/x`) even though `-0.0 == 0.0` compares true — so a
+// classifier that reported only "zero" would hide a real distinction.
+func Class(x float64) @[]readonly char
+
+// ToInt64 converts x the way `cast(int64, x)` does — truncating toward zero —
+// and additionally reports whether the value SURVIVED: false when x was NaN
+// (which becomes 0) or outside the int64 range (which saturates at the extreme).
+// The conversion itself never traps; the bool is the only way to tell a genuine
+// 9223372036854775807 from a saturated one.
+//
+// int64 rather than the word-sized int, so the bounds below are the same on a
+// 32-bit target as on a 64-bit one.
+func ToInt64(x float64) (int64, bool)
+
+// Ulp returns the distance from x to the next representable float64 away from
+// zero — the size of one unit in the last place. It is the scale at which
+// float comparisons stop being meaningful: near 1.0 it is about 2.2e-16, near
+// 1e16 it is 2.0, and beyond 2^53 it exceeds 1, which is why a large float64
+// cannot represent consecutive integers.
+func Ulp(x float64) float64

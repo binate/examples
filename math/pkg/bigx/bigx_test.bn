@@ -1,0 +1,130 @@
+package "pkg/bigx"
+
+import "pkg/builtins/testing"
+import "pkg/std/math/big"
+
+// textEq reports whether two texts hold the same bytes; slices have no ==.
+func textEq(a @[]readonly char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestDecimalSmall checks the renderings a wrong digit order or an off-by-one
+// buffer would break first, including the zero that has no digits to emit.
+func TestDecimalSmall() testing.TestResult {
+	if !textEq(Decimal(big.New()), "0") {
+		return "zero renders as 0, not empty"
+	}
+	if !textEq(Decimal(big.FromUint64(7)), "7") {
+		return "one digit"
+	}
+	if !textEq(Decimal(big.FromUint64(10)), "10") {
+		return "a trailing zero survives the reversal"
+	}
+	if !textEq(Decimal(big.FromUint64(1000)), "1000") {
+		return "several trailing zeros"
+	}
+	if !textEq(Decimal(big.FromUint64(1234567890)), "1234567890") {
+		return "digit order"
+	}
+	return ""
+}
+
+// TestDecimalWide checks values past one limb and past uint64 entirely — the
+// point of the type.
+func TestDecimalWide() testing.TestResult {
+	if !textEq(Decimal(big.FromUint64(18446744073709551615)), "18446744073709551615") {
+		return "the largest uint64"
+	}
+	var pow @big.Nat = big.FromUint64(1)
+	pow = pow.Shl(pow, 64)
+	if !textEq(Decimal(pow), "18446744073709551616") {
+		return "2^64, which no machine integer holds"
+	}
+	pow = pow.Shl(pow, 36)
+	if !textEq(Decimal(pow), "1267650600228229401496703205376") {
+		return "2^100"
+	}
+	return ""
+}
+
+// TestDecimalDoesNotConsume checks that rendering a Nat leaves it usable —
+// Decimal divides repeatedly, so it must work on a copy.
+func TestDecimalDoesNotConsume() testing.TestResult {
+	var n @big.Nat = big.FromUint64(12345)
+	var first @[]readonly char = Decimal(n)
+	var second @[]readonly char = Decimal(n)
+	if !textEq(first, "12345") || !textEq(second, "12345") {
+		return "the Nat survives being printed twice"
+	}
+	if n.ToUint64() != 12345 {
+		return "and still holds its value"
+	}
+	return ""
+}
+
+// TestFactorial checks the base cases and two values, the larger of which is far
+// past what a uint64 could hold.
+func TestFactorial() testing.TestResult {
+	if !textEq(Decimal(Factorial(0)), "1") {
+		return "0! is 1"
+	}
+	if !textEq(Decimal(Factorial(1)), "1") {
+		return "1! is 1"
+	}
+	if !textEq(Decimal(Factorial(10)), "3628800") {
+		return "10!"
+	}
+	if !textEq(Decimal(Factorial(25)), "15511210043330985984000000") {
+		return "25!, which needs 84 bits"
+	}
+	if Factorial(20).ToUint64() != 2432902008176640000 {
+		return "20! is the largest factorial a uint64 holds"
+	}
+	return ""
+}
+
+// TestFib checks the base cases, the recurrence, and a value beyond uint64.
+func TestFib() testing.TestResult {
+	if !Fib(0).IsZero() {
+		return "Fib(0) is 0"
+	}
+	if Fib(1).ToUint64() != 1 || Fib(2).ToUint64() != 1 {
+		return "Fib(1) and Fib(2) are 1"
+	}
+	if Fib(10).ToUint64() != 55 {
+		return "Fib(10)"
+	}
+	if !textEq(Decimal(Fib(100)), "354224848179261915075") {
+		return "Fib(100), which exceeds uint64"
+	}
+	// The defining property, checked where the arithmetic is wide.
+	var sum @big.Nat = big.New()
+	sum = sum.Add(Fib(98), Fib(99))
+	if sum.Cmp(Fib(100)) != 0 {
+		return "Fib(n) = Fib(n-1) + Fib(n-2)"
+	}
+	return ""
+}
+
+// TestFibOutgrowsMachineIntegers pins where the machine-int version in the
+// `numbers` example would start lying.
+func TestFibOutgrowsMachineIntegers() testing.TestResult {
+	if !Fib(93).IsUint64() {
+		return "Fib(93) still fits a uint64"
+	}
+	if Fib(93).ToUint64() <= 9223372036854775807 {
+		return "but has already passed the int64 maximum"
+	}
+	if Fib(94).IsUint64() {
+		return "Fib(94) fits nothing machine-sized"
+	}
+	return ""
+}

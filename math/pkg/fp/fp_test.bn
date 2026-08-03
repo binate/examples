@@ -1,0 +1,169 @@
+package "pkg/fp"
+
+import "pkg/builtins/testing"
+import "pkg/std/math"
+
+// textEq reports whether two texts hold the same bytes; slices have no ==.
+func textEq(a @[]readonly char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestClassSpecials checks the classes that are not ordinary numbers.
+func TestClassSpecials() testing.TestResult {
+	if !textEq(Class(math.NaN()), "nan") {
+		return "NaN"
+	}
+	if !textEq(Class(math.Inf(1)), "+inf") {
+		return "+Inf"
+	}
+	if !textEq(Class(math.Inf(-1)), "-inf") {
+		return "-Inf"
+	}
+	// Every NaN is a NaN, including one built from bits rather than math.NaN().
+	if !textEq(Class(math.Float64frombits(0x7ff8000000000042)), "nan") {
+		return "a NaN with a payload is still nan"
+	}
+	return ""
+}
+
+// TestClassZeroIsSigned checks the distinction the two zeros keep even though
+// they compare equal — the reason Class reports them separately.
+//
+// The negative zero comes from Copysign, not from a `-0.0` literal: the bytecode
+// VM currently computes `-x` as `0.0 - x`, which loses the sign of a zero, so a
+// literal would make this test pass compiled and fail interpreted. Tracked as a
+// toolchain bug; see ../../TODO.md.
+func TestClassZeroIsSigned() testing.TestResult {
+	var negZero float64 = math.Copysign(0.0, -1.0)
+	if !textEq(Class(0.0), "zero") {
+		return "+0"
+	}
+	if !textEq(Class(negZero), "-zero") {
+		return "-0"
+	}
+	if 0.0 != negZero {
+		return "the two zeros COMPARE equal"
+	}
+	if math.Float64bits(0.0) == math.Float64bits(negZero) {
+		return "yet differ in bits"
+	}
+	// A negative zero also arrives from arithmetic, not just from Copysign.
+	if !textEq(Class(-1.0 * 0.0), "-zero") {
+		return "-1 * 0 is a negative zero"
+	}
+	return ""
+}
+
+// TestClassFinite checks normal and subnormal, including the boundary between
+// them.
+func TestClassFinite() testing.TestResult {
+	if !textEq(Class(1.0), "normal") {
+		return "1.0"
+	}
+	if !textEq(Class(-1e-300), "normal") {
+		return "a small normal is still normal"
+	}
+	if !textEq(Class(math.MaxFloat64), "normal") {
+		return "the largest finite value"
+	}
+	if !textEq(Class(math.SmallestNonzeroFloat64), "subnormal") {
+		return "the smallest nonzero value is subnormal"
+	}
+	if !textEq(Class(2.2250738585072014e-308), "normal") {
+		return "the smallest NORMAL is normal"
+	}
+	return ""
+}
+
+// TestToInt64Exact checks the conversions that lose nothing but the fraction —
+// truncation toward zero, in both directions.
+func TestToInt64Exact() testing.TestResult {
+	n, ok := ToInt64(3.9)
+	if !ok || n != 3 {
+		return "3.9 truncates toward zero"
+	}
+	m, mok := ToInt64(-3.9)
+	if !mok || m != -3 {
+		return "-3.9 truncates toward zero, not down"
+	}
+	z, zok := ToInt64(-0.0)
+	if !zok || z != 0 {
+		return "-0.0 converts to 0"
+	}
+	return ""
+}
+
+// TestToInt64Saturates checks the values that do NOT survive: the conversion
+// still produces something (it never traps), and the bool is what says so.
+func TestToInt64Saturates() testing.TestResult {
+	hi, hiok := ToInt64(1e300)
+	if hiok {
+		return "1e300 does not fit"
+	}
+	if hi != 9223372036854775807 {
+		return "and saturates at the maximum"
+	}
+	lo, look := ToInt64(-1e300)
+	if look {
+		return "-1e300 does not fit"
+	}
+	if lo != -9223372036854775808 {
+		return "and saturates at the minimum"
+	}
+	n, nok := ToInt64(math.NaN())
+	if nok || n != 0 {
+		return "NaN becomes 0, and is reported as lost"
+	}
+	inf, iok := ToInt64(math.Inf(1))
+	if iok || inf != 9223372036854775807 {
+		return "+Inf saturates and is reported as lost"
+	}
+	return ""
+}
+
+// TestToInt64Boundary checks the edge the bound is written carefully for: 2^63
+// is out of range, and the largest float64 strictly below it is in.
+func TestToInt64Boundary() testing.TestResult {
+	_, atPow63 := ToInt64(9223372036854775808.0)
+	if atPow63 {
+		return "2^63 is one past the int64 maximum"
+	}
+	below, ok := ToInt64(9223372036854774784.0)
+	if !ok || below != 9223372036854774784 {
+		return "the largest float64 below 2^63 converts exactly"
+	}
+	_, minOk := ToInt64(-9223372036854775808.0)
+	if !minOk {
+		return "-2^63 IS representable, so it survives"
+	}
+	return ""
+}
+
+// TestUlp checks the gap to the next representable value at three scales,
+// including the one where it exceeds 1 and the float64 stops counting.
+func TestUlp() testing.TestResult {
+	if Ulp(1.0) != 2.220446049250313e-16 {
+		return "one ulp at 1.0 is 2^-52"
+	}
+	if Ulp(-1.0) != Ulp(1.0) {
+		return "the gap is symmetric about zero"
+	}
+	if Ulp(9007199254740992.0) != 2.0 {
+		return "past 2^53 the gap is 2"
+	}
+	if 9007199254740993.0 != 9007199254740992.0 {
+		return "so consecutive integers collide there"
+	}
+	if !math.IsNaN(Ulp(math.NaN())) {
+		return "NaN has no neighbor"
+	}
+	return ""
+}

@@ -125,6 +125,11 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
+- [`math`](math/) — **floating point and big integers** (`pkg/std/math`,
+  `pkg/std/math/big`): the IEEE classes, NaN, signed zero, five ways to round,
+  and where precision ends — alongside Binate's defined-everything arithmetic
+  (overflow wraps, float→int saturates, NaN converts to 0). Then `big.Nat` picks
+  up where a machine integer gives out, with 50! and Fib(100) exact.
 - [`processes`](processes/) — **running a child program**
   (`pkg/std/os/process`): exit codes, death by signal, `LookPath`, and the
   `Options` fields (`Args`, `Argv0`, `Env`/`ReplaceEnv`, `SearchPath`). Built

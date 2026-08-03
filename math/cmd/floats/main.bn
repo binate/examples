@@ -1,0 +1,112 @@
+// floats tours `pkg/std/math` and, with it, Binate's rule that every arithmetic
+// operation is DEFINED: nothing here traps, is undefined, or depends on a
+// compiler flag. Overflow wraps, float→int conversion saturates, NaN and the
+// infinities behave exactly as IEEE 754 says, and both execution modes agree.
+//
+// Defined is not the same as lossless, and most of what follows is about
+// noticing the difference.
+package "main"
+
+import "pkg/fp"
+import "pkg/std/math"
+import "pkg/stdx/fmt"
+
+// classify prints the IEEE class of a value alongside its bit pattern, since
+// two values that compare equal need not be the same value.
+func classify(label *[]readonly char, x float64) {
+	fmt.Printf("  %-9s %-9s bits 0x%016x\n", label, fp.Class(x), math.Float64bits(x))
+}
+
+// convert prints what a float64 becomes as an int64, and whether it survived.
+func convert(label *[]readonly char, x float64) {
+	n, exact := fp.ToInt64(x)
+	fmt.Printf("  %-12s -> %d (survived %t)\n", label, n, exact)
+}
+
+// main walks classes, NaN, signed zero, rounding, saturation, and precision.
+func main() {
+	// The negative zero below is built with Copysign rather than written as the
+	// `-0.0` literal. Copysign is the portable spelling anyway — Go folds a
+	// `-0.0` literal to `+0.0`, so it is how you write one there too — and here
+	// it is also necessary: the bytecode VM currently computes `-x` as `0.0 - x`,
+	// which loses the sign of a zero, so the literal would make this program
+	// disagree with itself between compiled and interpreted mode. Tracked as a
+	// toolchain bug; see ../TODO.md for what to change back once it is fixed.
+	var negZero float64 = math.Copysign(0.0, -1.0)
+
+	fmt.Println("classes:")
+	classify("0.0", 0.0)
+	classify("-0.0", negZero)
+	classify("1.0", 1.0)
+	classify("NaN", math.NaN())
+	classify("+Inf", math.Inf(1))
+	classify("-Inf", math.Inf(-1))
+	classify("smallest", math.SmallestNonzeroFloat64)
+	classify("max", math.MaxFloat64)
+
+	// NaN compares false against everything, itself included. That is not a
+	// quirk to work around — it is the definition, and `x != x` is the test.
+	var nan float64 = math.NaN()
+	fmt.Printf("NaN: == itself %t, != itself %t, < 1 %t, > 1 %t, IsNaN %t\n",
+		nan == nan, nan != nan, nan < 1.0, nan > 1.0, math.IsNaN(nan))
+
+	// Signed zero: equal by comparison, distinguishable by sign — and the
+	// difference propagates through division.
+	fmt.Printf("zero: -0.0 == 0.0 %t, Signbit(-0.0) %t, 1/-0.0 %g, Copysign(3,-0) %g\n",
+		negZero == 0.0, math.Signbit(negZero), 1.0 / negZero,
+		math.Copysign(3.0, negZero))
+
+	// Infinity arithmetic is defined too — including the cases that produce NaN.
+	var inf float64 = math.Inf(1)
+	fmt.Printf("inf: inf+1 %g, inf*0 is nan %t, inf-inf is nan %t, 1/inf %g\n",
+		inf + 1.0, math.IsNaN(inf * 0.0), math.IsNaN(inf - inf), 1.0 / inf)
+
+	// Five ways to remove a fraction, and they disagree on purpose. Round goes
+	// away from zero at .5; RoundToEven goes to the even neighbor, which is what
+	// keeps a long sum of rounded values from drifting upward.
+	fmt.Println("rounding:")
+	fmt.Printf("  %-6s %6s %6s %6s %6s %6s\n", "x", "floor", "ceil", "trunc", "round", "even")
+	roundRow(2.5)
+	roundRow(3.5)
+	roundRow(-2.5)
+	roundRow(2.4)
+
+	// A float→int cast never traps: it truncates toward zero, saturates at the
+	// extremes, and turns NaN into 0.
+	fmt.Println("conversion:")
+	convert("3.9", 3.9)
+	convert("-3.9", -3.9)
+	convert("1e300", 1e300)
+	convert("-1e300", -1e300)
+	convert("NaN", math.NaN())
+
+	// Integer overflow wraps — also defined, also lossy.
+	var big int64 = 9223372036854775807
+	fmt.Printf("int64 overflow: max+1 = %d\n", big + 1)
+
+	// Precision: one ulp is the gap to the next representable value, and once it
+	// exceeds 1 the float64 can no longer count.
+	fmt.Printf("ulp: at 1.0 %g, at 1e16 %g, at 2^53 %g\n",
+		fp.Ulp(1.0), fp.Ulp(1e16), fp.Ulp(9007199254740992.0))
+	fmt.Printf("2^53: 9007199254740993.0 == 9007199254740992.0 -> %t\n",
+		9007199254740993.0 == 9007199254740992.0)
+	fmt.Printf("0.1+0.2 == 0.3 %t, and the difference is %g\n",
+		0.1 + 0.2 == 0.3, 0.1 + 0.2 - 0.3)
+
+	// A few functions, including one whose exact result is not representable.
+	fmt.Printf("funcs: Sqrt(2)^2 == 2 %t, Hypot(3,4) %g, Pow(2,10) %g, Log(E) %g\n",
+		math.Sqrt(2.0) * math.Sqrt(2.0) == 2.0, math.Hypot(3.0, 4.0),
+		math.Pow(2.0, 10.0), math.Log(math.E))
+	whole, frac := math.Modf(3.75)
+	f, e := math.Frexp(48.0)
+	fmt.Printf("decompose: Modf(3.75) = %g + %g, Frexp(48) = %g * 2^%d\n",
+		whole, frac, f, e)
+	fmt.Printf("bits round-trip: %t\n",
+		math.Float64frombits(math.Float64bits(math.Pi)) == math.Pi)
+}
+
+// roundRow prints one row of the rounding table.
+func roundRow(x float64) {
+	fmt.Printf("  %-6g %6g %6g %6g %6g %6g\n", x, math.Floor(x), math.Ceil(x),
+		math.Trunc(x), math.Round(x), math.RoundToEven(x))
+}

@@ -1,0 +1,29 @@
+// Package bigx supplies what `pkg/std/math/big` does not yet: a way to SEE a
+// Nat, and two things worth computing with one.
+//
+// `big.Nat` is an arbitrary-precision unsigned integer of base-2^32 limbs. It
+// arrives with arithmetic but no text conversion, so Decimal here is the missing
+// half — and it is the reason the example has something to print.
+//
+// The API convention `big` uses is the destination-first one from Go's math/big:
+// `z.Add(x, y)` sets z and returns it, so a caller supplies the destination and
+// no allocation happens per operation. `z` may alias `x` or `y`, which is what
+// makes an accumulator loop (`acc.Mul(acc, k)`) allocation-free.
+package "pkg/bigx"
+
+import "pkg/std/math/big"
+
+// Decimal renders n in base 10. It works by repeatedly dividing by 10 and
+// keeping the remainders, so the digits arrive least-significant first and are
+// reversed at the end; zero renders as "0" rather than empty.
+func Decimal(n @big.Nat) @[]readonly char
+
+// Factorial returns n! — the running product 1*2*…*n — computed with an
+// accumulator that aliases itself, so the whole loop allocates only as the
+// number grows. Factorial(0) is 1.
+func Factorial(n int) @big.Nat
+
+// Fib returns the nth Fibonacci number, with Fib(0) = 0 and Fib(1) = 1. Unlike
+// the machine-int version in the `numbers` example, this one does not wrap:
+// Fib(100) is a 21-digit number that no 64-bit integer can hold.
+func Fib(n int) @big.Nat

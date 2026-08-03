@@ -1,0 +1,67 @@
+package "pkg/fp"
+
+import "pkg/std/math"
+
+// maxInt64AsFloat is the smallest float64 that is >= the largest int64. The
+// int64 maximum (2^63 - 1) is NOT representable as a float64, and the nearest
+// float64 above it is exactly 2^63, so a value is in range iff it is strictly
+// below this. Writing the bound the other way — x <= cast(float64, maxInt64) —
+// would round it UP to 2^63 and let an out-of-range value through.
+const maxInt64AsFloat float64 = 9223372036854775808.0
+
+// minInt64AsFloat is the most negative int64 (-2^63), which IS exactly
+// representable as a float64, so that bound is inclusive.
+const minInt64AsFloat float64 = -9223372036854775808.0
+
+// Class names the IEEE class of x.
+func Class(x float64) @[]readonly char {
+	// NaN first, and via x != x rather than a comparison against a NaN
+	// constant: NaN compares false against everything, itself included, which
+	// is exactly what makes this test work.
+	if math.IsNaN(x) {
+		return "nan"
+	}
+	if math.IsInf(x, 1) {
+		return "+inf"
+	}
+	if math.IsInf(x, -1) {
+		return "-inf"
+	}
+	if x == 0.0 {
+		// -0.0 == 0.0 is true, so the sign bit is the only way to tell them
+		// apart.
+		if math.Signbit(x) {
+			return "-zero"
+		}
+		return "zero"
+	}
+	if math.Abs(x) < 2.2250738585072014e-308 {
+		return "subnormal"
+	}
+	return "normal"
+}
+
+// ToInt64 converts x to an int64, reporting whether the value survived.
+func ToInt64(x float64) (int64, bool) {
+	if math.IsNaN(x) {
+		return 0, false
+	}
+	var t float64 = math.Trunc(x)
+	if t >= maxInt64AsFloat || t < minInt64AsFloat {
+		return cast(int64, x), false
+	}
+	return cast(int64, x), true
+}
+
+// Ulp returns the distance from x to the next representable float64 away from
+// zero.
+func Ulp(x float64) float64 {
+	if math.IsNaN(x) {
+		return x
+	}
+	var away float64 = math.Inf(1)
+	if math.Signbit(x) {
+		away = math.Inf(-1)
+	}
+	return math.Abs(math.Nextafter(x, away) - x)
+}

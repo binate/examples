@@ -1,0 +1,31 @@
+classes:
+  0.0       zero      bits 0x0000000000000000
+  -0.0      -zero     bits 0x8000000000000000
+  1.0       normal    bits 0x3ff0000000000000
+  NaN       nan       bits 0x7ff8000000000001
+  +Inf      +inf      bits 0x7ff0000000000000
+  -Inf      -inf      bits 0xfff0000000000000
+  smallest  subnormal bits 0x0000000000000001
+  max       normal    bits 0x7fefffffffffffff
+NaN: == itself false, != itself true, < 1 false, > 1 false, IsNaN true
+zero: -0.0 == 0.0 true, Signbit(-0.0) true, 1/-0.0 -Inf, Copysign(3,-0) -3
+inf: inf+1 +Inf, inf*0 is nan true, inf-inf is nan true, 1/inf 0
+rounding:
+  x       floor   ceil  trunc  round   even
+  2.5         2      3      2      3      2
+  3.5         3      4      3      4      4
+  -2.5       -3     -2     -2     -3     -2
+  2.4         2      3      2      2      2
+conversion:
+  3.9          -> 3 (survived true)
+  -3.9         -> -3 (survived true)
+  1e300        -> 9223372036854775807 (survived false)
+  -1e300       -> -9223372036854775808 (survived false)
+  NaN          -> 0 (survived false)
+int64 overflow: max+1 = -9223372036854775808
+ulp: at 1.0 2.220446049250313e-16, at 1e16 2, at 2^53 2
+2^53: 9007199254740993.0 == 9007199254740992.0 -> true
+0.1+0.2 == 0.3 false, and the difference is 5.551115123125783e-17
+funcs: Sqrt(2)^2 == 2 false, Hypot(3,4) 5, Pow(2,10) 1024, Log(E) 1
+decompose: Modf(3.75) = 3 + 0.75, Frexp(48) = 0.75 * 2^6
+bits round-trip: true

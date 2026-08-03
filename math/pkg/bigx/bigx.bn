@@ -1,0 +1,52 @@
+package "pkg/bigx"
+
+import "pkg/std/math/big"
+
+// Decimal renders n in base 10.
+func Decimal(n @big.Nat) @[]readonly char {
+	if n.IsZero() {
+		return "0"
+	}
+	// A base-2^32 limb count bounds the digits: each limb is under 10 decimal
+	// digits, so 10 per limb is always enough. BitLen/3 would do as well; this
+	// buffer is discarded either way once the digits are reversed.
+	var digits @[]char = make_slice(char, n.BitLen() + 1)
+	var count int = 0
+	// Clone first: DivModUint32 writes its quotient into the destination, and
+	// the caller's Nat must not be consumed by being printed.
+	var rest @big.Nat = n.Clone()
+	for !rest.IsZero() {
+		var d uint32 = 0
+		rest, d = rest.DivModUint32(rest, 10)
+		digits[count] = cast(char, cast(int, d) + cast(int, '0'))
+		count = count + 1
+	}
+	var out @[]char = make_slice(char, count)
+	for i := 0; i < count; i++ {
+		out[i] = digits[count - 1 - i]
+	}
+	return out
+}
+
+// Factorial returns n!.
+func Factorial(n int) @big.Nat {
+	var acc @big.Nat = big.FromUint64(1)
+	for k := 2; k <= n; k++ {
+		// acc aliases the destination, so the product accumulates in place.
+		acc = acc.MulUint32(acc, cast(uint32, k))
+	}
+	return acc
+}
+
+// Fib returns the nth Fibonacci number.
+func Fib(n int) @big.Nat {
+	var a @big.Nat = big.New()
+	var b @big.Nat = big.FromUint64(1)
+	for i := 0; i < n; i++ {
+		var next @big.Nat = big.New()
+		next = next.Add(a, b)
+		a = b
+		b = next
+	}
+	return a
+}

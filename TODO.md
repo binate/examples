@@ -79,10 +79,16 @@ Written roughly in the order they are worth doing:
   form — plus type switches and `present`/`same`. `minbasic` uses interfaces
   for its injected I/O, but nothing here shows assertions or type switches.
 
-- **`math` — floating point (`pkg/std/math`, `pkg/std/math/big`).** The IEEE
-  surface (`NaN`/`Inf` and their tests, `Copysign`, `Frexp`/`Ldexp`, rounding
-  modes) alongside Binate's defined-everything arithmetic (saturating float→int
-  `cast`, `x != x` for NaN), and `big.Nat` arbitrary-precision integers.
+- **`math` — DONE, with one thing to undo.** The example builds its negative
+  zero with `math.Copysign(0.0, -1.0)` instead of writing the `-0.0` literal,
+  because the bytecode VM computes `-x` as `0.0 - x` and so loses the sign of a
+  zero — the literal makes the program disagree with itself between compiled and
+  interpreted mode. (Copysign is the portable spelling anyway, which is why this
+  costs the example nothing.) Tracked as a MAJOR VM bug on the binate side;
+  once a toolchain carrying the fix is pinned, restore the `-0.0` literal in
+  `math/cmd/floats/main.bn` and `math/pkg/fp/fp_test.bn` — it is the more direct
+  way to show a negative zero — and drop the explanations from both files and
+  from `math/README.md`.
 
 ## Other
 

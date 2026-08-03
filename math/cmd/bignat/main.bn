@@ -1,0 +1,62 @@
+// bignat computes with `pkg/std/math/big`, whose Nat is an arbitrary-precision
+// unsigned integer — the answer to the other program's last lesson, that a
+// machine integer wraps and a float64 stops counting past 2^53.
+//
+// Nothing here overflows: 50! has 65 digits and Fib(100) has 21, and both are
+// exact.
+package "main"
+
+import "pkg/bigx"
+import "pkg/std/math/big"
+import "pkg/stdx/fmt"
+
+// show prints a labelled Nat in base 10 with its size in bits.
+func show(label *[]readonly char, n @big.Nat) {
+	fmt.Printf("%-12s (%3d bits) %s\n", label, n.BitLen(), bigx.Decimal(n))
+}
+
+// main computes factorials and Fibonacci numbers, then exercises the
+// destination-first arithmetic directly.
+func main() {
+	show("0!", bigx.Factorial(0))
+	show("10!", bigx.Factorial(10))
+	show("25!", bigx.Factorial(25))
+	show("50!", bigx.Factorial(50))
+
+	show("Fib(90)", bigx.Fib(90))
+	show("Fib(100)", bigx.Fib(100))
+
+	// Where a machine integer gives up. Fib(93) still fits in a uint64 but has
+	// already passed the int64 maximum, so the int-based version in the
+	// `numbers` example wraps into negatives there; Fib(94) passes uint64 too.
+	// This one keeps counting either way.
+	var f93 @big.Nat = bigx.Fib(93)
+	var f94 @big.Nat = bigx.Fib(94)
+	fmt.Printf("Fib(93) fits in uint64 %t (but exceeds int64 max %t), Fib(94) fits %t\n",
+		f93.IsUint64(), f93.ToUint64() > 9223372036854775807, f94.IsUint64())
+
+	// The destination-first convention: z.Op(x, y) sets z and returns it, and z
+	// may alias an operand — which is what lets an accumulator loop run without
+	// allocating per step.
+	var a @big.Nat = big.FromUint64(1)
+	a = a.Shl(a, 128)
+	show("2^128", a)
+	var one @big.Nat = big.FromUint64(1)
+	a = a.Sub(a, one)
+	show("2^128 - 1", a)
+
+	// Division returns both halves. r must be a Nat distinct from z — passing
+	// one for both silently yields wrong results, which the API documents.
+	var q @big.Nat = big.New()
+	var r @big.Nat = big.New()
+	var p @big.Nat = big.FromUint64(1000000007)
+	q, r = q.DivMod(a, p, r)
+	show("(2^128-1)/p", q)
+	show("(2^128-1)%p", r)
+
+	// Cmp gives the three-way comparison. A Nat is UNSIGNED, so Sub requires
+	// x >= y and panics rather than wrapping — the one operation here that can
+	// abort, and only on a caller error.
+	fmt.Printf("compare: q vs r %d, r vs q %d, q vs q %d, r is zero %t\n",
+		q.Cmp(r), r.Cmp(q), q.Cmp(q), r.IsZero())
+}
