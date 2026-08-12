@@ -47,11 +47,17 @@ overflow: int64 9223372036854775807 (err true), int8 127 (err true)
 Base 0 infers from the prefix (`0x2a`, `0o52`, `0b101010`) and accepts `_`
 separators. `ParseFloat` accepts the specials (`inf`, `nan`) and hex floats.
 
-One thing to know: **strconv's errors root in no base**, so
-`errors.Is(err, errors.BadData)` is false for a syntax error. That is a tracked
-gap in the library, not a design choice — which is why `csv.Parse` re-roots what
-it gets, quoting strconv's message (it names the field and the reason) under its
-own `errors.BadData`:
+strconv's errors are **classified**, too: a syntax error roots in
+`errors.BadData` and an out-of-range value in `errors.OutOfRange` (both under
+`ConditionsUnmet`), so a caller can tell "that is not a number" from "that number
+does not fit" without reading the message.
+
+`csv.Parse` still re-roots what it gets, under its own `errors.BadData`, quoting
+strconv's message because it names the field and the reason. That is a choice
+rather than a necessity: re-rooting gives every malformed line ONE classification,
+where `errors.Wrap` would preserve strconv's — so an out-of-range count would
+surface as `OutOfRange` instead. Either is defensible; uniformity is easier for a
+caller that only wants to know the line was bad.
 
 ```
 [alpha,three,0.5] -> count: strconv.Atoi: parsing "three": invalid syntax (BadData true)

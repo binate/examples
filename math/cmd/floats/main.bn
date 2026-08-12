@@ -25,18 +25,11 @@ func convert(label *[]readonly char, x float64) {
 
 // main walks classes, NaN, signed zero, rounding, saturation, and precision.
 func main() {
-	// The negative zero below is built with Copysign rather than written as the
-	// `-0.0` literal. Copysign is the portable spelling anyway — Go folds a
-	// `-0.0` literal to `+0.0`, so it is how you write one there too — and here
-	// it is also necessary: the bytecode VM currently computes `-x` as `0.0 - x`,
-	// which loses the sign of a zero, so the literal would make this program
-	// disagree with itself between compiled and interpreted mode. Tracked as a
-	// toolchain bug; see ../TODO.md for what to change back once it is fixed.
-	var negZero float64 = math.Copysign(0.0, -1.0)
-
+	// Binate's `-0.0` really is a negative zero — unlike Go, which folds the
+	// literal to +0.0 and makes you write math.Copysign(0, -1) to get one.
 	fmt.Println("classes:")
 	classify("0.0", 0.0)
-	classify("-0.0", negZero)
+	classify("-0.0", -0.0)
 	classify("1.0", 1.0)
 	classify("NaN", math.NaN())
 	classify("+Inf", math.Inf(1))
@@ -53,8 +46,7 @@ func main() {
 	// Signed zero: equal by comparison, distinguishable by sign — and the
 	// difference propagates through division.
 	fmt.Printf("zero: -0.0 == 0.0 %t, Signbit(-0.0) %t, 1/-0.0 %g, Copysign(3,-0) %g\n",
-		negZero == 0.0, math.Signbit(negZero), 1.0 / negZero,
-		math.Copysign(3.0, negZero))
+		-0.0 == 0.0, math.Signbit(-0.0), 1.0 / -0.0, math.Copysign(3.0, -0.0))
 
 	// Infinity arithmetic is defined too — including the cases that produce NaN.
 	var inf float64 = math.Inf(1)

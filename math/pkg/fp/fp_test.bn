@@ -36,13 +36,10 @@ func TestClassSpecials() testing.TestResult {
 
 // TestClassZeroIsSigned checks the distinction the two zeros keep even though
 // they compare equal — the reason Class reports them separately.
-//
-// The negative zero comes from Copysign, not from a `-0.0` literal: the bytecode
-// VM currently computes `-x` as `0.0 - x`, which loses the sign of a zero, so a
-// literal would make this test pass compiled and fail interpreted. Tracked as a
-// toolchain bug; see ../../TODO.md.
 func TestClassZeroIsSigned() testing.TestResult {
-	var negZero float64 = math.Copysign(0.0, -1.0)
+	// Binate's -0.0 literal is a genuine negative zero (Go folds it to +0.0),
+	// and so is one built with Copysign; both spellings are checked.
+	var negZero float64 = -0.0
 	if !textEq(Class(0.0), "zero") {
 		return "+0"
 	}
@@ -55,7 +52,10 @@ func TestClassZeroIsSigned() testing.TestResult {
 	if math.Float64bits(0.0) == math.Float64bits(negZero) {
 		return "yet differ in bits"
 	}
-	// A negative zero also arrives from arithmetic, not just from Copysign.
+	if !textEq(Class(math.Copysign(0.0, -1.0)), "-zero") {
+		return "Copysign builds the same value"
+	}
+	// A negative zero also arrives from arithmetic, not just from a literal.
 	if !textEq(Class(-1.0 * 0.0), "-zero") {
 		return "-1 * 0 is a negative zero"
 	}

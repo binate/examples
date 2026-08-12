@@ -94,25 +94,11 @@ not for building up a collection.
 ## Layout
 
 ```
-pkg/tally.bni       Word (+ its lang.Hashable impl), Split, FirstSeen, Lengths, Sum
+pkg/tally.bni       Word (+ its lang.Hashable impl), Split, Counts, FirstSeen, Lengths, Sum
 pkg/tally/          the bodies, and the unit tests
 cmd/wordcount/      the demo: counts, lookups, iteration, Vec growth
 tests/              the compiled == interpreted == fixture harness
 ```
-
-The counting itself lives in `cmd/wordcount` rather than in `pkg/tally`, which is
-**not** a design choice: a `.bni` currently cannot name a generic instantiated on
-a type its own package `impl`s, so declaring
-
-```binate
-func Counts(words @vec.Vec[Word]) @hashmap.Map[Word, int]
-```
-
-is rejected with `type argument Word does not satisfy constraint Hashable` — with
-the `impl` a few lines below in the same file. Any `.bn` builds that map happily
-(the command does, and so do this package's tests), and so does another package's
-`.bni`; only the declaring package's own interface file trips. See
-[`TODO.md`](../TODO.md).
 
 ## Building and running
 

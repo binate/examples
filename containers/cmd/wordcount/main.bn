@@ -22,31 +22,6 @@ import "pkg/tally"
 var text @[]readonly char = "the quick brown fox jumps over the lazy dog; "
 	"The DOG barks, and the fox runs."
 
-// countWords returns how many times each word occurs. Map.Get's second result
-// distinguishes "absent" from "present and zero", which is why a miss starts the
-// count at 1 rather than leaning on the zero value.
-//
-// This belongs in pkg/tally, next to Split and FirstSeen. It sits here because a
-// `.bni` cannot currently name `@hashmap.Map[Word, int]` — see that package's
-// doc comment; a `.bn` like this one has no such trouble.
-func countWords(words @vec.Vec[tally.Word]) @hashmap.Map[tally.Word, int] {
-	var counts @hashmap.Map[tally.Word, int] = hashmap.New[tally.Word, int]()
-	var it vec.Cursor[tally.Word] = words.Iter()
-	for {
-		w, ok := it.Next()
-		if !ok {
-			break
-		}
-		n, seen := counts.Get(w)
-		if seen {
-			counts.Put(w, n + 1)
-		} else {
-			counts.Put(w, 1)
-		}
-	}
-	return counts
-}
-
 // lengthsOf returns each word's length, in word order — the Vec[int] the boxed
 // iterator below walks.
 func lengthsOf(words @vec.Vec[tally.Word]) @vec.Vec[int] {
@@ -67,7 +42,7 @@ func lengthsOf(words @vec.Vec[tally.Word]) @vec.Vec[int] {
 func main() {
 	var words @vec.Vec[tally.Word] = tally.Split(text)
 	var order @vec.Vec[tally.Word] = tally.FirstSeen(words)
-	var counts @hashmap.Map[tally.Word, int] = countWords(words)
+	var counts @hashmap.Map[tally.Word, int] = tally.Counts(words)
 	fmt.Printf("tokens %d, distinct %d\n", words.Len(), order.Len())
 
 	// The report walks `order` (first-appearance) and looks each word up, rather

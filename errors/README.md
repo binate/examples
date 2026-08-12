@@ -5,12 +5,6 @@ last result, and the caller decides what to do with it. This example is a small
 `key = value` config parser that fails four different ways, and a program that
 shows what a caller can actually *do* with each one.
 
-> **This example is compiled-only for now, and sits out the default sweeps.**
-> `bni` segfaults on `errors.Is` when the error's dynamic type is a user-defined
-> `errors.Error` — which `ParseError` below is. It is a tracked MAJOR toolchain
-> bug, reproduced on the pinned `bnc-0.0.12` and on a `main` build; the same code
-> compiled is correct throughout. See [`.skip-default-sweeps`](.skip-default-sweeps).
-
 ## There is no nil to compare against
 
 An interface value is never nil, so the test is `present`:
@@ -106,17 +100,17 @@ just these same chains.
 pkg/config.bni + config/     Config, ParseError, Parse, Load
 pkg/config/config_test.bn    10 tests over the classifications and the chain
 cmd/report/                  one good parse and five failures
-tests/                       compiled vs fixture (see the note above)
+tests/                       compiled == interpreted == fixture
 ```
 
 ## Building and running
 
 ```sh
-errors/tests/run.sh                            # compiled vs fixture
-scripts/run-compiled.sh       errors/cmd/report
-scripts/run-tests-compiled.sh errors/pkg/config
+errors/tests/run.sh                             # compiled == interpreted == fixture
+scripts/run-compiled.sh          errors/cmd/report
+scripts/run-interpreted.sh       errors/cmd/report
+scripts/run-tests-compiled.sh    errors/pkg/config
+scripts/run-tests-interpreted.sh errors/pkg/config
 ```
 
-`scripts/run-interpreted.sh` and `run-tests-interpreted.sh` will crash the VM
-until the bug above is fixed. Expected output is pinned in
-[`tests/expected.txt`](tests/expected.txt).
+Expected output is pinned in [`tests/expected.txt`](tests/expected.txt).

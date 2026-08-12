@@ -37,13 +37,9 @@ NaN is the other way around: it compares **false** against everything, itself
 included. That is not a quirk to route around; `x != x` is the NaN test, and
 `math.IsNaN` is its name.
 
-> The example builds its negative zero with `math.Copysign(0.0, -1.0)` rather
-> than writing `-0.0`. That is the portable spelling regardless — Go folds a
-> `-0.0` literal to `+0.0`, so Copysign is how you write one there too — but here
-> it is also load-bearing: the bytecode VM currently computes `-x` as `0.0 - x`,
-> which loses the sign of a zero, so the literal would make this program disagree
-> with itself across the two modes. It is a tracked toolchain bug, and
-> [`TODO.md`](../TODO.md) records what to change back once it is fixed.
+> Binate's `-0.0` literal is a genuine negative zero. Go folds that literal to
+> `+0.0`, so a Go program needs `math.Copysign(0, -1)` to get one; here both
+> spellings work, and the example uses each once.
 
 ## Five ways to drop a fraction
 

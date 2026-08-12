@@ -164,8 +164,7 @@ output.
   difference between wrapping (keeps the cause and its classification), rooting
   (mints a new error under a chosen base), and a concrete error type carrying
   structured data, plus `errors.Is` classifying through any amount of wrapping
-  and a type assertion recovering the concrete error back out. **Compiled-only
-  and outside the default sweeps** — a tracked VM bug (see the example's README).
+  and a type assertion recovering the concrete error back out.
 - [`cinterop`](cinterop/) — calling **external C library code** from Binate via
   the `__c_call` (call a C function) and `__c_global` (address a C global)
   intrinsics, against a small demo C library (`csrc/rng.c`, a deterministic

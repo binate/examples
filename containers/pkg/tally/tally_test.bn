@@ -118,6 +118,31 @@ func TestWordKeysAMap() testing.TestResult {
 	return ""
 }
 
+// TestCounts checks the tally itself: each word's occurrences, an absent word
+// missing rather than reading as zero, and case folding collapsing two spellings.
+func TestCounts() testing.TestResult {
+	var counts @hashmap.Map[Word, int] = Counts(Split("the dog and The DOG"))
+	if counts.Len() != 3 {
+		return "three distinct words"
+	}
+	the, ok := counts.Get(NewWord("the"))
+	if !ok || the != 2 {
+		return "the appears twice, in either case"
+	}
+	dog, dogOk := counts.Get(NewWord("DOG"))
+	if !dogOk || dog != 2 {
+		return "and so does dog, looked up in the other case"
+	}
+	n, found := counts.Get(NewWord("cat"))
+	if found || n != 0 {
+		return "an absent word misses rather than reading zero"
+	}
+	if Counts(Split("")).Len() != 0 {
+		return "no words, no counts"
+	}
+	return ""
+}
+
 // TestFirstSeenDedupesInOrder checks that the distinct words come back in order
 // of first appearance — the property the report's determinism rests on.
 func TestFirstSeenDedupesInOrder() testing.TestResult {

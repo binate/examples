@@ -36,7 +36,7 @@ tree like this repo:
 - a fixed path assumes an installer ran;
 - `/usr/bin/env bni` assumes `bni` is on `PATH` **and** that it can find its own
   standard library, which today it cannot: `bni` has no default search path, so
-  even a zero-import script fails with `package "pkg/bootstrap" not found`;
+  even a zero-import script fails with `package "pkg/builtins/lang" not found`;
 - passing the search paths on the line is not an option either. They are 264 and
   353 characters for a cached bundle, against a kernel limit of about **256 bytes
   for the whole line** — and they differ per machine, so they could not be
@@ -75,22 +75,6 @@ which the two fixtures differ — the harness checks that it is the *only* one.
 started from source: true     # kernel exec, and bni -x
 started from source: false    # compiled
 ```
-
-## A wrinkle in printing arguments
-
-The loop copies each argument into a local before printing it:
-
-```binate
-var arg @[]readonly char = args[i]
-fmt.Printf("hello, %s\n", arg)
-```
-
-That is required, not stylistic. `os.Args()` is fully readonly — element slots
-included — so an element has type `readonly @[]readonly char`, and `fmt` has no
-case for a readonly-qualified slice: printing `args[i]` directly renders
-`%!?(unknown)`. The copy is free (a slice is a handle, not the bytes) and the
-same bytes then print fine. It is a tracked gap in `fmt`, recorded in
-[`TODO.md`](../TODO.md) so the workaround comes back out when it is fixed.
 
 ## Layout
 

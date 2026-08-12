@@ -2,7 +2,7 @@
 
 ## Planned examples — the standard library
 
-The library bundled with `bnc-0.0.12` reaches well past what the examples here
+The library bundled with `bnc-0.0.13` reaches well past what the examples here
 show. `pkg/std` has `errors`, `io`, `math` (+ `math/big`), `os` (+ `os/process`,
 `os/sys`), `strconv`, `strings`, and `time`; `pkg/stdx` has `fmt`, `slices`,
 `cmp`, `hash`, and `containers/{vec,hashmap,set,table,mapfn,setfn,iter}`. Only
@@ -16,36 +16,22 @@ generic sweeps with no gating.
 
 Written roughly in the order they are worth doing:
 
-- **`fmt` — formatted output (`pkg/stdx/fmt`).** `Print`/`Println`/`Printf`,
-  `Sprintf`, and `Fprintf` into a `strings.Builder` and `os.Stderr`; the verb,
-  flag, width and precision grid; `*`/`.*` operand-supplied widths; a user type
-  printed through `lang.Stringer`; and the diagnostic renderings (`%!d(...)`,
-  `MISSING`, `EXTRA`, `NOVERB`) that make a bad format visible instead of
-  silent. Must document what fmt actually recognizes: `int`, `int64`, `uint64`,
-  `bool`, `float32/64`, the char-slice string spellings, and `lang.Stringer`.
-  A `uint`, a sized int (`int8/16/32`, `uint8/16/32`), or a `char` renders as
-  `%!d(?=42)` and needs `cast(int, x)`; a struct or slice operand renders
-  `%!?(unknown)` (struct reflection is a later layer).
+- **`fmt` — formatted output (`pkg/stdx/fmt`).** The one example the series
+  planned and never wrote — every other example uses `fmt` but none is *about*
+  it. `Print`/`Println`/`Printf`, `Sprintf`, and `Fprintf` into a
+  `strings.Builder` and `os.Stderr`; the verb, flag, width and precision grid;
+  `*`/`.*` operand-supplied widths; a user type printed through `lang.Stringer`;
+  and the diagnostic renderings (`%!d(...)`, `MISSING`, `EXTRA`, `NOVERB`) that
+  make a bad format visible instead of silent. As of `bnc-0.0.13` every scalar
+  formats (the sized ints, `uint` and `char` included) and a struct renders
+  through reflection, so the example no longer has to teach around holes — check
+  what `%v` of a nested struct, an array and a slice does before writing it.
 
-- **`containers` — DONE.** One thing to revisit: `countWords` sits in
-  `cmd/wordcount` instead of `pkg/tally`, because the pinned `bnc-0.0.12` rejects
-  a `.bni` that names a generic instantiated on a type its own package `impl`s —
-  `func Counts(…) @hashmap.Map[Word, int]` fails with "type argument Word does
-  not satisfy constraint Hashable" though the `impl` is in the same file. **Fixed
-  upstream** (binate `ff505c92`); once `BUILDER_VERSION` names a release carrying
-  it, move `countWords` into `pkg/tally` as `Counts` (with a unit test — the
-  package's own `.bn` tests can already build such a map) and drop the
-  explanations from `containers/README.md` and `pkg/tally.bni`.
+- **`containers` — DONE.**
 
 - **`files` — DONE.**
 
-- **`errors` — DONE, but compiled-only and outside the default sweeps.** `bni`
-  SIGSEGVs on `errors.Is` over a user-defined `errors.Error`, which the example's
-  `ParseError` is — a tracked MAJOR, reproduced on both the pinned `bnc-0.0.12`
-  and a `main` build. When a toolchain carrying the fix is pinned: delete
-  `errors/.skip-default-sweeps`, restore the interpreted leg in
-  `errors/tests/run.sh` (it becomes the usual two-way diff), and drop the note
-  from the example's README and from the entry in the top-level README.
+- **`errors` — DONE.**
 
 - **`processes` — DONE.**
 
@@ -57,13 +43,6 @@ Written roughly in the order they are worth doing:
   stays the honest thing to teach for an *uninstalled* tree, so at most the
   README gains a note.
 
-  One thing to undo: `cmd/greet/main.bn` copies each argument into an unqualified
-  local before printing it, because `fmt` has no case for the
-  `readonly @[]readonly char` an `os.Args()` element has and renders it
-  `%!?(unknown)`. Tracked as a `fmt` gap on the binate side; when a release
-  carries the fix, print `args[i]` directly and drop the comment and the README
-  section about it.
-
 - **`text` — DONE.**
 
 - **`time` — DONE.** It ships an example-local UTC calendar (`pkg/cal`), since
@@ -74,16 +53,7 @@ Written roughly in the order they are worth doing:
 
 - **`interfaces` — DONE.**
 
-- **`math` — DONE, with one thing to undo.** The example builds its negative
-  zero with `math.Copysign(0.0, -1.0)` instead of writing the `-0.0` literal,
-  because the bytecode VM computes `-x` as `0.0 - x` and so loses the sign of a
-  zero — the literal makes the program disagree with itself between compiled and
-  interpreted mode. (Copysign is the portable spelling anyway, which is why this
-  costs the example nothing.) Tracked as a MAJOR VM bug on the binate side;
-  once a toolchain carrying the fix is pinned, restore the `-0.0` literal in
-  `math/cmd/floats/main.bn` and `math/pkg/fp/fp_test.bn` — it is the more direct
-  way to show a negative zero — and drop the explanations from both files and
-  from `math/README.md`.
+- **`math` — DONE.**
 
 ## Other
 

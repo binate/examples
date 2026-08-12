@@ -10,9 +10,9 @@ import "pkg/stdx/slices"
 // widest an int and a shortest-round-trip float64 can render, plus separators.
 const maxRecordText int = 64
 
-// badData returns an error rooted in errors.BadData carrying msg. strconv's own
-// errors root in nothing, so a caller of this package that wants to classify a
-// failure gets the classification from here.
+// badData returns an error rooted in errors.BadData carrying msg — the single
+// classification every malformed line gets, whatever the underlying reason was
+// (see Parse's doc comment for why this roots rather than wraps).
 func badData(msg @[]readonly char) @errors.Error {
 	return errors.Rooted(errors.BadData, msg)
 }

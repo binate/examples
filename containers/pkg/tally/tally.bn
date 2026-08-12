@@ -1,5 +1,6 @@
 package "pkg/tally"
 
+import "pkg/stdx/containers/hashmap"
 import "pkg/stdx/containers/iter"
 import "pkg/stdx/containers/set"
 import "pkg/stdx/containers/vec"
@@ -74,6 +75,25 @@ func Split(text *[]readonly char) @vec.Vec[Word] {
 		words.Push(NewWord(text[start:len(text)]))
 	}
 	return words
+}
+
+// Counts returns how many times each word occurs.
+func Counts(words @vec.Vec[Word]) @hashmap.Map[Word, int] {
+	var counts @hashmap.Map[Word, int] = hashmap.New[Word, int]()
+	var it vec.Cursor[Word] = words.Iter()
+	for {
+		w, ok := it.Next()
+		if !ok {
+			break
+		}
+		n, seen := counts.Get(w)
+		if seen {
+			counts.Put(w, n + 1)
+		} else {
+			counts.Put(w, 1)
+		}
+	}
+	return counts
 }
 
 // FirstSeen returns the distinct words in order of first appearance.

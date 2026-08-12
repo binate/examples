@@ -9,18 +9,12 @@
 // so both methods take value receivers and the `impl` names `Word`, not `*Word`.
 //
 // Every operation here is an ordinary non-generic function over a concrete
-// instantiation (`@vec.Vec[Word]`, `@set.Set[int]`), so the bodies live in
-// tally.bn — only a generic declaration must ship its body in the `.bni`.
-//
-// The counting itself lives in cmd/wordcount rather than here, and that is not a
-// style choice: a `.bni` currently cannot NAME a generic instantiated on a type
-// its own package `impl`s, so `func Counts(…) @hashmap.Map[Word, int]` is
-// rejected with "type argument Word does not satisfy constraint Hashable" even
-// though the impl is a few lines below. A `Map[Word, int]` built in any `.bn` —
-// the command, or this package's own tests — is fine.
+// instantiation (`@vec.Vec[Word]`, `@hashmap.Map[Word, int]`), so the bodies live
+// in tally.bn — only a generic declaration must ship its body in the `.bni`.
 package "pkg/tally"
 
 import "pkg/builtins/lang"
+import "pkg/stdx/containers/hashmap"
 import "pkg/stdx/containers/iter"
 import "pkg/stdx/containers/set"
 import "pkg/stdx/containers/vec"
@@ -60,6 +54,11 @@ impl Word : lang.Hashable
 // known in advance — a growable container with an amortized O(1) Push, unlike
 // `slices.Append`, which reallocates and copies on every single element.
 func Split(text *[]readonly char) @vec.Vec[Word]
+
+// Counts returns how many times each word occurs. Map.Get's second result
+// distinguishes "absent" from "present and zero", which is why the count starts
+// at 1 on a miss rather than relying on the zero value.
+func Counts(words @vec.Vec[Word]) @hashmap.Map[Word, int]
 
 // FirstSeen returns the distinct words in order of first appearance, using a Set
 // for the membership test. Insertion order is worth keeping precisely because a

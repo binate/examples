@@ -30,8 +30,13 @@ type Record struct {
 //
 // A malformed line is an error rooted in `errors.BadData`, carrying the reason —
 // wrong field count, empty name, or an unparsable number. The value errors quote
-// strconv's own message, because it says exactly which field and why; the
-// classification is added here, since strconv's errors carry none of their own.
+// strconv's own message, because it says exactly which field and why.
+//
+// Re-rooting rather than wrapping is a choice: strconv classifies its own errors
+// (`BadData` for a syntax error, `OutOfRange` for an overflow), and `errors.Wrap`
+// would pass that through, so an out-of-range count would surface as
+// `OutOfRange`. Rooting instead gives every malformed line ONE classification,
+// which is what a caller that only wants "this line is bad" would rather have.
 func Parse(line @[]readonly char) (Record, @errors.Error)
 
 // ParseAll reads a whole document, one record per line, skipping blank lines. A
