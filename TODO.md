@@ -108,19 +108,23 @@ Written roughly in the order they are worth doing:
   without linking, so it covers this example like any other.)
 
 - **Migrate off the old `bni` CLI at the next BUILDER bump.** `bni`'s
-  command-line interface was redesigned: every input is now a flag and bare
-  positionals are ONLY the interpreted program's argv. This repo still uses the
-  old forms (positional source files, `-x` script mode) and must migrate once the
-  pinned BUILDER ships the new `bni`. The transformations:
-  - `-x` (single-file script mode) → `-main-file` (which must be the LAST token
-    on a `#!/usr/bin/env -S bni …` line, so the kernel-appended script path
-    becomes its value).
-  - a positional source **file** → prefix it with `-main-file`; a positional
-    directory **main package** → prefix it with `-main-dir`.
+  command-line interface was redesigned. The main package is `-main-dir <dir>`,
+  `-main-file <file>`, or — when neither is given — the **first positional**
+  (auto-detected dir vs file); everything after the main package is the
+  program's argv. This repo still uses the old forms (`-x` script mode, and
+  `--`-separates-filenames) and must migrate once the pinned BUILDER ships the
+  new `bni`. The transformations:
+  - `-x` (script mode) → **drop it**: a bare `bni <script>` already treats the
+    first positional as the main, with trailing args as the program's argv.
+  - a bare `bni <file>` / `bni <dir>` run still works (first positional = main);
+    the old `--`-separates-filenames-from-args rule is gone — `bni <main> args…`
+    passes `args…` to the program directly (flag-looking args included, since
+    parsing stops at `<main>`).
   - `--test`/`-test` now TAKES the package as its value, so the package must come
     immediately after `--test` (`--test <pkg>`), not as a trailing positional.
-  - `--` keeps its standard "end of bni's flags" meaning (only needed to pass a
-    progarg that looks like a flag); there are no positional source files anymore.
+  - the canonical shebang is `#!/usr/bin/env -S bni <flags> --` — the trailing
+    `--` (standard end-of-flags) makes the kernel-appended script path the
+    positional main even if it is named like a flag; `-x` is no longer used.
 
   Sites to update: `examples/scripts/run-interpreted.sh`,
   `examples/scripts/run-tests-interpreted.sh`, `examples/scripting/bin/bnrun`,
