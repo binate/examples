@@ -106,3 +106,23 @@ Written roughly in the order they are worth doing:
   design, not a temporary gate — no action needed unless the C-interop build path
   changes. (The `lint` hygiene check is not affected: bnlint checks sources
   without linking, so it covers this example like any other.)
+
+- **Migrate off the old `bni` CLI at the next BUILDER bump.** `bni`'s
+  command-line interface was redesigned: every input is now a flag and bare
+  positionals are ONLY the interpreted program's argv. This repo still uses the
+  old forms (positional source files, `-x` script mode) and must migrate once the
+  pinned BUILDER ships the new `bni`. The transformations:
+  - `-x` (single-file script mode) → `-main-file` (which must be the LAST token
+    on a `#!/usr/bin/env -S bni …` line, so the kernel-appended script path
+    becomes its value).
+  - a positional source **file** → prefix it with `-main-file`; a positional
+    directory **main package** → prefix it with `-main-dir`.
+  - `--test`/`-test` now TAKES the package as its value, so the package must come
+    immediately after `--test` (`--test <pkg>`), not as a trailing positional.
+  - `--` keeps its standard "end of bni's flags" meaning (only needed to pass a
+    progarg that looks like a flag); there are no positional source files anymore.
+
+  Sites to update: `examples/scripts/run-interpreted.sh`,
+  `examples/scripts/run-tests-interpreted.sh`, `examples/scripting/bin/bnrun`,
+  and the `cmd/greet/main.bn` shebang (plus any other `bni` invocation a
+  repo-wide grep for `bni ` / ` -x ` surfaces).
