@@ -1,0 +1,48 @@
+// Package trace reads the running program's own call stack, through
+// `pkg/std/debug`.
+//
+// What comes back is a RAW frame: a `Mode` saying how to read it, and a `Loc`
+// that is a return address when compiled and a VM function index when
+// interpreted. Turning either into a function name is a later phase of the
+// library, so nothing here symbolizes anything.
+//
+// That makes most of a capture unprintable — an address differs per run, and the
+// depth of the stack differs per MODE, because the two have different entry
+// machinery below `main` (5 frames deep at main compiled, 3 interpreted, at time
+// of writing). What IS stable is everything relative: a call adds exactly one
+// frame, `skip` removes exactly one, and a buffer too small to hold the capture
+// says so. Those are the properties this package exposes and its tests pin.
+package "pkg/trace"
+
+// Mode reports which execution mode this code is running in, by reading the tag
+// on its own stack frame — a native frame means compiled, a VM frame means
+// interpreted. It is the one thing a raw frame says outright, and the one place
+// a Binate program can observe the difference: everything else about the two
+// modes is defined to be identical. The result is "compiled" or "interpreted"
+// (or "unknown", if there turns out to be no frame to read — there always is).
+//
+// A `const` cannot hold those names, incidentally: `const` in Binate is
+// compile-time SCALARS only, and text is a slice. An immutable non-scalar is
+// spelled `var x readonly T`.
+func Mode() @[]readonly char
+
+// Depth returns how many frames sit above Depth's caller — the caller itself,
+// its caller, and so on. The absolute number is not portable (it counts the
+// entry machinery below main, which differs by mode); differences between two
+// Depths are.
+func Depth() int
+
+// DepthAt returns the Depth measured n nested calls further down, so a caller
+// can compare depths instead of trusting one. `DepthAt(n+1) - DepthAt(n)` is 1
+// on every target in either mode.
+func DepthAt(n int) int
+
+// Capture fills a buffer of `size` frames and returns (written, total): how many
+// frames landed in the buffer, and how many there were to capture. A total
+// greater than the size means the capture was truncated — the contract that lets
+// a caller size a buffer in two passes rather than guessing.
+func Capture(size int) (int, int)
+
+// Uniform reports whether every frame of a full capture carries the same Mode
+// tag, which is what makes Mode's one-frame shortcut sound.
+func Uniform() bool

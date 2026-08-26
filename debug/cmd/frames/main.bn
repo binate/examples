@@ -1,0 +1,62 @@
+// frames reads the program's own call stack and reports what can be said about
+// it portably — which is less than you might expect, and more than nothing.
+//
+// A raw frame's Loc is a return address when compiled and a VM function index
+// when interpreted, so no absolute number here is printable. Depth is not
+// portable either: the entry machinery below main is deeper in one mode than the
+// other. What survives is arithmetic — a call adds one frame, a skip removes one
+// — plus the one genuinely mode-dependent fact, which the program prints
+// deliberately: which mode it is running in.
+package "main"
+
+import "pkg/std/debug"
+import "pkg/std/fmt"
+import "pkg/trace"
+
+// deep calls trace.Depth n levels down, so main can compare depths.
+func deep(n int) int {
+	return trace.DepthAt(n)
+}
+
+// main reports relative depths, the buffer contract, and the execution mode.
+func main() {
+	// Absolute depth is not portable, so what gets printed is the difference:
+	// each nested call is exactly one more frame, in either mode, on any target.
+	var base int = deep(0)
+	fmt.Println("each call adds one frame:")
+	for n := 1; n <= 4; n++ {
+		fmt.Printf("  %d call(s) deeper: +%d\n", n, deep(n) - base)
+	}
+
+	// skip is the same arithmetic from the other end, and floors at zero rather
+	// than going negative when it passes the top of the stack.
+	var buf @[]debug.Frame = make_slice(debug.Frame, 64)
+	var full int = debug.Callers(0, buf)
+	fmt.Printf("skipping 1 removes %d, skipping past the top leaves %d\n",
+		full - debug.Callers(1, buf), debug.Callers(1000, buf))
+
+	// A buffer smaller than the stack is not an error: it fills, and the return
+	// value still reports the whole depth, so a caller can size and retry.
+	//
+	// The totals themselves are not printed: how many frames sit below main is a
+	// property of the platform's startup chain when compiled and of the VM's own
+	// stack when interpreted, so it differs by mode AND by target.
+	written, total := trace.Capture(1)
+	fmt.Printf("a 1-frame buffer holds %d and reports more (truncated %t)\n",
+		written, total > written)
+	full2, fullTotal := trace.Capture(64)
+	fmt.Printf("a 64-frame buffer holds every frame (truncated %t)\n", fullTotal > full2)
+
+	// Caller answers with a bool rather than a garbage frame.
+	_, near := debug.Caller(0)
+	_, far := debug.Caller(1000)
+	fmt.Printf("frame 0 exists %t, frame 1000 exists %t\n", near, far)
+
+	// Every frame of one capture carries the same tag, which is what makes
+	// reading a single frame enough to answer the question below.
+	fmt.Printf("all frames agree on their mode: %t\n", trace.Uniform())
+
+	// The one thing that differs between the two runs of this program — and the
+	// only place a Binate program can observe the difference at all.
+	fmt.Printf("running %s\n", trace.Mode())
+}

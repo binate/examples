@@ -129,6 +129,13 @@ output.
   glob cannot inject flags; and a parse error is a value the program prints
   itself. The grammar is unit-tested over literal argument vectors, since a
   FlagSet parses a slice rather than a process.
+- [`debug`](debug/) — **reading your own call stack** (`pkg/std/debug`): raw,
+  unsymbolized frames, in both modes. Almost nothing about a capture is portable
+  — a `Loc` is an address or a VM index, and even the depth differs by mode — so
+  the example prints only what holds either way: a call adds one frame, a skip
+  removes one, a small buffer reports truncation. Its one deliberate exception is
+  the frame tag, which is the only place a program can observe which mode it is
+  running in.
 - [`containers`](containers/) — the standard library's **containers**
   (`pkg/stdx/containers`): a word counter over `Vec[T]`, `Map[K, V]`, and
   `Set[T]`, keyed on a user type that implements `lang.Hashable` (the way to key

@@ -1,0 +1,61 @@
+package "pkg/trace"
+
+import "pkg/std/debug"
+
+// bufSize is comfortably deeper than anything here captures, so a "full" capture
+// is never itself truncated.
+const bufSize int = 64
+
+// Mode reports which execution mode this code is running in.
+func Mode() @[]readonly char {
+	f, ok := debug.Caller(0)
+	if !ok {
+		return "unknown"
+	}
+	if f.Mode == debug.FRAME_VM {
+		return "interpreted"
+	}
+	return "compiled"
+}
+
+// Depth returns how many frames sit above Depth's caller.
+func Depth() int {
+	var buf @[]debug.Frame = make_slice(debug.Frame, bufSize)
+	// skip = 0 is the function that called Callers — this one — and Callers
+	// never reports itself, so the count starts at Depth's caller.
+	return debug.Callers(0, buf)
+}
+
+// DepthAt returns the Depth measured n nested calls further down.
+func DepthAt(n int) int {
+	if n <= 0 {
+		return Depth()
+	}
+	return DepthAt(n - 1)
+}
+
+// Capture fills a buffer of `size` frames and returns (written, total).
+func Capture(size int) (int, int) {
+	var buf @[]debug.Frame = make_slice(debug.Frame, size)
+	var total int = debug.Callers(0, buf)
+	var written int = total
+	if written > size {
+		written = size
+	}
+	return written, total
+}
+
+// Uniform reports whether every frame of a full capture carries the same Mode.
+func Uniform() bool {
+	var buf @[]debug.Frame = make_slice(debug.Frame, bufSize)
+	var n int = debug.Callers(0, buf)
+	if n > bufSize {
+		n = bufSize
+	}
+	for i := 1; i < n; i++ {
+		if buf[i].Mode != buf[0].Mode {
+			return false
+		}
+	}
+	return true
+}

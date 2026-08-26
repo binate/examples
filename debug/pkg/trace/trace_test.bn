@@ -1,0 +1,139 @@
+package "pkg/trace"
+
+import "pkg/builtins/testing"
+import "pkg/std/debug"
+
+// textEq reports whether two texts hold the same bytes; slices have no ==.
+func textEq(a @[]readonly char, b *[]readonly char) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestEachCallAddsOneFrame checks the property the absolute depth cannot give:
+// however deep the stack starts, one more call is one more frame.
+func TestEachCallAddsOneFrame() testing.TestResult {
+	for n := 0; n < 6; n++ {
+		if DepthAt(n + 1) - DepthAt(n) != 1 {
+			return "one nested call is exactly one frame"
+		}
+	}
+	return ""
+}
+
+// TestDepthIsPositive checks the only absolute thing worth asserting: a running
+// program always has frames above the caller (main, and the entry below it).
+func TestDepthIsPositive() testing.TestResult {
+	if Depth() < 1 {
+		return "there is always at least one frame above the caller"
+	}
+	if DepthAt(3) <= Depth() {
+		return "recursing gets deeper, not shallower"
+	}
+	return ""
+}
+
+// TestSkipRemovesFrames checks the other end of the same arithmetic: skipping k
+// frames reports k fewer, FLOORED at zero.
+//
+// The floor is the part worth testing carefully. A stack deep enough for the
+// subtraction to stay positive hides it — and how deep the stack is here depends
+// on the mode: the test runner sits several frames lower when compiled than
+// under the VM, which is exactly how an earlier version of this test came to
+// pass compiled and fail interpreted.
+func TestSkipRemovesFrames() testing.TestResult {
+	var buf @[]debug.Frame = make_slice(debug.Frame, 64)
+	var full int = debug.Callers(0, buf)
+	for k := 0; k <= full + 2; k++ {
+		var want int = full - k
+		if want < 0 {
+			want = 0
+		}
+		if debug.Callers(k, buf) != want {
+			return "skipping k reports k fewer, never below zero"
+		}
+	}
+	if debug.Callers(1000, buf) != 0 {
+		return "skipping far past the top is still zero"
+	}
+	return ""
+}
+
+// TestCaptureReportsTruncation checks the buffer contract: a total greater than
+// the size means frames were dropped, which is what lets a caller size in two
+// passes.
+func TestCaptureReportsTruncation() testing.TestResult {
+	written, total := Capture(1)
+	if written != 1 {
+		return "a one-slot buffer receives one frame"
+	}
+	if total <= written {
+		return "and reports a total larger than it held"
+	}
+	full, fullTotal := Capture(64)
+	if full != fullTotal {
+		return "a large enough buffer holds everything"
+	}
+	if fullTotal < total {
+		return "the total does not depend on the buffer size"
+	}
+	return ""
+}
+
+// TestCaptureOfNothing checks the degenerate buffer.
+func TestCaptureOfNothing() testing.TestResult {
+	written, total := Capture(0)
+	if written != 0 {
+		return "a zero-length buffer receives nothing"
+	}
+	if total < 1 {
+		return "but the total still counts the frames that are there"
+	}
+	return ""
+}
+
+// TestCallerPastTheTop checks the bool that says a requested frame does not
+// exist, rather than returning a garbage one.
+func TestCallerPastTheTop() testing.TestResult {
+	_, ok := debug.Caller(0)
+	if !ok {
+		return "frame 0 exists"
+	}
+	_, deep := debug.Caller(1000)
+	if deep {
+		return "a frame past the top does not"
+	}
+	return ""
+}
+
+// TestModeIsOneOfTwo checks that Mode answers with a name, and that it agrees
+// with the raw tag it is derived from.
+func TestModeIsOneOfTwo() testing.TestResult {
+	var m @[]readonly char = Mode()
+	if !textEq(m, "compiled") && !textEq(m, "interpreted") {
+		return "Mode names one of the two execution modes"
+	}
+	f, ok := debug.Caller(0)
+	if !ok {
+		return "there is a frame to read"
+	}
+	if textEq(m, "interpreted") != (f.Mode == debug.FRAME_VM) {
+		return "and agrees with the frame's own tag"
+	}
+	return ""
+}
+
+// TestFramesAgreeOnMode checks the assumption behind reading just one frame: a
+// capture never mixes native and VM frames.
+func TestFramesAgreeOnMode() testing.TestResult {
+	if !Uniform() {
+		return "every frame in a capture carries the same mode"
+	}
+	return ""
+}

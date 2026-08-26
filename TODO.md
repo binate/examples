@@ -1,13 +1,5 @@
 # examples — TODO
 
-## Examples still to write
-
-The library bundled with `bnc-0.0.14` reaches past what the examples cover.
-One package has no example of its own:
-
-- **`debug` — (`pkg/std/debug`).** Read the `.bni` first; scope the example to
-  what it actually offers.
-
 ## Open work
 
 - **`minbasic/pkg/host` has no unit tests.** The dependency-injection layer that

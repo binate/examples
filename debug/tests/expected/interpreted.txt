@@ -1,0 +1,11 @@
+each call adds one frame:
+  1 call(s) deeper: +1
+  2 call(s) deeper: +2
+  3 call(s) deeper: +3
+  4 call(s) deeper: +4
+skipping 1 removes 1, skipping past the top leaves 0
+a 1-frame buffer holds 1 and reports more (truncated true)
+a 64-frame buffer holds every frame (truncated false)
+frame 0 exists true, frame 1000 exists false
+all frames agree on their mode: true
+running interpreted
