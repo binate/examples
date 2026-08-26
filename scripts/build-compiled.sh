@@ -17,5 +17,5 @@ set_paths "$EXAMPLE" "$LIB"
 
 mkdir -p "$(dirname "$OUT")"
 echo "build-compiled: $1 -> out/$EXAMPLE/$SUB" >&2
-"$BNC" -I "$I" -L "$L" --runtime "$RT" -o "$OUT" "$CMDDIR" >&2
+"$BNC" -I "$I" -L "$L" -o "$OUT" "$CMDDIR" >&2
 echo "$OUT"

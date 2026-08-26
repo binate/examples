@@ -1,7 +1,7 @@
 #!/usr/bin/env bnrun
 // greet is one source file that runs three ways: directly as `./main.bn args…`
-// through the kernel, as `bnrun main.bn args…` through bni's `-x` script mode,
-// and as a compiled binary. Nothing about the program changes between them.
+// through the kernel, as `bnrun main.bn args…` through the interpreter, and as a
+// compiled binary. Nothing about the program changes between them.
 //
 // The `#!` line above is why it can be the first: the toolchain's lexer skips a
 // shebang line at offset 0, in bnc as well as bni, so the file stays valid
@@ -34,7 +34,7 @@ func main() {
 	fmt.Printf("argc %d\n", len(args))
 
 	// Element 0 is the program name, and what it holds says how the program was
-	// started: the SCRIPT path under `bni -x` (so it ends in ".bn"), and the
+	// started: the SCRIPT path when interpreted (so it ends in ".bn"), and the
 	// BINARY path when compiled. Reporting which kind it is keeps the output
 	// machine-independent — the path itself would not be.
 	fmt.Printf("started from source: %t\n", endsWithBn(args[0]))

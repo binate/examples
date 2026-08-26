@@ -6,7 +6,7 @@ binary — the same source, unmodified:
 
 ```sh
 PATH=scripting/bin:$PATH  scripting/cmd/greet/main.bn world friend   # kernel
-scripting/bin/bnrun scripting/cmd/greet/main.bn world friend         # bni -x
+scripting/bin/bnrun scripting/cmd/greet/main.bn world friend         # interpreter
 scripts/run-compiled.sh scripting/cmd/greet world friend             # bnc
 ```
 
@@ -23,9 +23,10 @@ Exactly one thing: **the lexer ignores a `#!` line at offset 0** (spec
 `lex.shebang`), in `bnc` as well as `bni`. That is what lets a file be both a
 script and a compilable program.
 
-Plus `bni -x`, which is script *mode*: exactly one source file, and everything
-after it belongs to the program rather than being taken as more sources or
-interpreter flags.
+Plus one argv rule: `--` ends bni's own flags, and everything after the main
+package is the program's argv. So `bni <flags> -- script.bn a b` runs the script
+with `a b`, and bni's usage names exactly that as the shebang form
+(`#!/usr/bin/env -S bni <flags> --`).
 
 ## What the shebang cannot do, and why that is not Binate's problem
 
@@ -35,10 +36,10 @@ tree like this repo:
 
 - a fixed path assumes an installer ran;
 - `/usr/bin/env bni` assumes `bni` is on `PATH` **and** that it can find its own
-  standard library, which today it cannot: `bni` has no default search path, so
-  even a zero-import script fails with `package "pkg/builtins/lang" not found`;
-- passing the search paths on the line is not an option either. They are 264 and
-  353 characters for a cached bundle, against a kernel limit of about **256 bytes
+  standard library, which it cannot on its own: `bni` has no default search path,
+  so even a zero-import script fails with `package "pkg/builtins/lang" not found`;
+- passing the search paths on the line is not an option either. They are 266 and
+  355 characters for a cached bundle, against a kernel limit of about **256 bytes
   for the whole line** — and they differ per machine, so they could not be
   committed anyway.
 
@@ -54,10 +55,25 @@ So this example names its own launcher:
 ```
 
 21 bytes, no absolute paths, nothing machine-specific. [`bin/bnrun`](bin/bnrun)
-is a nine-line shell script that resolves the toolchain the same way the rest of
-the repo does — honoring `BUILDER_VERSION` and `BINATE_BUNDLE` — and execs
-`bni -x` with the search paths filled in. A real project would ship the same
-thing, or install a `bni` that knows where its library lives.
+resolves the toolchain the same way the rest of the repo does — honoring
+`BUILDER_VERSION` and `BINATE_BUNDLE` — and execs `bni <paths> -- "$@"`.
+
+### The shim is not the only way
+
+`bni` reads `BINATE_PACKAGE_INTERFACE_PATH` and `BINATE_PACKAGE_IMPL_PATH` when
+the matching flag is absent, so an environment that has those exported needs no
+shim at all:
+
+```
+#!/usr/bin/env -S bni --
+```
+
+That works — verified — and is the `PYTHONPATH`-shaped answer: configuration
+lives in the environment, and the script names only the interpreter. This example
+keeps the shim because it must run from an **unconfigured** checkout, where
+nothing has been exported and the toolchain may not even be downloaded yet. A
+deployed program would more likely rely on the environment, or on an installed
+`bni` that knows where its own library lives.
 
 One subtlety worth knowing: the kernel refuses a `#!` line whose interpreter is
 *itself* a script. That rule does not bite here, because the interpreter is
@@ -67,12 +83,12 @@ shebang is resolved normally.
 ## argv[0] says how you were started
 
 `os.Args()` element 0 is the program name, and it names whatever actually started
-the program: the **script** path under `bni -x`, the **binary** path when
+the program: the **script** path when interpreted, the **binary** path when
 compiled. The program reports which kind it got, and that is the single line on
 which the two fixtures differ — the harness checks that it is the *only* one.
 
 ```
-started from source: true     # kernel exec, and bni -x
+started from source: true     # kernel exec, and via bnrun
 started from source: false    # compiled
 ```
 

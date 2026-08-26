@@ -24,9 +24,10 @@ prepended to the toolchain's `-I`/`-L` search paths.
 
 ## Toolchain
 
-Builds use a released Binate bundle (`bnc`, `bni`, plus the standard library and
-C runtime) — no Binate source checkout required, just `clang` on `PATH` for
-linking compiled output. The version is pinned in `BUILDER_VERSION` and
+Builds use a released Binate bundle (`bnc`, `bni`, plus the standard library) —
+no Binate source checkout required, just `clang` on `PATH` for linking compiled
+output. (There is no C runtime to link: Binate's runtime is written in Binate.
+The bundle ships one only for bare-metal targets, which the examples do not use.) The version is pinned in `BUILDER_VERSION` and
 fetched/cached on demand by `scripts/fetch-builder.sh`:
 
 ```sh
@@ -125,8 +126,8 @@ output.
   against the standard hierarchy (`errors.Is(err, errors.NotFound)`). Its
   `ReadAll`/`Copy` take `io.Reader`/`io.Writer` rather than a file, so the unit
   tests drive them with fake streams and never touch the disk.
-- [`scripting`](scripting/) — **`#!` scripts and `bni -x`**: one source file that
-  runs through the kernel, through bni's script mode, and compiled. All the
+- [`scripting`](scripting/) — **`#!` scripts and the interpreter**: one source
+  file that runs through the kernel, through `bni`, and compiled. All the
   toolchain owes a script is ignoring the `#!` line (which `bnc` does too); the
   rest is the ordinary shebang deployment problem, solved the ordinary way — the
   line names a small launcher of the example's own (`bin/bnrun`) rather than an

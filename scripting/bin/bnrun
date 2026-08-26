@@ -32,6 +32,8 @@ BP="$(dirname "$LIB")/bin/binate-paths"
 I="$("$BP" --iface --base "$LIB" --prepend "$EXAMPLE_DIR")"
 L="$("$BP" --impl --base "$LIB" --prepend "$EXAMPLE_DIR")"
 
-# -x is bni's script mode: exactly one source file, and everything after it goes
-# to the program rather than being taken as more sources or bni flags.
-exec "$BNI" -x -I "$I" -L "$L" "$@"
+# `--` ends bni's flags: the next argument is the script, and everything after
+# that is the program's argv. That is the form bni's own usage prescribes for a
+# shebang (`#!/usr/bin/env -S bni <flags> --`), which is exactly what this shim
+# is standing in for.
+exec "$BNI" -I "$I" -L "$L" -- "$@"

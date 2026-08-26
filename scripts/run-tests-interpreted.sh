@@ -19,4 +19,6 @@ LIB="$("$SCRIPT_DIR/fetch-builder.sh" --lib)"
 set_paths "$EXAMPLE" "$LIB"
 
 echo "run-tests-interpreted: $1" >&2
-exec "$BNI" --test -I "$I" -L "$L" "$PKG"
+# --test takes the package as its VALUE, and repeats for several; a package left
+# trailing after the flags would be read as a program argument instead.
+exec "$BNI" --test "$PKG" -I "$I" -L "$L"

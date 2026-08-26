@@ -37,7 +37,6 @@ LIB="$(scripts/fetch-builder.sh --lib)"
 BP="$(dirname "$LIB")/bin/binate-paths"
 I="$("$BP" --iface --base "$LIB" --prepend "$EXAMPLE_DIR")"
 L="$("$BP" --impl --base "$LIB" --prepend "$EXAMPLE_DIR")"
-RT="$("$BP" --runtime --base "$LIB")"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT INT TERM
@@ -54,7 +53,7 @@ done
 # build <sub> -> writes $WORK/<sub>, or returns nonzero (build log on stdout).
 build() {
     # shellcheck disable=SC2086  # LINK_OBJS must word-split into flag pairs.
-    "$BNC" -I "$I" -L "$L" --runtime "$RT" $LINK_OBJS \
+    "$BNC" -I "$I" -L "$L" $LINK_OBJS \
         -o "$WORK/$1" "$EXAMPLE_DIR/cmd/$1" 2>&1
 }
 

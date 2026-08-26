@@ -27,7 +27,7 @@ trap 'rm -rf "$bdir"' EXIT INT TERM
 echo "run-tests-compiled: $1" >&2
 # bnc --test prints the test-binary path on stdout; on a compile error it
 # exits non-zero and the captured text is the diagnostic, not a binary.
-testbin="$("$BNC" --test -I "$I" -L "$L" --runtime "$RT" --build-dir "$bdir" "$PKG" 2>&1)" || true
+testbin="$("$BNC" --test -I "$I" -L "$L" --build-dir "$bdir" "$PKG" 2>&1)" || true
 if [ ! -x "$testbin" ]; then
     printf '%s\n' "$testbin" >&2
     echo "run-tests-compiled: compile failed for $1" >&2

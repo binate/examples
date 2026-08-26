@@ -3,7 +3,7 @@
 # three ways and checks each against a fixture:
 #
 #   1. kernel exec   ./cmd/greet/main.bn a b        (the `#!` line does the work)
-#   2. bni -x        bin/bnrun cmd/greet/main.bn a b
+#   2. interpreter   bin/bnrun cmd/greet/main.bn a b
 #   3. compiled      bnc, then run the binary
 #
 # Legs 1 and 2 must agree exactly — leg 1 is just the kernel arranging leg 2 —
@@ -53,7 +53,7 @@ PATH="$EXAMPLE_DIR/bin:$PATH" "$SRC" world friend > "$WORK/kernel.out" 2>&1
 check "kernel exec" "$WORK/kernel.out" "$want_script"
 
 "$EXAMPLE_DIR/bin/bnrun" "$SRC" world friend > "$WORK/bnrun.out" 2>&1
-check "bni -x" "$WORK/bnrun.out" "$want_script"
+check "interpreter" "$WORK/bnrun.out" "$want_script"
 
 BIN="$(scripts/build-compiled.sh scripting/cmd/greet)"
 "$BIN" world friend > "$WORK/compiled.out" 2>&1
@@ -70,6 +70,6 @@ if [ -f "$want_script" ] && [ -f "$want_compiled" ]; then
 fi
 
 if [ "$fail" -eq 0 ]; then
-    echo "scripting/tests/run.sh: PASS (kernel == bni -x == fixture; compiled == fixture)"
+    echo "scripting/tests/run.sh: PASS (kernel == interpreter == fixture; compiled == fixture)"
 fi
 [ "$fail" -eq 0 ]

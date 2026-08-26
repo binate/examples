@@ -2,11 +2,12 @@
 
 ## Planned examples — the standard library
 
-The library bundled with `bnc-0.0.13` reaches well past what the examples here
-show. `pkg/std` has `errors`, `io`, `math` (+ `math/big`), `os` (+ `os/process`,
-`os/sys`), `strconv`, `strings`, and `time`; `pkg/stdx` has `fmt`, `slices`,
-`cmp`, `hash`, and `containers/{vec,hashmap,set,table,mapfn,setfn,iter}`. Only
-`generics` and `minbasic` touch any of it, and neither is *about* the library.
+The library bundled with `bnc-0.0.14` reaches well past what the examples here
+show. `pkg/std` has `debug`, `errors`, `fmt`, `io`, `math` (+ `math/big`), `os`
+(+ `os/process`, `os/sys`), `strconv`, `strings`, and `time`; `pkg/stdx` has
+`flags`, `slices`, `cmp`, `hash`, and
+`containers/{vec,hashmap,set,table,mapfn,setfn,iter}`. Only `generics` and
+`minbasic` touch any of it, and neither is *about* the library.
 
 Every entry below runs in **both modes**: the bytecode VM reaches the
 libc-backed file and process layers as well as the compiler does (the "no FFI"
@@ -37,11 +38,14 @@ Written roughly in the order they are worth doing:
 
 - **`scripting` — DONE.** The shebang names `bin/bnrun`, a launcher of the
   example's own, rather than the interpreter: `bni` has no default search path,
-  and the real `-I`/`-L` are far past the kernel's ~256-byte shebang limit. If
-  `bni` ever defaults its search paths to its own installation (tracked on the
-  binate side), `#!/usr/bin/env bni -x` becomes a complete shebang — but the shim
-  stays the honest thing to teach for an *uninstalled* tree, so at most the
-  README gains a note.
+  and the real `-I`/`-L` are far past the kernel's ~256-byte shebang limit. As of
+  `bnc-0.0.14` a *configured* environment needs no shim —
+  `BINATE_PACKAGE_INTERFACE_PATH` / `BINATE_PACKAGE_IMPL_PATH` supply the paths,
+  so `#!/usr/bin/env -S bni --` runs a script outright (the README shows it) —
+  but this repo has to work from an unconfigured checkout, so the shim stays as
+  the thing being taught. If `bni` ever defaults its search paths to its own
+  installation (still open on the binate side), even that configuration goes
+  away.
 
 - **`text` — DONE.**
 
@@ -93,10 +97,13 @@ Written roughly in the order they are worth doing:
   workflow) rather than a fixed schedule — evaluate whether that wiring
   is worth it vs. a daily cron.
 
-- **Program-argument passing.** Confirm how arguments reach an example
-  under `bni` (whether a `--` separator is needed) vs. the compiled
-  binary, once we have an example that reads `Args()`. The run scripts
-  currently forward extra args as-is.
+- **Program-argument passing — ANSWERED (`bnc-0.0.14`).** Everything after the
+  main package is the program's argv, and `--` ends *bni's* flags rather than
+  introducing the program's. So the separator belongs BEFORE the package —
+  `bni <flags> -- <pkg> args…` — which is what `run-interpreted.sh` does; a `--`
+  placed after the package arrives as the program's first argument, which is
+  what it used to do. The compiled binary takes arguments directly, so both
+  modes now agree, and `scripting` is the example that reads `Args()`.
 
 - **`cinterop` stays built by its own harness (permanent).** The C-interop
   example ships `csrc/`, so `build-all.sh` skips it — the generic bnc-only sweep
@@ -107,26 +114,15 @@ Written roughly in the order they are worth doing:
   changes. (The `lint` hygiene check is not affected: bnlint checks sources
   without linking, so it covers this example like any other.)
 
-- **Migrate off the old `bni` CLI at the next BUILDER bump.** `bni`'s
-  command-line interface was redesigned. The main package is `-main-dir <dir>`,
-  `-main-file <file>`, or — when neither is given — the **first positional**
-  (auto-detected dir vs file); everything after the main package is the
-  program's argv. This repo still uses the old forms (`-x` script mode, and
-  `--`-separates-filenames) and must migrate once the pinned BUILDER ships the
-  new `bni`. The transformations:
-  - `-x` (script mode) → **drop it**: a bare `bni <script>` already treats the
-    first positional as the main, with trailing args as the program's argv.
-  - a bare `bni <file>` / `bni <dir>` run still works (first positional = main);
-    the old `--`-separates-filenames-from-args rule is gone — `bni <main> args…`
-    passes `args…` to the program directly (flag-looking args included, since
-    parsing stops at `<main>`).
-  - `--test`/`-test` now TAKES the package as its value, so the package must come
-    immediately after `--test` (`--test <pkg>`), not as a trailing positional.
-  - the canonical shebang is `#!/usr/bin/env -S bni <flags> --` — the trailing
-    `--` (standard end-of-flags) makes the kernel-appended script path the
-    positional main even if it is named like a flag; `-x` is no longer used.
+- **Migration off the old `bni` CLI — DONE (`bnc-0.0.14`).** `-x` is gone;
+  `--` ends bni's flags and the first positional after it is the main package,
+  with everything following it the program's argv. `run-interpreted.sh` moved its
+  `--` to before the package (after it, the program received a literal `--` as
+  its first argument), `run-tests-interpreted.sh` passes `--test <pkg>` as a
+  flag VALUE, and `bin/bnrun` execs `bni <paths> -- "$@"`. `cmd/greet`'s shebang
+  needed nothing: it names the shim, so the `--` lives inside `bnrun`.
 
-  Sites to update: `examples/scripts/run-interpreted.sh`,
-  `examples/scripts/run-tests-interpreted.sh`, `examples/scripting/bin/bnrun`,
-  and the `cmd/greet/main.bn` shebang (plus any other `bni` invocation a
-  repo-wide grep for `bni ` / ` -x ` surfaces).
+  The same bump retired `binate-paths --runtime`, since a host build links no C
+  runtime any more (the runtime is Binate). `_common.sh` no longer computes `RT`
+  and neither `build-compiled.sh` nor `run-tests-compiled.sh` passes `--runtime`
+  — it had been naming a file that no longer exists and was silently ignored.

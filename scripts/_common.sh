@@ -4,7 +4,7 @@
 # Provides REPO_DIR and three helpers:
 #   parse_cmd_path <example>/cmd/<sub>  -> EXAMPLE SUB CMDDIR OUT
 #   parse_pkg_path <example>/<pkg-path> -> EXAMPLE PKG PKGDIR
-#   set_paths      <example> <lib>      -> I L RT  (search paths rooted at the example)
+#   set_paths      <example> <lib>      -> I L  (search paths rooted at the example)
 
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -54,17 +54,21 @@ parse_pkg_path() {
     [ -d "$PKGDIR" ] || { echo "no such package directory: $_pkg" >&2; exit 2; }
 }
 
-# Each example is its own package search root, prepended ahead of the
-# bundle's stdlib/runtime roots (the bundle layout per BUNDLE-HOWTO.md).
+# Each example is its own package search root, prepended ahead of the bundle's
+# stdlib roots (the bundle layout per BUNDLE-HOWTO.md).
+#
+# There is no --runtime: Binate's runtime is itself Binate (pkg/builtins/rt plus
+# startup), so a host build links no C runtime and bnc takes no runtime input.
+# The flag survives on bnc only for a bare-metal target, which resolves crt0.s
+# and friends relative to it.
 set_paths() {
     _root="$REPO_DIR/$1"
     _lib="$2"
     # binate-paths (shipped in the bundle's bin/, the sibling of lib/) is the
     # single source of truth for the package search-path formula documented in
     # BUNDLE-HOWTO.md.  --prepend puts the example dir ahead of the bundle's
-    # stdlib/runtime roots; --base points it at the bundle's lib/.
+    # stdlib roots; --base points it at the bundle's lib/.
     _bp="$(dirname "$_lib")/bin/binate-paths"
     I="$("$_bp" --iface --base "$_lib" --prepend "$_root")"
     L="$("$_bp" --impl --base "$_lib" --prepend "$_root")"
-    RT="$("$_bp" --runtime --base "$_lib")"
 }
