@@ -102,7 +102,7 @@ func (p @parser) parseTargetList(ctx @[]char) @[]@Expr {
 // parseTarget parses one assignable target: a string variable (EX_SVAR), or a
 // numeric variable / array element (EX_VAR / EX_AINDEX via parseVarOrArray). Any
 // other token is a parse error reported against `ctx` (the enclosing statement).
-func (p @parser) parseTarget(ctx @[]char) @Expr {
+func (p @parser) parseTarget(ctx *[]readonly char) @Expr {
 	if p.cur.Kind == TOK_SVAR {
 		var e @Expr = make(Expr)
 		e.Kind = EX_SVAR

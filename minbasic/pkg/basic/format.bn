@@ -79,7 +79,7 @@ func appendMagnitude(b buf.CharBuf, m float64) buf.CharBuf {
 // point, FMT_SIG-1 fraction digits, then a signed exponent) into the d
 // significant digits (point removed) and the integer base-10 exponent of the
 // leading digit.
-func splitSci(sci @[]char) (@[]char, int) {
+func splitSci(sci *[]readonly char) (@[]char, int) {
 	var digits buf.CharBuf = buf.New()
 	var i int = 0
 	for i < len(sci) && sci[i] != 'e' {
@@ -108,7 +108,7 @@ func splitSci(sci @[]char) (@[]char, int) {
 
 // trimZeros returns the prefix of digits with trailing '0' characters removed.
 // At least one digit is always retained.
-func trimZeros(digits @[]char) @[]char {
+func trimZeros(digits *[]readonly char) @[]char {
 	var end int = len(digits)
 	for end > 1 && digits[end - 1] == '0' {
 		end = end - 1
@@ -120,7 +120,7 @@ func trimZeros(digits @[]char) @[]char {
 // significant digits and the exponent of the leading digit. exp >= 0 places the
 // decimal point exp+1 digits in; exp < 0 prints leading zeros after the point
 // (".5", ".000001") with no digit left of the point.
-func appendUnscaled(b buf.CharBuf, digits @[]char, exp int) buf.CharBuf {
+func appendUnscaled(b buf.CharBuf, digits *[]readonly char, exp int) buf.CharBuf {
 	var sig @[]char = trimZeros(digits)
 	if exp >= 0 {
 		return appendNonNegExp(b, sig, exp)
@@ -160,7 +160,7 @@ func appendNonNegExp(b buf.CharBuf, sig @[]char, exp int) buf.CharBuf {
 // 1 <= x < 10 (up to d significant digits, trailing fractional zeros trimmed —
 // a significand of exactly 1 prints as "1."), an uppercase 'E', the exponent
 // sign, and the exponent digits.
-func appendScaled(b buf.CharBuf, digits @[]char, exp int) buf.CharBuf {
+func appendScaled(b buf.CharBuf, digits *[]readonly char, exp int) buf.CharBuf {
 	var sig @[]char = trimZeros(digits)
 	b = b.WriteByte(sig[0])
 	b = b.WriteByte('.')

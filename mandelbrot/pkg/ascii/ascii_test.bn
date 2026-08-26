@@ -3,7 +3,7 @@ package "pkg/ascii"
 import "pkg/builtins/testing"
 
 // sameText reports whether got holds exactly the characters of want.
-func sameText(got @[]char, want *[]readonly char) bool {
+func sameText(got *[]readonly char, want *[]readonly char) bool {
 	if len(got) != len(want) {
 		return false
 	}

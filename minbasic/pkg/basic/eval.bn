@@ -11,8 +11,10 @@ const ZONE_WIDTH int = 15
 // NUM_ZONES is the number of print zones per line (the standard reference 5).
 const NUM_ZONES int = 5
 
-// MARGIN is the line width: NUM_ZONES * ZONE_WIDTH = 75 character positions.
-const MARGIN int = 75
+// MARGIN is the line width — 75 character positions. Deriving it from the two
+// constants above keeps the relationship checked rather than asserted in a
+// comment, and is why NUM_ZONES exists as a name at all.
+const MARGIN int = NUM_ZONES * ZONE_WIDTH
 
 // MAX_STR_LEN is the ECMA-55 limit on a string datum assigned to a string
 // variable (clause 11.5): assigning a longer string is a fatal error.

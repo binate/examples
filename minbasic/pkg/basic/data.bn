@@ -142,7 +142,7 @@ func numericDatum(d @datum) bool {
 // grammar (clause 6.2): an optional sign, a significand (`integer fraction?` or
 // just a `.integer` fraction), and an optional `E sign? integer` exponent. This
 // is the same shape lexNumber scans for a source numeric literal.
-func isNumericConstant(s @[]char) bool {
+func isNumericConstant(s *[]readonly char) bool {
 	var i int = 0
 	if i < len(s) && (s[i] == '+' || s[i] == '-') {
 		i = i + 1
@@ -168,7 +168,7 @@ func isNumericConstant(s @[]char) bool {
 // matchExponent reports whether s from index i onward is a valid (possibly
 // empty) numeric-constant exponent: nothing, or `E sign? integer` consuming the
 // whole remainder. A bare 'E' or an 'E' with no exponent digits is rejected.
-func matchExponent(s @[]char, i int) bool {
+func matchExponent(s *[]readonly char, i int) bool {
 	if i >= len(s) {
 		return true
 	}

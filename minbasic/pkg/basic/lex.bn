@@ -45,7 +45,7 @@ func (l @lexer) skipSpaces() {
 
 // keywordKind returns the keyword token kind for an all-letters run, or -1 if
 // the run is not a keyword in this slice's vocabulary.
-func keywordKind(word @[]char) int {
+func keywordKind(word *[]readonly char) int {
 	if charsEq(word, "LET") {
 		return TOK_LET
 	} else if charsEq(word, "PRINT") {
@@ -66,7 +66,7 @@ func keywordKind(word @[]char) int {
 // keywords (GOTO/GO/TO/IF/THEN/FOR/STEP/NEXT), or -1 if word is not one of
 // them. Split from keywordKind so neither function's if/else-if chain grows
 // unwieldy.
-func controlKeywordKind(word @[]char) int {
+func controlKeywordKind(word *[]readonly char) int {
 	if charsEq(word, "GOTO") {
 		return TOK_GOTO
 	} else if charsEq(word, "GO") {
@@ -91,7 +91,7 @@ func controlKeywordKind(word @[]char) int {
 // data keywords (SUB/RETURN/ON/READ/DATA/RESTORE/INPUT), or -1 if word is not one
 // of them. (GO and TO are recognized in controlKeywordKind; `GO SUB` pairs TOK_GO
 // with TOK_SUB.) Split out so no if/else-if chain grows unwieldy.
-func subroutineKeywordKind(word @[]char) int {
+func subroutineKeywordKind(word *[]readonly char) int {
 	if charsEq(word, "GOSUB") {
 		return TOK_GOSUB
 	} else if charsEq(word, "SUB") {
@@ -115,7 +115,7 @@ func subroutineKeywordKind(word @[]char) int {
 // arrayKeywordKind returns the keyword token kind for the array-declaration
 // keywords (DIM, OPTION, BASE), the user-function keyword DEF, and RANDOMIZE, or
 // -1 if word is not one of them. Split out so no if/else-if chain grows unwieldy.
-func arrayKeywordKind(word @[]char) int {
+func arrayKeywordKind(word *[]readonly char) int {
 	if charsEq(word, "DIM") {
 		return TOK_DIM
 	} else if charsEq(word, "OPTION") {
@@ -132,7 +132,7 @@ func arrayKeywordKind(word @[]char) int {
 
 // charsEq reports whether managed-slice a equals the raw-slice literal b
 // character-for-character.
-func charsEq(a @[]char, b *[]readonly char) bool {
+func charsEq(a *[]readonly char, b *[]readonly char) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -211,7 +211,7 @@ func (l @lexer) lexWord() Token {
 // `FN<letter>`: exactly three letters, the first two `FN`. The `FN` prefix is
 // reserved (see TOK_FN), so such a run is always a function reference, never a
 // variable. (`DEF` is handled as a keyword before lexWord reaches this point.)
-func isFnName(word @[]char) bool {
+func isFnName(word *[]readonly char) bool {
 	return len(word) == 3 && word[0] == 'F' && word[1] == 'N'
 }
 
@@ -354,7 +354,7 @@ func (l @lexer) lexRelational(c char) Token {
 
 // sliceChars returns the characters of src in [start, end) as a fresh
 // managed-slice (the result is owned by the caller).
-func sliceChars(src @[]char, start int, end int) @[]char {
+func sliceChars(src *[]readonly char, start int, end int) @[]char {
 	var n int = end - start
 	var out @[]char = make_slice(char, n)
 	for i := 0; i < n; i++ {

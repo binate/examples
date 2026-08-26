@@ -44,7 +44,7 @@ func newArrayStore(base int) @arrayStore {
 // arrayIndex maps a single-letter array name to its slot in the array store.
 // The name is assumed well-formed (a one-letter A..Z, which the parser
 // guarantees for an array reference).
-func arrayIndex(name @[]char) int {
+func arrayIndex(name *[]readonly char) int {
 	return cast(int, name[0] - 'A')
 }
 

@@ -91,7 +91,7 @@ func nextRawLine(src *[]readonly char, off int) (@[]char, int) {
 }
 
 // isBlank reports whether a line is empty or all spaces/tabs (a no-op line).
-func isBlank(text @[]char) bool {
+func isBlank(text *[]readonly char) bool {
 	for i := 0; i < len(text); i++ {
 		if text[i] != ' ' && text[i] != '\t' {
 			return false
@@ -102,7 +102,7 @@ func isBlank(text @[]char) bool {
 
 // parseLine parses one raw program line ("<number> <statement>") into a Line,
 // reporting the line number in any diagnostic so errors are locatable.
-func parseLine(text @[]char) (@Line, @[]char, bool) {
+func parseLine(text *[]readonly char) (@Line, @[]char, bool) {
 	var num int
 	var rest @[]char
 	var nok bool
@@ -134,7 +134,7 @@ func lineDiag(num int, msg @[]char) @[]char {
 // splitLineNumber parses a leading 1..4 digit line number (skipping leading
 // spaces), returning its value, the remaining characters, and ok. Leading zeros
 // are allowed; the value must be 1..9999.
-func splitLineNumber(text @[]char) (int, @[]char, bool) {
+func splitLineNumber(text *[]readonly char) (int, @[]char, bool) {
 	var i int = 0
 	for i < len(text) && (text[i] == ' ' || text[i] == '\t') {
 		i = i + 1

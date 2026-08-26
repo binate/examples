@@ -3,7 +3,7 @@ package "pkg/buf"
 import "pkg/builtins/testing"
 
 // eq reports whether managed-slice got holds exactly the bytes of want.
-func eq(got @[]char, want *[]readonly char) bool {
+func eq(got *[]readonly char, want *[]readonly char) bool {
 	if len(got) != len(want) {
 		return false
 	}

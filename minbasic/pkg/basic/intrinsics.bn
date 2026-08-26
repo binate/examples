@@ -23,7 +23,7 @@ const (
 // funcCode maps a three-letter word to its FN_* code, or -1 if the word is not a
 // supplied-function name. The lexer uses this to classify a letter-run as a
 // function reference (TOK_FUNC) rather than a variable.
-func funcCode(word @[]char) int {
+func funcCode(word *[]readonly char) int {
 	if charsEq(word, "ABS") {
 		return FN_ABS
 	} else if charsEq(word, "ATN") {
@@ -43,7 +43,7 @@ func funcCode(word @[]char) int {
 // funcCodeRest maps the remaining supplied-function names (RND/SGN/SIN/SQR/TAN)
 // to their FN_* code, or -1. Split from funcCode so neither if/else-if chain
 // grows unwieldy.
-func funcCodeRest(word @[]char) int {
+func funcCodeRest(word *[]readonly char) int {
 	if charsEq(word, "RND") {
 		return FN_RND
 	} else if charsEq(word, "SGN") {

@@ -105,7 +105,7 @@ func sgn(x float64) float64 {
 // a zero-trip loop's body. Nested FOR/NEXT pairs on other variables are stepped
 // over by depth counting. If no matching NEXT exists the loop runs to the end
 // of the program (one past the last line), where execution simply stops.
-func (r @runtime) afterMatchingNext(name @[]char) int {
+func (r @runtime) afterMatchingNext(name *[]readonly char) int {
 	var depth int = 0
 	for i := r.pc + 1; i < len(r.prog); i++ {
 		var st @Stmt = r.prog[i].Stmt

@@ -98,7 +98,7 @@ func (s @basicSession) result(status StepStatus) StepResult {
 
 // writeOut sends framing text (banner, prompt acknowledgements, info) through
 // the ReplIO normal-output channel — never through the program's ConsoleOut.
-func (s @basicSession) writeOut(text @[]char) {
+func (s @basicSession) writeOut(text *[]readonly char) {
 	s.io.WriteOut(text)
 }
 

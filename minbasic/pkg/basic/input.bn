@@ -117,7 +117,7 @@ func validReply(data @[]@datum) bool {
 // isUnquotedString reports whether s is a non-empty ECMA-55 unquoted-string: at
 // least one character, each a plain-string-character or a space (the scanner has
 // already trimmed the leading/trailing spaces, so any space here is interior).
-func isUnquotedString(s @[]char) bool {
+func isUnquotedString(s *[]readonly char) bool {
 	if len(s) == 0 {
 		return false
 	}

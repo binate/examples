@@ -125,7 +125,7 @@ func (r @runtime) execLet(s @Stmt, errMsg *@[]char) int {
 
 // copyChars returns a fresh owned copy of s, so a stored string variable does
 // not alias an AST literal or another variable's backing.
-func copyChars(s @[]char) @[]char {
+func copyChars(s *[]readonly char) @[]char {
 	var out @[]char = make_slice(char, len(s))
 	for i := 0; i < len(s); i++ {
 		out[i] = s[i]

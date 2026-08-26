@@ -42,7 +42,7 @@ func (r @runtime) evalStrRel(rel @Rel) bool {
 
 // charsEqual reports whether two managed character slices have the same length
 // and the same characters.
-func charsEqual(a @[]char, b @[]char) bool {
+func charsEqual(a *[]readonly char, b *[]readonly char) bool {
 	if len(a) != len(b) {
 		return false
 	}

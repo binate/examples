@@ -46,7 +46,7 @@ func newNullIn() @io.ConsoleIn {
 
 // contains reports whether hay holds needle as a substring (a naive scan, used to
 // assert that a diagnostic appears in captured output).
-func contains(hay @[]char, needle *[]readonly char) bool {
+func contains(hay *[]readonly char, needle *[]readonly char) bool {
 	var n int = len(needle)
 	if n == 0 {
 		return true
@@ -94,7 +94,7 @@ func newEvalRT() @runtime {
 // runWithIn parses and runs the full program src reading INPUT replies from inp,
 // returning the captured output (program PRINT output plus any diagnostics) and
 // the resulting variable store.
-func runWithIn(src @[]char, inp @io.ConsoleIn) (@[]char, @env) {
+func runWithIn(src *[]readonly char, inp @io.ConsoleIn) (@[]char, @env) {
 	var cap @captureOut = make(captureOut)
 	cap.b = buf.New()
 	var out @io.ConsoleOut = cap
@@ -112,7 +112,7 @@ func runWithIn(src @[]char, inp @io.ConsoleIn) (@[]char, @env) {
 
 // runProg runs src with no INPUT replies available — the harness for executor
 // tests that do not read INPUT.
-func runProg(src @[]char) (@[]char, @env) {
+func runProg(src *[]readonly char) (@[]char, @env) {
 	return runWithIn(src, newNullIn())
 }
 
@@ -140,7 +140,7 @@ impl @scriptIn : io.ConsoleIn
 
 // runProgInput runs src with the given INPUT reply lines (consumed in order; a
 // further read past them reports end-of-input).
-func runProgInput(src @[]char, replies @[]@[]char) (@[]char, @env) {
+func runProgInput(src *[]readonly char, replies @[]@[]char) (@[]char, @env) {
 	var s @scriptIn = make(scriptIn)
 	s.lines = replies
 	s.pos = 0
@@ -173,7 +173,7 @@ func newSession() (@ReplSession, @captureOut) {
 
 // u8 copies a char slice into a uint8 slice (the same bytes) for Step's raw input
 // view.
-func u8(line @[]char) @[]uint8 {
+func u8(line *[]readonly char) @[]uint8 {
 	var out @[]uint8 = make_slice(uint8, len(line))
 	for i := 0; i < len(line); i++ {
 		out[i] = cast(uint8, line[i])
@@ -182,6 +182,6 @@ func u8(line @[]char) @[]uint8 {
 }
 
 // feed runs one input line through the session.
-func feed(sess @ReplSession, line @[]char) {
+func feed(sess @ReplSession, line *[]readonly char) {
 	sess.Step(u8(line), false)
 }

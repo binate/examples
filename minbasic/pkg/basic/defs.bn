@@ -25,7 +25,7 @@ type defStore struct {
 // fnIndex maps a one-character function-letter name (the Text of a TOK_FN /
 // EX_FNCALL / ST_DEF, e.g. "A" for FNA) to its slot 0..25 in a defStore. The
 // name is a single uppercase letter, guaranteed by the lexer.
-func fnIndex(name @[]char) int {
+func fnIndex(name *[]readonly char) int {
 	return cast(int, name[0] - 'A')
 }
 
