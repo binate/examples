@@ -80,6 +80,10 @@ scripts/test-all.sh [compiled|interpreted|both]    run every *_test.bn package (
 
 The package argument is `<example>/<import-path>` (e.g. `minbasic/pkg/buf`).
 
+Output goes through `pkg/std/fmt`, never the `print`/`println` builtins — those
+are transitional debug output on their way out of the language, and a repo-wide
+grep for them should stay empty.
+
 An example can also carry **end-to-end suites** — any executable `run.sh` under
 the example directory (e.g. `minbasic/tests/run.sh`, `minbasic/sessions/run.sh`).
 `scripts/e2e-all.sh` discovers and runs them all (also in CI).
