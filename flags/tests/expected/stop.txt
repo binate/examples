@@ -1,0 +1,5 @@
+verbose true, name world, count 1
+tags []
+paths []
+positionals [-n --tag]
+hello, world!

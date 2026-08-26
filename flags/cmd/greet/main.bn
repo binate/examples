@@ -1,0 +1,49 @@
+// greet is a small command-line tool, and exists to be RUN with different
+// argument vectors — its whole output is a report of what parsing made of them.
+//
+// The parsing itself lives in pkg/cli, because a FlagSet parses a slice rather
+// than a process: that package's tests cover the grammar with no program to
+// start, and this command only bridges the real argument vector into it.
+package "main"
+
+import "pkg/cli"
+import "pkg/std/fmt"
+import "pkg/std/os"
+
+// list renders a repeatable flag's values as [a b c], so an empty one is visible
+// rather than blank.
+func list(label *[]readonly char, values @[]@[]char) {
+	fmt.Printf("%s [", label)
+	for i := 0; i < len(values); i++ {
+		if i > 0 {
+			fmt.Print(" ")
+		}
+		fmt.Printf("%s", values[i])
+	}
+	fmt.Println("]")
+}
+
+// main parses the command line and reports it, or explains why it could not.
+func main() {
+	var opts cli.Options = cli.Parse(cli.ArgsToVector(os.Args()))
+
+	// A parse error is a message the caller decides what to do with — flags
+	// neither prints nor exits on its own.
+	if len(opts.Error) > 0 {
+		fmt.Printf("greet: %s\n", opts.Error)
+		fmt.Print(cli.Usage())
+		os.Exit(2)
+	}
+	if opts.Help {
+		fmt.Print(cli.Usage())
+		return
+	}
+
+	fmt.Printf("verbose %t, name %s, count %d\n", opts.Verbose, opts.Name, opts.Count)
+	list("tags", opts.Tags)
+	list("paths", opts.Paths)
+	list("positionals", opts.Rest)
+	for i := 0; i < opts.Count; i++ {
+		fmt.Printf("hello, %s!\n", opts.Name)
+	}
+}

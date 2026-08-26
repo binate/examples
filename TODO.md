@@ -3,11 +3,7 @@
 ## Examples still to write
 
 The library bundled with `bnc-0.0.14` reaches past what the examples cover.
-Two packages have no example of their own:
-
-- **`flags` — command-line parsing (`pkg/stdx/flags`).** The package `bni`'s own
-  CLI was rebuilt on, so an example can point at a real consumer. Pairs with
-  `scripting`, which already reads `os.Args()` by hand.
+One package has no example of its own:
 
 - **`debug` — (`pkg/std/debug`).** Read the `.bni` first; scope the example to
   what it actually offers.

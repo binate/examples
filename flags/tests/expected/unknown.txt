@@ -1,0 +1,8 @@
+greet: unknown flag: --nope
+usage: greet [flags] [args]
+  -h, --help    print this help and exit
+  -v, --verbose    explain what is happening
+  -n, --name <value>    who to greet
+  -c, --count <value>    how many times to greet
+  -t, --tag <value>    a label to attach (repeatable)
+  -p, --path <value>    search path (repeatable, or colon-separated)

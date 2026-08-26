@@ -1,0 +1,46 @@
+package "pkg/cli"
+
+import "pkg/stdx/flags"
+
+// register builds the FlagSet and binds every destination in opts.
+func register(opts *Options) @flags.FlagSet {
+	var fs @flags.FlagSet = flags.New("greet")
+	fs.BoolVar(&opts.Help, "help", "h", "print this help and exit")
+	fs.BoolVar(&opts.Verbose, "verbose", "v", "explain what is happening")
+	fs.StringVar(&opts.Name, "name", "n", "world", "who to greet")
+	fs.IntVar(&opts.Count, "count", "c", 1, "how many times to greet")
+	fs.StringListVar(&opts.Tags, "tag", "t", "a label to attach (repeatable)")
+	fs.StringListSepVar(&opts.Paths, "path", "p", ':', "search path (repeatable, or colon-separated)")
+	return fs
+}
+
+// Parse interprets args and returns the options it describes.
+func Parse(args @[]@[]char) Options {
+	var opts Options
+	var fs @flags.FlagSet = register(&opts)
+	opts.Rest, opts.Error = fs.Parse(args)
+	return opts
+}
+
+// Usage renders the flag list.
+func Usage() @[]readonly char {
+	var opts Options
+	return register(&opts).Usage()
+}
+
+// ArgsToVector copies os.Args()[1:] into the vector a FlagSet parses.
+func ArgsToVector(argv @[]readonly @[]readonly char) @[]@[]char {
+	if len(argv) <= 1 {
+		return make_slice(@[]char, 0)
+	}
+	var out @[]@[]char = make_slice(@[]char, len(argv) - 1)
+	for i := 1; i < len(argv); i++ {
+		var n int = len(argv[i])
+		var s @[]char = make_slice(char, n)
+		for j := 0; j < n; j++ {
+			s[j] = argv[i][j]
+		}
+		out[i - 1] = s
+	}
+	return out
+}

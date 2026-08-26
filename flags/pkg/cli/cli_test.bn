@@ -1,0 +1,210 @@
+package "pkg/cli"
+
+import "pkg/builtins/testing"
+
+// eq reports whether a text equals want; slices have no ==.
+func eq(a *[]readonly char, want *[]readonly char) bool {
+	if len(a) != len(want) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// contains reports whether haystack holds needle, for asserting on messages
+// without pinning their exact wording.
+func contains(haystack @[]readonly char, needle *[]readonly char) bool {
+	if len(needle) > len(haystack) {
+		return false
+	}
+	for i := 0; i + len(needle) <= len(haystack); i++ {
+		var hit bool = true
+		for j := 0; j < len(needle); j++ {
+			if haystack[i + j] != needle[j] {
+				hit = false
+				break
+			}
+		}
+		if hit {
+			return true
+		}
+	}
+	return false
+}
+
+// TestDefaults checks that an empty vector leaves every destination at the
+// default it was registered with.
+func TestDefaults() testing.TestResult {
+	var o Options = Parse(make_slice(@[]char, 0))
+	if len(o.Error) != 0 {
+		return "no arguments is not an error"
+	}
+	if o.Verbose || o.Help {
+		return "bools default to false"
+	}
+	if !eq(o.Name, "world") || o.Count != 1 {
+		return "values default to what StringVar/IntVar were given"
+	}
+	if len(o.Tags) != 0 || len(o.Rest) != 0 {
+		return "lists and positionals start empty"
+	}
+	return ""
+}
+
+// TestBoolForms checks that a bool flag never consumes the next token, and that
+// the =false form clears it.
+func TestBoolForms() testing.TestResult {
+	if !Parse(@[]@[]char{"-v"}).Verbose {
+		return "the alias sets it"
+	}
+	if !Parse(@[]@[]char{"--verbose"}).Verbose {
+		return "so does the name"
+	}
+	if !Parse(@[]@[]char{"-verbose"}).Verbose {
+		return "one dash or two, it is the same flag"
+	}
+	if Parse(@[]@[]char{"--verbose=false"}).Verbose {
+		return "=false clears it"
+	}
+	// The token after a bool is NOT its value — it is a positional, which also
+	// stops parsing.
+	var o Options = Parse(@[]@[]char{"-v", "later"})
+	if !o.Verbose || len(o.Rest) != 1 {
+		return "a bool leaves the next token alone"
+	}
+	return ""
+}
+
+// TestValueForms checks the four spellings a value flag accepts.
+func TestValueForms() testing.TestResult {
+	if !eq(Parse(@[]@[]char{"--name", "Ada"}).Name, "Ada") {
+		return "--name value"
+	}
+	if !eq(Parse(@[]@[]char{"--name=Ada"}).Name, "Ada") {
+		return "--name=value"
+	}
+	if !eq(Parse(@[]@[]char{"-n", "Ada"}).Name, "Ada") {
+		return "-n value"
+	}
+	if !eq(Parse(@[]@[]char{"-n=Ada"}).Name, "Ada") {
+		return "-n=value"
+	}
+	return ""
+}
+
+// TestIntValues checks integer parsing, including the failures.
+func TestIntValues() testing.TestResult {
+	if Parse(@[]@[]char{"-c", "7"}).Count != 7 {
+		return "a decimal value"
+	}
+	if Parse(@[]@[]char{"-c", "-2"}).Count != -2 {
+		return "a negative value"
+	}
+	var bad Options = Parse(@[]@[]char{"-c", "many"})
+	if len(bad.Error) == 0 {
+		return "a non-numeric value is an error"
+	}
+	var missing Options = Parse(@[]@[]char{"-c"})
+	if len(missing.Error) == 0 {
+		return "a value flag with no value is an error"
+	}
+	return ""
+}
+
+// TestRepeatable checks both list forms: one value per occurrence, and the
+// separator-splitting variant.
+func TestRepeatable() testing.TestResult {
+	var o Options = Parse(@[]@[]char{"-t", "a", "--tag", "b"})
+	if len(o.Tags) != 2 || !eq(o.Tags[0], "a") || !eq(o.Tags[1], "b") {
+		return "each occurrence appends"
+	}
+	var p Options = Parse(@[]@[]char{"-p", "one:two:three"})
+	if len(p.Paths) != 3 || !eq(p.Paths[2], "three") {
+		return "a separated value splits into entries"
+	}
+	var mixed Options = Parse(@[]@[]char{"-p", "a::b", "-p", "c"})
+	if len(mixed.Paths) != 3 {
+		return "empty entries are dropped, and occurrences accumulate"
+	}
+	return ""
+}
+
+// TestParsingStops checks the rule that keeps a glob from injecting flags: the
+// first positional ends flag parsing, and everything after it is an operand.
+func TestParsingStops() testing.TestResult {
+	var o Options = Parse(@[]@[]char{"-v", "file.txt", "-n", "Ada"})
+	if !o.Verbose {
+		return "flags before the positional are parsed"
+	}
+	if !eq(o.Name, "world") {
+		return "flags AFTER it are not"
+	}
+	if len(o.Rest) != 3 {
+		return "they are positionals instead"
+	}
+	if !eq(o.Rest[1], "-n") {
+		return "verbatim, dashes and all"
+	}
+	return ""
+}
+
+// TestDashDash checks the explicit end-of-flags marker: consumed, and everything
+// after it is an operand even when it looks like a flag.
+func TestDashDash() testing.TestResult {
+	var o Options = Parse(@[]@[]char{"-v", "--", "-n", "--tag"})
+	if !o.Verbose {
+		return "flags before -- are parsed"
+	}
+	if len(o.Rest) != 2 || !eq(o.Rest[0], "-n") {
+		return "-- is consumed and the rest are operands"
+	}
+	return ""
+}
+
+// TestUnknownFlag checks that an unrecognized flag is refused rather than passed
+// through, and that the message names it.
+func TestUnknownFlag() testing.TestResult {
+	var o Options = Parse(@[]@[]char{"--nope"})
+	if len(o.Error) == 0 {
+		return "an unknown flag is an error"
+	}
+	if !contains(o.Error, "nope") {
+		return "and the message names it"
+	}
+	return ""
+}
+
+// TestUsageListsEveryFlag checks that Usage covers what register bound, so the
+// help text cannot drift from the flags.
+func TestUsageListsEveryFlag() testing.TestResult {
+	var u @[]readonly char = Usage()
+	if !contains(u, "greet") {
+		return "the program name"
+	}
+	if !contains(u, "--verbose") || !contains(u, "--count") || !contains(u, "--path") {
+		return "every registered flag appears"
+	}
+	if !contains(u, "<value>") {
+		return "a value flag is marked as taking one"
+	}
+	return ""
+}
+
+// TestArgsToVector checks the bridge from os.Args()'s fully-readonly vector,
+// including that it drops the program name.
+func TestArgsToVector() testing.TestResult {
+	var argv @[]readonly @[]readonly char = @[]readonly @[]readonly char{"greet", "-v", "x"}
+	var out @[]@[]char = ArgsToVector(argv)
+	if len(out) != 2 || !eq(out[0], "-v") || !eq(out[1], "x") {
+		return "argv[0] is dropped and the rest copied"
+	}
+	var bare @[]readonly @[]readonly char = @[]readonly @[]readonly char{"greet"}
+	if len(ArgsToVector(bare)) != 0 {
+		return "a program name alone yields nothing to parse"
+	}
+	return ""
+}

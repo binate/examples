@@ -1,0 +1,5 @@
+verbose false, name world, count 1
+tags []
+paths []
+positionals []
+hello, world!

@@ -1,0 +1,6 @@
+verbose true, name Ada, count 2
+tags [x y]
+paths [one two]
+positionals [extra1 extra2]
+hello, Ada!
+hello, Ada!

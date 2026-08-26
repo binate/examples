@@ -1,0 +1,48 @@
+// Package cli is one command-line tool's argument handling, built on
+// `pkg/stdx/flags`. It is separated from the command for the reason every
+// argument parser should be: a FlagSet parses a slice, not a process, so the
+// whole surface is testable against hand-written argument vectors with no
+// program to run.
+//
+// The shape mirrors what the toolchain's own tools do (bni's `CLIArgs`): one
+// struct of results, each field bound to a flag by POINTER, filled in place by
+// Parse. There is no lookup-by-name afterwards — a flag's destination IS the
+// field, so a typo is a compile error rather than a missing key.
+package "pkg/cli"
+
+// Options is everything the command line can say, plus what parsing made of it.
+//
+// Error is empty on success and a ready-to-print message otherwise; Rest holds
+// the positionals. Both come from Parse rather than from a flag, which is why
+// they sit alongside the bound fields rather than being bound themselves.
+type Options struct {
+	Help    bool
+	Verbose bool
+	Name    @[]char
+	Count   int
+	Tags    @[]@[]char
+	Paths   @[]@[]char
+	Rest    @[]@[]char
+	Error   @[]readonly char
+}
+
+// Parse interprets args — the argument vector WITHOUT the program name — and
+// returns the options it describes.
+//
+// Parsing stops at the first positional or at `--`, so flags never intersperse
+// with operands: `greet -v alice -x` passes `-x` to the program as a positional
+// rather than rejecting it as an unknown flag, which is what keeps a shell glob
+// from injecting flags.
+func Parse(args @[]@[]char) Options
+
+// Usage renders the flag list, for `-h` and for the error path.
+func Usage() @[]readonly char
+
+// ArgsToVector copies os.Args()[1:] into the `@[]@[]char` a FlagSet parses.
+//
+// The copy is not incidental: `os.Args()` is fully readonly — element slots and
+// text both — while `flags` binds mutable `@[]char` destinations, and dropping
+// element-level readonly is not a conversion the language will do implicitly (or
+// with `cast`). Every tool that parses its own command line writes this loop,
+// including `bni` itself.
+func ArgsToVector(argv @[]readonly @[]readonly char) @[]@[]char
