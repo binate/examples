@@ -6,6 +6,7 @@
 package "pkg/host"
 
 import "pkg/basic/io"
+import "pkg/std/os"
 
 // NewConsole returns a ConsoleOut that writes a BASIC program's output to the
 // process's standard output.
@@ -24,6 +25,13 @@ func WriteStderr(s *[]readonly char) int
 // line at a time. It is the REPL host's input source, kept here because reading
 // from a file descriptor is one of the jobs that reaches pkg/std/os.
 func NewStdinReader() @LineReader
+
+// NewFileLineReader returns a LineReader that reads f one line at a time — the
+// same line assembly NewStdinReader uses, over any file. It exists so that
+// assembly (newline handling, a final unterminated line, the end-of-input latch)
+// can be exercised against a real file rather than the process's stdin, and it
+// serves a host that wants to replay a script through the same seam.
+func NewFileLineReader(f @os.File) @LineReader
 
 // NewConsoleIn returns a pkg/basic/io.ConsoleIn that reads a BASIC program's
 // INPUT replies from reader. The caller passes the LineReader so one stdin stream

@@ -50,24 +50,34 @@ func NewConsole() @io.ConsoleOut {
 	return out
 }
 
-// stdinReader reads lines from standard input. It reads one byte per Read call (a
+// fileReader reads lines from an os.File. It reads one byte per Read call (a
 // line-oriented REPL needs no buffering, and leaving unconsumed bytes in a shared
 // buffer is the kind of statefulness this seam avoids) and assembles a line up to
 // the next '\n'. sawEof latches once Read reports no more input, so a subsequent
 // ReadLine returns the eof signal without another read.
-type stdinReader struct {
+//
+// The file is a field rather than os.Stdin baked in, which is what lets the line
+// assembly below be tested against a real file instead of the process's stdin.
+type fileReader struct {
+	f      @os.File
 	sawEof bool
 }
 
 // NewStdinReader returns a LineReader bound to standard input.
 func NewStdinReader() @LineReader {
-	var r @stdinReader = make(stdinReader)
+	return NewFileLineReader(os.Stdin)
+}
+
+// NewFileLineReader returns a LineReader over f.
+func NewFileLineReader(f @os.File) @LineReader {
+	var r @fileReader = make(fileReader)
+	r.f = f
 	r.sawEof = false
 	var lr @LineReader = r
 	return lr
 }
 
-// ReadLine reads the next line from standard input. It accumulates bytes until a
+// ReadLine reads the next line from the reader's file. It accumulates bytes until a
 // '\n' (excluded from the result) or end-of-input. Eof is true only when the
 // input was already exhausted at a line boundary (an empty line returned); a
 // final unterminated line is returned with Eof false, and the next call reports
@@ -78,7 +88,7 @@ func NewStdinReader() @LineReader {
 // is currently miscompiled (the call site drops the sret buffer and emits an
 // `extractvalue void`, which is invalid IR); a single-struct return compiles
 // correctly in both modes.
-func (r @stdinReader) ReadLine() LineResult {
+func (r @fileReader) ReadLine() LineResult {
 	var res LineResult
 	if r.sawEof {
 		res.Line = make_slice(char, 0)
@@ -90,7 +100,7 @@ func (r @stdinReader) ReadLine() LineResult {
 	var got bool = false
 	for {
 		var n int
-		n, _ = os.Stdin.Read(one)
+		n, _ = r.f.Read(one)
 		if n <= 0 {
 			// End of input (Read returns 0 with io.EOF) or a read error: stop and
 			// return what was accumulated. The line-reader contract carries no
@@ -112,7 +122,7 @@ func (r @stdinReader) ReadLine() LineResult {
 	}
 }
 
-impl @stdinReader : LineReader
+impl @fileReader : LineReader
 
 // consoleIn adapts a LineReader into a pkg/basic/io.ConsoleIn: a BASIC INPUT
 // reply is just one line of input, so ReadLine forwards to the wrapped reader and

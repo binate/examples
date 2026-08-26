@@ -2,12 +2,6 @@
 
 ## Open work
 
-- **`minbasic/pkg/host` has no unit tests.** The dependency-injection layer that
-  binds the interpreter to real stdin/stdout/files; testing it needs fake
-  descriptors. It is exercised end-to-end by `minbasic/tests` and
-  `minbasic/sessions`, which drive whole programs and REPL transcripts through
-  it, so this is a coverage gap rather than a hole.
-
 - **Canary CI against the latest release.** Add a CI job that builds every
   `*/cmd/*` with `BUILDER_VERSION=latest`, separate from the pinned build, so a
   newly-published release that breaks an example is surfaced without reddening
