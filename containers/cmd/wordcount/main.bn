@@ -9,10 +9,10 @@
 // fixture that happens to pass.
 package "main"
 
+import "pkg/std/fmt"
 import "pkg/stdx/containers/hashmap"
 import "pkg/stdx/containers/set"
 import "pkg/stdx/containers/vec"
-import "pkg/stdx/fmt"
 import "pkg/stdx/slices"
 import "pkg/tally"
 

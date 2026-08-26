@@ -10,9 +10,9 @@ package "main"
 
 import "pkg/proc"
 import "pkg/std/errors"
+import "pkg/std/fmt"
 import "pkg/std/os"
 import "pkg/std/os/process"
-import "pkg/stdx/fmt"
 
 // report runs a shell script and prints how it ended.
 func report(label *[]readonly char, script @[]readonly char) {

@@ -17,7 +17,7 @@ generic sweeps with no gating.
 
 Written roughly in the order they are worth doing:
 
-- **`fmt` — formatted output (`pkg/stdx/fmt`).** The one example the series
+- **`fmt` — formatted output (`pkg/std/fmt`).** The one example the series
   planned and never wrote — every other example uses `fmt` but none is *about*
   it. `Print`/`Println`/`Printf`, `Sprintf`, and `Fprintf` into a
   `strings.Builder` and `os.Stderr`; the verb, flag, width and precision grid;
@@ -62,7 +62,7 @@ Written roughly in the order they are worth doing:
 ## Other
 
 - **Migration off `print`/`println` — DONE.** No example calls the builtins any
-  more; all output goes through `pkg/stdx/fmt`. A repo-wide grep is the check
+  more; all output goes through `pkg/std/fmt`. A repo-wide grep is the check
   (`grep -rn '\bprintln(\|\bprint(' --include='*.bn' --include='*.bni'`), and it
   should stay empty: they are transitional debug output slated for removal from
   the language, so a new example must not reach for them.

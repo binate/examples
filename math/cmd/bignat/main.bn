@@ -7,8 +7,8 @@
 package "main"
 
 import "pkg/bigx"
+import "pkg/std/fmt"
 import "pkg/std/math/big"
-import "pkg/stdx/fmt"
 
 // show prints a labelled Nat in base 10 with its size in bits.
 func show(label *[]readonly char, n @big.Nat) {

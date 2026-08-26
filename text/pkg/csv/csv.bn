@@ -1,9 +1,9 @@
 package "pkg/csv"
 
 import "pkg/std/errors"
+import "pkg/std/fmt"
 import "pkg/std/strconv"
 import "pkg/std/strings"
-import "pkg/stdx/fmt"
 import "pkg/stdx/slices"
 
 // maxRecordText is an upper bound on one rendered record: the name, plus the

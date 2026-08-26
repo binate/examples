@@ -9,7 +9,7 @@
 package "main"
 
 import "pkg/agg"
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // add sums two ints. As a top-level function it is a non-capturing function
 // value, assignable to Fold's `*func(int, int) int` combiner parameter.

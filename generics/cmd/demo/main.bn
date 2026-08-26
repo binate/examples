@@ -5,7 +5,7 @@ package "main"
 
 import "pkg/hashmap"
 import "pkg/sort"
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 import "pkg/vec"
 
 // printInts prints each element of s on its own line.

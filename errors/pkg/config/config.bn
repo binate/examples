@@ -1,11 +1,11 @@
 package "pkg/config"
 
 import "pkg/std/errors"
+import "pkg/std/fmt"
 import "pkg/std/io"
 import "pkg/std/os"
 import "pkg/std/strconv"
 import "pkg/std/strings"
-import "pkg/stdx/fmt"
 
 // NewParseError returns a ParseError at line (1-based) rooted in base.
 func NewParseError(line int, detail @[]readonly char, base @errors.Error) @ParseError {

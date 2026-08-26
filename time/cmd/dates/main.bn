@@ -14,9 +14,9 @@ package "main"
 
 import "pkg/cal"
 import "pkg/std/errors"
+import "pkg/std/fmt"
 import "pkg/std/os"
 import "pkg/std/time"
-import "pkg/stdx/fmt"
 
 // show prints a Point with a label.
 func show(label *[]readonly char, p time.Point) {

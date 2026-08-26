@@ -2,7 +2,7 @@ package "main"
 
 // A second runnable in the same example, sharing the same pkg/seq.
 import "pkg/seq"
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // main prints the GCD of two sample integer pairs, one per line.
 func main() {

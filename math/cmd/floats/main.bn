@@ -8,8 +8,8 @@
 package "main"
 
 import "pkg/fp"
+import "pkg/std/fmt"
 import "pkg/std/math"
-import "pkg/stdx/fmt"
 
 // classify prints the IEEE class of a value alongside its bit pattern, since
 // two values that compare equal need not be the same value.

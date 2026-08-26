@@ -1,8 +1,8 @@
 package "pkg/proc"
 
 import "pkg/std/errors"
+import "pkg/std/fmt"
 import "pkg/std/os/process"
-import "pkg/stdx/fmt"
 
 // Describe renders an ExitStatus as short text.
 func Describe(st process.ExitStatus) @[]readonly char {

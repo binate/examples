@@ -7,7 +7,7 @@ package "main"
 
 import "pkg/config"
 import "pkg/std/errors"
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // good parses cleanly. Adjacent string literals concatenate at compile time.
 var good @[]readonly char = "# a comment\n"

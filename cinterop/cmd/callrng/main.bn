@@ -11,7 +11,7 @@
 // interpreted path and no unit tests (a __c_call cannot run under the VM).
 package "main"
 
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // main seeds the generator, then draws two short deterministic sequences —
 // exercising the three call shapes __c_call supports: a void-return call, a

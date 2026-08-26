@@ -9,9 +9,9 @@ package "main"
 
 import "pkg/csv"
 import "pkg/std/errors"
+import "pkg/std/fmt"
 import "pkg/std/strconv"
 import "pkg/std/strings"
-import "pkg/stdx/fmt"
 
 // document is the input, with a blank line and a negative number in it.
 var document @[]readonly char = "alpha,3,0.5\n"

@@ -9,8 +9,8 @@
 // see the README for why it cannot name the interpreter directly.
 package "main"
 
+import "pkg/std/fmt"
 import "pkg/std/os"
-import "pkg/stdx/fmt"
 
 // endsWithBn reports whether name ends in ".bn" — how the program tells a script
 // run from a compiled one, since argv[0] names whichever actually started it.

@@ -13,7 +13,7 @@
 // Compiled-mode only: the bytecode VM does no FFI (no interpreted path here).
 package "main"
 
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // main reads the library's default seed through the __c_global pointer, then
 // reseeds by writing through it and confirms the writes actually changed the

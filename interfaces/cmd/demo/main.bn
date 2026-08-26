@@ -9,7 +9,7 @@
 package "main"
 
 import "pkg/shape"
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // Triangle is this command's own shape type. The library knows nothing about it.
 type Triangle struct {

@@ -1,7 +1,7 @@
 package "pkg/shape"
 
+import "pkg/std/fmt"
 import "pkg/std/math"
-import "pkg/stdx/fmt"
 
 // Area returns the rectangle's area.
 func (r *readonly Rect) Area() float64 {

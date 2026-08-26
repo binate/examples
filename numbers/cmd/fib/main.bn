@@ -2,7 +2,7 @@ package "main"
 
 // Prints the first 11 Fibonacci numbers via the example-local pkg/seq.
 import "pkg/seq"
-import "pkg/stdx/fmt"
+import "pkg/std/fmt"
 
 // main prints the first 11 Fibonacci numbers, one per line.
 func main() {
