@@ -1,0 +1,135 @@
+// demo tours `pkg/std/fmt`: the verbs and flags, what a struct looks like
+// through reflection, how a user type joins in via lang.Stringer, and the
+// diagnostics a bad format produces instead of silence.
+//
+// It opens with pkg/table, because the most useful thing fmt does here is not a
+// verb at all — it is taking a width as an OPERAND, which is what lets a table
+// align columns whose size is only known once every row is in.
+package "main"
+
+import "pkg/builtins/lang"
+import "pkg/std/fmt"
+import "pkg/std/os"
+import "pkg/std/strings"
+import "pkg/table"
+
+// celsius is a user type that renders itself, so fmt can print it directly.
+type celsius struct {
+	Deg int
+}
+
+// owned copies text into a mutable slice.
+//
+// It exists only because `lang.Stringer` requires `String() @[]char` while every
+// producer of text — Sprintf here, and strings.Builder — hands back
+// `@[]readonly char`. Dropping element-level readonly is not a `cast`: another
+// live handle may be relying on that view, so the language requires an explicit
+// unsafe_cast. Copying is the honest way to satisfy the signature.
+func owned(text @[]readonly char) @[]char {
+	var out @[]char = make_slice(char, len(text))
+	for i := 0; i < len(text); i++ {
+		out[i] = text[i]
+	}
+	return out
+}
+
+// String renders the temperature, and is what makes %v and %s work on a celsius.
+func (c *readonly celsius) String() @[]char {
+	return owned(fmt.Sprintf("%d°C", c.Deg))
+}
+
+impl *readonly celsius : lang.Stringer
+
+// reading is a plain struct — no String() — so fmt renders it by reflection.
+type reading struct {
+	Station @[]readonly char
+	Temp    celsius
+	Hours   [3]int
+	Notes   @[]readonly char
+}
+
+// report builds an aligned table whose column widths are computed from the data.
+func report() @[]readonly char {
+	var t @table.Table = table.New(3)
+	t.Row("station", "reading", "trend")
+	t.Row("Ostrava", "21C", "rising")
+	t.Row("Kiruna", "-8C", "steady")
+	t.Row("Ushuaia", "4C", "falling")
+	// Only the middle column is right-aligned, which is visible in the output
+	// exactly because the width reached Fprintf as an operand.
+	t.AlignRight(1)
+	return t.Render()
+}
+
+// main walks the table, the verbs, reflection, Stringer, and the error verbs.
+func main() {
+	fmt.Print(report())
+	var w @[]int = table.New(1).Widths()
+	fmt.Printf("an empty table has %d column of width %d\n", len(w), w[0])
+	// A width is a BYTE count, which is not a column count: text is a slice of
+	// bytes, so a multi-byte character is wider than it looks. The table above
+	// stays ASCII for exactly this reason.
+	fmt.Printf("\"21°C\" is %d bytes but 4 columns wide\n", len("21°C"))
+
+	fmt.Println("verbs:")
+	fmt.Printf("  %%d %d   %%s %s   %%t %t   %%c %c   %%q %q\n", 42, "text", true, 65, "quoted")
+	fmt.Printf("  %%x %x   %%X %X   %%o %o   %%b %b   %%x of text %x\n", 255, 255, 8, 5, "hi")
+	fmt.Printf("  %%f %f   %%e %e   %%g %g   %%v of a float %v\n", 3.5, 3.5, 3.5, 3.5)
+	fmt.Printf("  %%s of a number is its default text: %s and %s\n", 42, 2.5)
+
+	fmt.Println("flags and widths:")
+	fmt.Printf("  plain [%d] sign [%+d] space [% d] zero [%06d]\n", 42, 42, 42, 42)
+	fmt.Printf("  right [%8s] left [%-8s|] precision [%.2f] [%.3s]\n",
+		"pad", "pad", 3.14159, "truncated")
+	fmt.Printf("  alternate [%#x] [%#o] [%#b] and star widths [%*d] [%-*s|]\n",
+		255, 8, 5, 6, 42, 6, "star")
+
+	// A struct with no String() renders through reflection: %v gives the values,
+	// %+v names the fields. Nested structs, arrays and slices all recurse.
+	var r reading
+	r.Station = "Ostrava"
+	r.Temp.Deg = 21
+	r.Hours[0] = 6
+	r.Hours[1] = 12
+	r.Hours[2] = 18
+	r.Notes = "clear"
+	fmt.Println("structs:")
+	fmt.Printf("  %%v  %v\n", r)
+	fmt.Printf("  %%+v %+v\n", r)
+	// A pointer operand is followed rather than printed: `&r` renders as `r`
+	// does. (A pointer FIELD inside a struct is the exception — it shows as
+	// &{…}, to say that the value was reached through one.)
+	fmt.Printf("  through a pointer %+v\n", &r)
+
+	// A type with String() takes that path instead, for both %v and %s.
+	var c celsius
+	c.Deg = -8
+	fmt.Printf("  Stringer %v and %s\n", &c, &c)
+
+	// Sprint joins operands with a space only when NEITHER side is a string;
+	// Sprintln always separates and adds a newline.
+	fmt.Println("joining:")
+	fmt.Printf("  Sprint(\"a\", 1, 2, \"b\") -> [%s]\n", fmt.Sprint("a", 1, 2, "b"))
+	fmt.Printf("  Sprintln(\"a\", 1, 2)    -> [%s]\n", fmt.Sprintln("a", 1, 2))
+
+	// Anything a Writer accepts can be a destination — here a Builder.
+	var b @strings.Builder = strings.NewBuilder()
+	n, err := fmt.Fprintf(b, "%s=%d", "count", 7)
+	fmt.Printf("  Fprintf into a Builder: %d bytes, error %t, text [%s]\n",
+		n, present(err), b.String())
+
+	// A bad format is never silent: every mistake renders as a visible verb.
+	fmt.Println("diagnostics:")
+	fmt.Printf("  too few operands  [%d %d]\n", 1)
+	fmt.Printf("  wrong type        [%d]\n", "not a number")
+	fmt.Printf("  a bad star width  [%*d]\n", "wide", 1)
+	// A format ending in a bare % has no verb to apply.
+	fmt.Printf("  a trailing pct    [100%")
+	fmt.Printf("]\n")
+	// EXTRA is appended after the whole format is rendered, so it lands at the
+	// end of the line rather than where the missing verb would have been.
+	fmt.Printf("  too many operands [%d]\n", 1, "spare")
+
+	// The other standard stream. The harness merges it, so it appears here.
+	_, _ = fmt.Fprintf(os.Stderr, "this line went to stderr\n")
+}

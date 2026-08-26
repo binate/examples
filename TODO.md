@@ -3,16 +3,7 @@
 ## Examples still to write
 
 The library bundled with `bnc-0.0.14` reaches past what the examples cover.
-Three packages have no example of their own:
-
-- **`fmt` — formatted output (`pkg/std/fmt`).** Every example uses it and none
-  is *about* it. `Print`/`Println`/`Printf`, `Sprintf`, and `Fprintf` into a
-  `strings.Builder` and `os.Stderr`; the verb, flag, width and precision grid;
-  `*`/`.*` operand-supplied widths; a user type printed through `lang.Stringer`;
-  and the diagnostic renderings (`%!d(...)`, `MISSING`, `EXTRA`, `NOVERB`) that
-  make a bad format visible instead of silent. As of `bnc-0.0.13` every scalar
-  formats and a struct renders through reflection — check what `%v` and `%+v`
-  make of a nested struct, an array and a slice before writing it.
+Two packages have no example of their own:
 
 - **`flags` — command-line parsing (`pkg/stdx/flags`).** The package `bni`'s own
   CLI was rebuilt on, so an example can point at a real consumer. Pairs with

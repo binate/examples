@@ -117,6 +117,12 @@ output.
   (`Orderable`/`Hashable`) — constraint-method dispatch, monomorphized,
   bodies-in-`.bni`, with both primitives and user types satisfying the bounds.
   `cmd/demo` composes the three (collect → sort → tally).
+- [`fmt`](fmt/) — **formatted output** (`pkg/std/fmt`): the verb, flag and width
+  grid; `*` widths taken from the argument list, which is what lets `pkg/table`
+  align columns whose size is only known once every row is in; structs rendered
+  by reflection under `%v`/`%+v`; a user type joining in through
+  `lang.Stringer`; and the diagnostics (`MISSING`, `EXTRA`, `BADWIDTH`,
+  `NOVERB`) that make a bad format visible instead of silent.
 - [`containers`](containers/) — the standard library's **containers**
   (`pkg/stdx/containers`): a word counter over `Vec[T]`, `Map[K, V]`, and
   `Set[T]`, keyed on a user type that implements `lang.Hashable` (the way to key

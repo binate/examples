@@ -1,0 +1,44 @@
+// Package table renders rows of text as aligned columns. It exists to put
+// `pkg/std/fmt`'s more interesting machinery to work on something real: column
+// widths are not known until every row is in, so the format string cannot carry
+// them — they arrive as OPERANDS, through fmt's `*` width.
+//
+//     fmt.Fprintf(b, "%-*s", width, cell)     // left-aligned in `width` columns
+//     fmt.Fprintf(b, "%*s", width, cell)      // right-aligned
+//
+// Everything is accumulated into one `strings.Builder`, which is an `io.Writer`,
+// so the whole table is built with `Fprintf` and no intermediate strings.
+package "pkg/table"
+
+import "pkg/stdx/containers/vec"
+
+// Table collects rows of cells and renders them as aligned columns. Cells are
+// stored row-major; a row shorter than the column count is padded with empty
+// cells, and a longer one is an error the caller cannot make (Row takes exactly
+// what it is given and Render pads).
+type Table struct {
+	cols  int
+	cells @vec.Vec[@[]readonly char]
+	right @[]bool
+}
+
+// New returns an empty Table with the given number of columns, all left-aligned.
+func New(cols int) @Table
+
+// Row appends one row. It is variadic, so a caller writes the cells inline; the
+// callee receives them as a raw slice borrow and copies each handle into the
+// table, which is what lets the caller's arguments go out of scope afterwards.
+func (t @Table) Row(cells ...@[]readonly char)
+
+// AlignRight makes column col right-aligned (the default is left). Out-of-range
+// columns are ignored, so a caller need not bounds-check a loop.
+func (t @Table) AlignRight(col int)
+
+// Widths returns the rendered width of each column — the longest cell in it.
+// Exposed because it is the interesting half: these are the numbers that reach
+// `Fprintf` as `*` operands.
+func (t @Table) Widths() @[]int
+
+// Render returns the table as text, one line per row, columns separated by two
+// spaces, with no trailing spaces on a line and a newline after each.
+func (t @Table) Render() @[]readonly char

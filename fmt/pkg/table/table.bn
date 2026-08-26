@@ -1,0 +1,73 @@
+package "pkg/table"
+
+import "pkg/std/fmt"
+import "pkg/std/strings"
+import "pkg/stdx/containers/vec"
+
+// New returns an empty Table with the given number of columns.
+func New(cols int) @Table {
+	var t @Table = make(Table)
+	t.cols = cols
+	t.cells = vec.New[@[]readonly char]()
+	t.right = make_slice(bool, cols)
+	return t
+}
+
+// Row appends one row.
+func (t @Table) Row(cells ...@[]readonly char) {
+	for i := 0; i < t.cols; i++ {
+		if i < len(cells) {
+			t.cells.Push(cells[i])
+		} else {
+			t.cells.Push("")
+		}
+	}
+}
+
+// AlignRight makes column col right-aligned.
+func (t @Table) AlignRight(col int) {
+	if col >= 0 && col < t.cols {
+		t.right[col] = true
+	}
+}
+
+// Widths returns the rendered width of each column.
+func (t @Table) Widths() @[]int {
+	var w @[]int = make_slice(int, t.cols)
+	for i := 0; i < t.cells.Len(); i++ {
+		var col int = i % t.cols
+		var n int = len(t.cells.Get(i))
+		if n > w[col] {
+			w[col] = n
+		}
+	}
+	return w
+}
+
+// Render returns the table as text.
+func (t @Table) Render() @[]readonly char {
+	var b @strings.Builder = strings.NewBuilder()
+	var w @[]int = t.Widths()
+	var rows int = t.cells.Len() / t.cols
+	for r := 0; r < rows; r++ {
+		for c := 0; c < t.cols; c++ {
+			var cell @[]readonly char = t.cells.Get(r * t.cols + c)
+			if c > 0 {
+				_, _ = fmt.Fprint(b, "  ")
+			}
+			if c == t.cols - 1 {
+				// The last column is never padded: trailing spaces would be
+				// invisible in the output and visible in a diff.
+				_, _ = fmt.Fprintf(b, "%s", cell)
+			} else if t.right[c] {
+				// The width is an OPERAND, not part of the format string — it is
+				// not known until every row has been added.
+				_, _ = fmt.Fprintf(b, "%*s", w[c], cell)
+			} else {
+				_, _ = fmt.Fprintf(b, "%-*s", w[c], cell)
+			}
+		}
+		_, _ = fmt.Fprint(b, "\n")
+	}
+	return b.String()
+}

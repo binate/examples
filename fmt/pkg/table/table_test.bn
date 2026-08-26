@@ -1,0 +1,117 @@
+package "pkg/table"
+
+import "pkg/builtins/testing"
+
+// eq reports whether a text equals want; slices have no ==.
+func eq(a @[]readonly char, want *[]readonly char) bool {
+	if len(a) != len(want) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// sample returns a two-column table with a short and a long cell in each.
+func sample() @Table {
+	var t @Table = New(2)
+	t.Row("a", "one")
+	t.Row("bbb", "2")
+	return t
+}
+
+// TestWidths checks that a column's width is its longest cell — the number that
+// reaches Fprintf as a `*` operand.
+func TestWidths() testing.TestResult {
+	var w @[]int = sample().Widths()
+	if len(w) != 2 {
+		return "one width per column"
+	}
+	if w[0] != 3 || w[1] != 3 {
+		return "the longest cell in each column"
+	}
+	var empty @[]int = New(3).Widths()
+	if len(empty) != 3 || empty[0] != 0 {
+		return "an empty table has zero-width columns"
+	}
+	return ""
+}
+
+// TestRenderLeftAligns checks the default: cells padded on the right, and the
+// LAST column never padded, so no line carries trailing spaces.
+func TestRenderLeftAligns() testing.TestResult {
+	if !eq(sample().Render(), "a    one\nbbb  2\n") {
+		return "left-aligned, two spaces between columns, no trailing pad"
+	}
+	return ""
+}
+
+// TestRenderRightAligns checks the other alignment, which is the same width
+// operand applied through `%*s` instead of `%-*s`.
+func TestRenderRightAligns() testing.TestResult {
+	var t @Table = New(2)
+	t.Row("a", "one")
+	t.Row("bbb", "2")
+	t.AlignRight(0)
+	if !eq(t.Render(), "  a  one\nbbb  2\n") {
+		return "the first column right-aligns"
+	}
+	// A right-aligned LAST column still is not padded — padding it would only
+	// add invisible trailing space.
+	var u @Table = New(2)
+	u.Row("a", "one")
+	u.Row("b", "2")
+	u.AlignRight(1)
+	if !eq(u.Render(), "a  one\nb  2\n") {
+		return "the last column is never padded"
+	}
+	return ""
+}
+
+// TestRowPadsShortRows checks that a row with fewer cells than columns is filled
+// out rather than shifting the table.
+func TestRowPadsShortRows() testing.TestResult {
+	var t @Table = New(3)
+	t.Row("a", "b", "c")
+	t.Row("d")
+	if !eq(t.Render(), "a  b  c\nd     \n") {
+		return "a short row is padded to the column count"
+	}
+	return ""
+}
+
+// TestEmptyRenders checks the degenerate table: no rows is no output, not a
+// blank line.
+func TestEmptyRenders() testing.TestResult {
+	if len(New(2).Render()) != 0 {
+		return "no rows renders as nothing"
+	}
+	return ""
+}
+
+// TestAlignRightIgnoresOutOfRange checks that a caller need not bounds-check.
+func TestAlignRightIgnoresOutOfRange() testing.TestResult {
+	var t @Table = New(1)
+	t.AlignRight(-1)
+	t.AlignRight(5)
+	t.Row("x")
+	if !eq(t.Render(), "x\n") {
+		return "an out-of-range column is ignored"
+	}
+	return ""
+}
+
+// TestWidthCountsBytes pins the caveat: a width is a byte count, so a cell with
+// a multi-byte character is wider than it looks on screen.
+func TestWidthCountsBytes() testing.TestResult {
+	var t @Table = New(2)
+	t.Row("21°C", "x")
+	var w @[]int = t.Widths()
+	if w[0] != 5 {
+		return "the degree sign costs two bytes, so the cell measures 5, not 4"
+	}
+	return ""
+}

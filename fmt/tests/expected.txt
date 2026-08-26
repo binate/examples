@@ -1,0 +1,32 @@
+station  reading  trend
+Ostrava      21C  rising
+Kiruna       -8C  steady
+Ushuaia       4C  falling
+an empty table has 1 column of width 0
+"21°C" is 5 bytes but 4 columns wide
+verbs:
+  %d 42   %s text   %t true   %c A   %q "quoted"
+  %x ff   %X FF   %o 10   %b 101   %x of text 6869
+  %f 3.500000   %e 3.500000e+00   %g 3.5   %v of a float 3.5
+  %s of a number is its default text: 42 and 2.5
+flags and widths:
+  plain [42] sign [+42] space [ 42] zero [000042]
+  right [     pad] left [pad     |] precision [3.14] [tru]
+  alternate [0xff] [010] [0b101] and star widths [    42] [star  |]
+structs:
+  %v  {Ostrava {21} [6 12 18] clear}
+  %+v {Station:Ostrava Temp:{Deg:21} Hours:[6 12 18] Notes:clear}
+  through a pointer {Station:Ostrava Temp:{Deg:21} Hours:[6 12 18] Notes:clear}
+  Stringer -8°C and -8°C
+joining:
+  Sprint("a", 1, 2, "b") -> [a1 2b]
+  Sprintln("a", 1, 2)    -> [a 1 2
+]
+  Fprintf into a Builder: 7 bytes, error false, text [count=7]
+diagnostics:
+  too few operands  [1 %!d(MISSING)]
+  wrong type        [%!d(string=not a number)]
+  a bad star width  [%!(BADWIDTH)1]
+  a trailing pct    [100%!(NOVERB)]
+  too many operands [1]
+%!(EXTRA string=spare)
