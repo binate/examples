@@ -53,6 +53,11 @@ The `Env`/`ReplaceEnv` pair is worth reading twice: `Options{}` inherits,
 child an empty environment. `pkg/proc`'s `ShEnv` sets `ReplaceEnv` so that
 passing an empty list means what it says.
 
+Reading one splits along the same line. `os.Getenv` answers about **this**
+process — it looks a name up in the snapshot `os.Env()` returns. `proc.EnvValue`
+answers about **any** list, which is what the one you are handing a child needs:
+nothing has parsed that for you. Same `NAME=value` shape, different subject.
+
 ## The child shares your stdout
 
 There is no capture in this API — the child inherits standard input, output, and

@@ -137,7 +137,7 @@ output.
   the frame tag, which is the only place a program can observe which mode it is
   running in.
 - [`containers`](containers/) — the standard library's **containers**
-  (`pkg/stdx/containers`): a word counter over `Vec[T]`, `Map[K, V]`, and
+  (`pkg/std/vec`, `hashmap`, `set`): a word counter over `Vec[T]`, `Map[K, V]`, and
   `Set[T]`, keyed on a user type that implements `lang.Hashable` (the way to key
   on text, since no slice does). Shows the shared cursor convention, the boxed
   `@iter.Iterator[T]` that lets one non-generic function walk any container,

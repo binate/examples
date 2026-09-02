@@ -24,9 +24,15 @@ import "pkg/std/os/process"
 func Describe(st process.ExitStatus) @[]readonly char
 
 // EnvValue returns the value bound to name in a "NAME=value" list — the POSIX
-// environ shape that os.Env() returns — and whether it was there at all. The
-// value may itself contain '=' (only the first one separates), and a name that
-// is a prefix of another entry's name does not match it.
+// environ shape — and whether it was there at all.
+//
+// For THIS process's environment, `os.Getenv` is the direct answer and this is
+// the long way round. EnvValue is for any OTHER list: the one you are about to
+// hand a child through Options.Env, or one read back from somewhere else.
+// Nothing has looked those up for you.
+//
+// The value may itself contain '=' (only the first one separates), and a name
+// that is a prefix of another entry's name does not match it.
 func EnvValue(env @[]readonly @[]readonly char, name *[]readonly char) (@[]readonly char, bool)
 
 // Sh runs `sh -c script`, resolving `sh` along PATH, with this process's

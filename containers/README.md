@@ -1,6 +1,7 @@
 # containers — the standard library's containers
 
-A word counter built on `pkg/stdx/containers`: the growable **`Vec[T]`**, the
+A word counter built on the standard containers — `pkg/std/vec`,
+`pkg/std/hashmap`, `pkg/std/set` — the growable **`Vec[T]`**, the
 hash **`Map[K, V]`**, and the hash **`Set[T]`**, plus the iteration protocol they
 share. Unlike [`generics`](../generics/), which *writes* generic containers as a
 teaching exercise, this one *uses* the library's.

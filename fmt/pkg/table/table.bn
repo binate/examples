@@ -2,7 +2,7 @@ package "pkg/table"
 
 import "pkg/std/fmt"
 import "pkg/std/strings"
-import "pkg/stdx/containers/vec"
+import "pkg/std/vec"
 
 // New returns an empty Table with the given number of columns.
 func New(cols int) @Table {

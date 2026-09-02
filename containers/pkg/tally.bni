@@ -1,5 +1,5 @@
 // Package tally counts words using the standard library's containers —
-// `Vec[T]`, `Map[K, V]`, and `Set[T]` from `pkg/stdx/containers`.
+// `Vec[T]`, `Map[K, V]`, and `Set[T]` from `pkg/std/{vec,hashmap,set}`.
 //
 // The reason `Word` exists rather than keying the map on a bare `@[]char` is the
 // current shape of `lang.Hashable`: only the scalar primitives implement it, so a
@@ -14,10 +14,10 @@
 package "pkg/tally"
 
 import "pkg/builtins/lang"
-import "pkg/stdx/containers/hashmap"
-import "pkg/stdx/containers/iter"
-import "pkg/stdx/containers/set"
-import "pkg/stdx/containers/vec"
+import "pkg/std/hashmap"
+import "pkg/std/iter"
+import "pkg/std/set"
+import "pkg/std/vec"
 
 // Word is one word of text, owned rather than borrowed: Text is a `@[]readonly
 // char` the Word keeps alive, because a Word outlives the buffer it was split

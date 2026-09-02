@@ -1,9 +1,9 @@
 package "pkg/tally"
 
 import "pkg/builtins/testing"
-import "pkg/stdx/containers/hashmap"
-import "pkg/stdx/containers/set"
-import "pkg/stdx/containers/vec"
+import "pkg/std/hashmap"
+import "pkg/std/set"
+import "pkg/std/vec"
 
 // eq reports whether a word's text equals want, so the assertions below read as
 // comparisons rather than loops (slices have no ==).

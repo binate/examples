@@ -1,9 +1,9 @@
 package "pkg/tally"
 
-import "pkg/stdx/containers/hashmap"
-import "pkg/stdx/containers/iter"
-import "pkg/stdx/containers/set"
-import "pkg/stdx/containers/vec"
+import "pkg/std/hashmap"
+import "pkg/std/iter"
+import "pkg/std/set"
+import "pkg/std/vec"
 
 // isLetter reports whether c is an ASCII letter — the only bytes Split keeps.
 func isLetter(c char) bool {

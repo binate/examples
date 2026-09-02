@@ -68,10 +68,21 @@ func main() {
 	named, _ := process.Run("sh", &opts)
 	fmt.Printf("argv0: %s\n", proc.Describe(named))
 
-	// This process's own environment, read as the "NAME=value" list it is.
-	var env @[]readonly @[]readonly char = os.Env()
-	_, hasPath := proc.EnvValue(env, "PATH")
-	_, hasNonsense := proc.EnvValue(env, "BINATE_DEFINITELY_UNSET")
+	// Reading THIS process's environment is a library call — os.Getenv looks a
+	// name up in the same snapshot os.Env() returns.
+	_, hasPath := os.Getenv("PATH")
+	_, hasNonsense := os.Getenv("BINATE_DEFINITELY_UNSET")
 	fmt.Printf("own env: entries %t, PATH set %t, nonsense set %t\n",
-		len(env) > 0, hasPath, hasNonsense)
+		len(os.Env()) > 0, hasPath, hasNonsense)
+
+	// A CHILD's environment is a list you build, and nothing has looked it up
+	// for you — which is what proc.EnvValue is for. Same "NAME=value" shape,
+	// different subject: os.Getenv answers about us, EnvValue about any list.
+	var childEnv @[]readonly @[]readonly char =
+			@[]readonly @[]readonly char{"MARK=3", "EMPTY=", "ODD=a=b"}
+	mark, markOk := proc.EnvValue(childEnv, "MARK")
+	_, emptyOk := proc.EnvValue(childEnv, "EMPTY")
+	odd, _ := proc.EnvValue(childEnv, "ODD")
+	fmt.Printf("child env: MARK %s (%t), EMPTY set %t, ODD %s\n",
+		mark, markOk, emptyOk, odd)
 }

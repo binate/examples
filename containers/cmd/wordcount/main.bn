@@ -1,6 +1,6 @@
 // wordcount tallies the words of a fixed sentence with the standard library's
 // containers, and along the way shows the three things a user of
-// `pkg/stdx/containers` has to know: how a container is created and grown, how
+// the standard containers has to know: how a container is created and grown, how
 // its cursor iterates, and which orders are guaranteed.
 //
 // Every number printed is derived from the text below, so the output is a stable
@@ -10,9 +10,9 @@
 package "main"
 
 import "pkg/std/fmt"
-import "pkg/stdx/containers/hashmap"
-import "pkg/stdx/containers/set"
-import "pkg/stdx/containers/vec"
+import "pkg/std/hashmap"
+import "pkg/std/set"
+import "pkg/std/vec"
 import "pkg/stdx/slices"
 import "pkg/tally"
 

@@ -10,7 +10,7 @@
 // so the whole table is built with `Fprintf` and no intermediate strings.
 package "pkg/table"
 
-import "pkg/stdx/containers/vec"
+import "pkg/std/vec"
 
 // Table collects rows of cells and renders them as aligned columns. Cells are
 // stored row-major; a row shorter than the column count is padded with empty
