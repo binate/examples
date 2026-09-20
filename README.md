@@ -123,7 +123,7 @@ output.
   by reflection under `%v`/`%+v`; a user type joining in through
   `lang.Stringer`; and the diagnostics (`MISSING`, `EXTRA`, `BADWIDTH`,
   `NOVERB`) that make a bad format visible instead of silent.
-- [`flags`](flags/) — **parsing a command line** (`pkg/stdx/flags`): the parser
+- [`flags`](flags/) — **parsing a command line** (`pkg/std/flags`): the parser
   `bni`'s own CLI is built on. Destinations bind by pointer, so a misspelled
   field is a compile error; parsing stops at the first positional or `--`, so a
   glob cannot inject flags; and a parse error is a value the program prints

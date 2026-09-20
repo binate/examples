@@ -1,5 +1,5 @@
 // Package cli is one command-line tool's argument handling, built on
-// `pkg/stdx/flags`. It is separated from the command for the reason every
+// `pkg/std/flags`. It is separated from the command for the reason every
 // argument parser should be: a FlagSet parses a slice, not a process, so the
 // whole surface is testable against hand-written argument vectors with no
 // program to run.

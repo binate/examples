@@ -1,6 +1,6 @@
 # flags — parsing a command line
 
-`pkg/stdx/flags` is the standard flag parser — the one `bni`'s own command line
+`pkg/std/flags` is the standard flag parser — the one `bni`'s own command line
 is built on. This example is a small tool, `greet`, that uses it the way a real
 tool does.
 

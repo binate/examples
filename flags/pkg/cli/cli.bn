@@ -1,6 +1,6 @@
 package "pkg/cli"
 
-import "pkg/stdx/flags"
+import "pkg/std/flags"
 
 // register builds the FlagSet and binds every destination in opts.
 func register(opts *Options) @flags.FlagSet {
