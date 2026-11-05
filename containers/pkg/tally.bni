@@ -5,8 +5,10 @@
 // current shape of `lang.Hashable`: only the scalar primitives implement it, so a
 // char-slice — Binate's string — cannot be a map key directly. Wrapping the text
 // in a one-field struct that supplies `Hash` and `Compare` is the way to key on
-// text today, and it is worth seeing: the constraint's `Self` is the VALUE type,
-// so both methods take value receivers and the `impl` names `Word`, not `*Word`.
+// text today, and it is worth seeing: the map is keyed on the VALUE type, so the
+// `impl` names `Word`, not `*Word`; the constraint's `Self` is the impl's receiver
+// type, so `Compare` takes a `Word`, and both methods take value receivers, as an
+// impl on a value requires.
 //
 // Every operation here is an ordinary non-generic function over a concrete
 // instantiation (`@vec.Vec[Word]`, `@hashmap.Map[Word, int]`), so the bodies live

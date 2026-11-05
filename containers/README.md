@@ -34,8 +34,10 @@ Three things about that are worth pausing on:
 - **The `impl` is required.** Declaring `Hash` and `Compare` is not enough —
   impls are nominal, so without the `impl` line `Word` does not satisfy the
   constraint no matter how well its method set matches.
-- **Value receivers.** The constraint's `Self` is the value type, so the methods
-  take `Word`, not `*Word`, and the impl names `Word`.
+- **Value receivers.** The map is keyed on `Word`, and a type argument satisfies
+  a constraint only through an impl on exactly that type, so the impl names
+  `Word`, not `*Word`. The constraint's `Self` is the impl's receiver type, so
+  `Compare` takes a `Word`, and an impl on a value uses value-receiver methods.
 - **`Hash` must agree with `Compare`.** Equal words have to hash equally, or a
   lookup can miss a key that is present. Here both read the same normalized
   bytes, so they agree by construction; `TestHashAgreesWithCompare` pins it.
