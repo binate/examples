@@ -1,10 +1,10 @@
 # containers — the standard library's containers
 
-A word counter built on the standard containers — `pkg/std/vec`,
-`pkg/std/hashmap`, `pkg/std/set` — the growable **`Vec[T]`**, the
-hash **`Map[K, V]`**, and the hash **`Set[T]`**, plus the iteration protocol they
-share. Unlike [`generics`](../generics/), which *writes* generic containers as a
-teaching exercise, this one *uses* the library's.
+A word counter built on the standard containers — `pkg/std/containers/vec`,
+`pkg/std/containers/hashmap`, `pkg/std/containers/set` — the growable
+**`Vec[T]`**, the hash **`Map[K, V]`**, and the hash **`Set[T]`**, plus the
+iteration protocol they share. Unlike [`generics`](../generics/), which *writes*
+generic containers as a teaching exercise, this one *uses* the library's.
 
 Binate has no built-in `map` and no `append` — growable collections are a library
 concern, and these are the library's answer.

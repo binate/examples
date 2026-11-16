@@ -16,10 +16,10 @@
 package "pkg/tally"
 
 import "pkg/builtins/lang"
-import "pkg/std/hashmap"
-import "pkg/std/iter"
-import "pkg/std/set"
-import "pkg/std/vec"
+import "pkg/std/containers/hashmap"
+import "pkg/std/containers/iter"
+import "pkg/std/containers/set"
+import "pkg/std/containers/vec"
 
 // Word is one word of text, owned rather than borrowed: Text is a `@[]readonly
 // char` the Word keeps alive, because a Word outlives the buffer it was split

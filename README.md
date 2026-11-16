@@ -137,12 +137,12 @@ output.
   the frame tag, which is the only place a program can observe which mode it is
   running in.
 - [`containers`](containers/) — the standard library's **containers**
-  (`pkg/std/vec`, `hashmap`, `set`): a word counter over `Vec[T]`, `Map[K, V]`, and
-  `Set[T]`, keyed on a user type that implements `lang.Hashable` (the way to key
-  on text, since no slice does). Shows the shared cursor convention, the boxed
-  `@iter.Iterator[T]` that lets one non-generic function walk any container,
-  which iteration orders are guaranteed, and why `Vec.Push` beats repeated
-  `slices.Append`.
+  (`pkg/std/containers/vec`, `hashmap`, `set`): a word counter over `Vec[T]`,
+  `Map[K, V]`, and `Set[T]`, keyed on a user type that implements
+  `lang.Hashable` (the way to key on text, since no slice does). Shows the
+  shared cursor convention, the boxed `@iter.Iterator[T]` that lets one
+  non-generic function walk any container, which iteration orders are
+  guaranteed, and why `Vec.Push` beats repeated `slices.Append`.
 - [`files`](files/) — **files and byte streams** (`pkg/std/os`, `pkg/std/io`):
   create/write/read/seek/stat/list/rename/remove in a scratch directory, the
   `io.EOF` read loop and its honor-`n`-before-`err` rule, and errors classified
